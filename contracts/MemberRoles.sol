@@ -20,13 +20,11 @@ import "./external/govblocks-protocol/interfaces/IMemberRoles.sol";
 import "./external/govblocks-protocol/Governed.sol";
 import "./external/proxy/OwnedUpgradeabilityProxy.sol";
 import "./interfaces/Iupgradable.sol";
-import "./interfaces/ITokenController.sol";
 
 contract MemberRoles is IMemberRoles, Governed, Iupgradable {
 
     using SafeMath for uint256;
 
-    ITokenController internal tokenController;
     struct MemberRoleDetails {
         uint256 memberCounter;
         mapping(address => uint256) memberIndex;
@@ -75,9 +73,6 @@ contract MemberRoles is IMemberRoles, Governed, Iupgradable {
         require(masterAddress == address(0), "Master address already set");
         masterAddress = msg.sender;
         IMaster masterInstance = IMaster(masterAddress);
-        tokenController = ITokenController(
-            masterInstance.getLatestAddress("TC")
-        );
         minLockAmountForDR = 500 ether;
         lockTimeForDR = 15 days;
     }
@@ -200,13 +195,8 @@ contract MemberRoles is IMemberRoles, Governed, Iupgradable {
                 counter++;
             }
         }
-        if (tokenController.totalBalanceOf(_memberAddress) > 0) {
             assignedRoles[counter] = uint256(Role.TokenHolder);
             counter++;
-        }
-        if (tokenController.tokensLockedAtTime(_memberAddress, "DR", (lockTimeForDR).add(now)) >= minLockAmountForDR) {
-            assignedRoles[counter] = uint256(Role.DisputeResolution);
-        }
         return assignedRoles;
     }
 
@@ -246,13 +236,13 @@ contract MemberRoles is IMemberRoles, Governed, Iupgradable {
         if (_roleId == uint256(Role.UnAssigned)) {
             return true;
         } else if (_roleId == uint256(Role.TokenHolder)) {
-            if (tokenController.totalBalanceOf(_memberAddress) > 0) {
+            // if (tokenController.totalBalanceOf(_memberAddress) > 0) {
                 return true;
-            }
+            // }
         } else if (_roleId == uint256(Role.DisputeResolution)) {
-            if (tokenController.tokensLockedAtTime(_memberAddress, "DR", (lockTimeForDR).add(now)) >= minLockAmountForDR) {
+            // if (tokenController.tokensLockedAtTime(_memberAddress, "DR", (lockTimeForDR).add(now)) >= minLockAmountForDR) {
                 return true;
-            }
+            // }
         } else if (memberRoleData[_roleId].memberIndex[_memberAddress] > 0) {
             //solhint-disable-line
             return true;

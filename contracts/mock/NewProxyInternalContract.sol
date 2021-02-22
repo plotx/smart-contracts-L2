@@ -2,10 +2,8 @@ pragma solidity 0.5.7;
 
 import "../Master.sol";
 import "../interfaces/Iupgradable.sol";
-import "./MockTokenController.sol";
 
 contract NewProxyInternalContract is Iupgradable {
-	MockTokenController tc;
 	Master public ms;
 
     function setMasterAddress() public {
@@ -13,8 +11,6 @@ contract NewProxyInternalContract is Iupgradable {
     }
 
     function callDummyOnlyInternalFunction(uint _val) public {
-    	tc = MockTokenController(ms.getLatestAddress('TC'));
-    	tc.dummyOnlyInternalFunction(_val);
     }
 
     function changeDependentContractAddress() public {

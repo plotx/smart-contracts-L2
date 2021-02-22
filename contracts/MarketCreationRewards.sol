@@ -4,7 +4,6 @@ import "./external/proxy/OwnedUpgradeabilityProxy.sol";
 import "./external/openzeppelin-solidity/math/SafeMath.sol";
 import "./external/openzeppelin-solidity/math/Math.sol";
 import "./external/govblocks-protocol/Governed.sol";
-import "./interfaces/ITokenController.sol";
 import "./interfaces/IChainLinkOracle.sol";
 import "./interfaces/IMarketUtility.sol";
 import "./interfaces/IToken.sol";

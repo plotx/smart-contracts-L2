@@ -21,7 +21,7 @@ import "./external/govblocks-protocol/interfaces/IGovernance.sol";
 import "./external/NativeMetaTransaction.sol";
 import "./interfaces/IMarketUtility.sol";   
 import "./interfaces/IToken.sol";
-import "./interfaces/ITokenController.sol";
+import "./interfaces/IbLOTToken.sol";
 import "./interfaces/IMarketCreationRewards.sol";
 
 contract IMaster {
@@ -166,7 +166,7 @@ contract AllMarkets is Governed, NativeMetaTransaction {
 
     address internal predictionToken;
 
-    ITokenController internal tokenController;
+    IbLOTToken internal bPLOTInstance;
     IMarketUtility internal marketUtility;
     IMarketCreationRewards internal marketCreationRewards;
 
@@ -358,7 +358,7 @@ contract AllMarkets is Governed, NativeMetaTransaction {
       plotToken = _plotToken;
       predictionToken = _plotToken;
       governance = IGovernance(ms.getLatestAddress("GV"));
-      tokenController = ITokenController(ms.getLatestAddress("TC"));
+      bPLOTInstance = IbLOTToken(ms.getLatestAddress("BL"));
     }
 
     /**
@@ -624,10 +624,10 @@ contract AllMarkets is Governed, NativeMetaTransaction {
         require(_predictionStake <= unusedBalance);
         _userData.unusedBalance = (unusedBalance.sub(_predictionStake)).mul(decimalMultiplier);
       } else {
-        require(_asset == tokenController.bLOTToken());
+        require(_asset == address(bPLOTInstance));
         require(!_userData.userMarketData[_marketId].predictedWithBlot);
         _userData.userMarketData[_marketId].predictedWithBlot = true;
-        tokenController.swapBLOT(_msgSenderAddress, address(this), (decimalMultiplier).mul(_predictionStake));
+        bPLOTInstance.convertToPLOT(_msgSenderAddress, address(this), (decimalMultiplier).mul(_predictionStake));
         _asset = plotToken;
       }
       _predictionStakePostDeduction = _deductFee(_marketId, _predictionStake, _msgSenderAddress);

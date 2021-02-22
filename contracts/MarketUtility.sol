@@ -18,7 +18,6 @@ pragma solidity 0.5.7;
 import "./external/openzeppelin-solidity/math/SafeMath.sol";
 import "./external/proxy/OwnedUpgradeabilityProxy.sol";
 import "./external/govblocks-protocol/Governed.sol";
-import "./interfaces/ITokenController.sol";
 import "./interfaces/IMarketRegistry.sol";
 import "./interfaces/IChainLinkOracle.sol";
 import "./interfaces/IToken.sol";
@@ -52,7 +51,6 @@ contract MarketUtility is Governed {
     mapping(bytes32 => uint) public marketTypeFeedPrice;
     
 
-    ITokenController internal tokenController;
     IAllMarkets internal allMarkets;
     modifier onlyAuthorized() {
         require(authorizedAddresses[msg.sender], "Not authorized");
@@ -66,7 +64,6 @@ contract MarketUtility is Governed {
       OwnedUpgradeabilityProxy proxy =  OwnedUpgradeabilityProxy(address(uint160(address(this))));
       require(msg.sender == proxy.proxyOwner(),"not owner.");
       IMaster ms = IMaster(msg.sender);
-      tokenController = ITokenController(ms.getLatestAddress("TC"));
       allMarkets = IAllMarkets(ms.getLatestAddress("AM"));
       masterAddress = msg.sender;
     }

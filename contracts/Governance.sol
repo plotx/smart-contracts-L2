@@ -24,7 +24,6 @@ import "./external/NativeMetaTransaction.sol";
 import "./interfaces/Iupgradable.sol";
 import "./interfaces/IAllMarkets.sol";
 import "./interfaces/IMarketCreationRewards.sol";
-import "./interfaces/ITokenController.sol";
 import "./interfaces/IToken.sol";
 import "./interfaces/IMaster.sol";
 import "./interfaces/IMarket.sol";
@@ -97,8 +96,7 @@ contract Governance is IGovernance, Iupgradable, NativeMetaTransaction {
     IProposalCategory internal proposalCategory;
     //Plot Token Instance
     IToken internal tokenInstance;
-    ITokenController internal tokenController;
-
+    
     mapping(uint256 => uint256) public proposalActionStatus;
     mapping(uint256 => uint256) internal proposalExecutionTime;
     mapping(uint256 => mapping(address => bool)) public isActionRejected;
@@ -576,7 +574,6 @@ contract Governance is IGovernance, Iupgradable, NativeMetaTransaction {
         tokenInstance = IToken(ms.dAppToken());
         memberRole = IMemberRoles(ms.getLatestAddress("MR"));
         proposalCategory = IProposalCategory(ms.getLatestAddress("PC"));
-        tokenController = ITokenController(ms.getLatestAddress("TC"));
         allMarkets = IAllMarkets(address(uint160(ms.getLatestAddress("AM"))));
         mcr = IMarketCreationRewards(address(uint160(ms.getLatestAddress("MC"))));
     }
@@ -851,8 +848,7 @@ contract Governance is IGovernance, Iupgradable, NativeMetaTransaction {
 
         allVotesByMember[_msgSenderAddress].push(totalVotes);
         memberProposalVote[_msgSenderAddress][_proposalId] = totalVotes;
-        tokenController.lockForGovernanceVote(_msgSenderAddress, tokenHoldingTime);
-
+        
         emit Vote(_msgSenderAddress, _proposalId, totalVotes, now, _solution);
         uint256 numberOfMembers = memberRole.numberOfMembers(mrSequence);
         _setVoteTally(_proposalId, _solution, mrSequence);
@@ -873,8 +869,10 @@ contract Governance is IGovernance, Iupgradable, NativeMetaTransaction {
         uint256 voters = 1;
         uint256 voteWeight;
         address _msgSenderAddress = _msgSender();
-        uint256 tokenBalance = tokenController.totalBalanceOf(_msgSenderAddress);
-        uint totalSupply = tokenController.totalSupply();
+        // uint256 tokenBalance = tokenController.totalBalanceOf(_msgSenderAddress);
+        uint256 tokenBalance = 0;
+        // uint totalSupply = tokenController.totalSupply();
+        uint totalSupply = 0;
         if (mrSequence != uint(IMemberRoles.Role.AdvisoryBoard) &&
         memberRole.checkRole(_msgSenderAddress, uint(IMemberRoles.Role.AdvisoryBoard))
         )
@@ -888,7 +886,8 @@ contract Governance is IGovernance, Iupgradable, NativeMetaTransaction {
         } else if (
             mrSequence == uint256(IMemberRoles.Role.DisputeResolution)
         ) {
-            voteWeight = tokenController.tokensLockedAtTime(_msgSenderAddress, "DR", now);
+            // voteWeight = tokenController.tokensLockedAtTime(_msgSenderAddress, "DR", now);
+            voteWeight = 0;
         } else {
             voteWeight = 1;
         }
@@ -933,9 +932,8 @@ contract Governance is IGovernance, Iupgradable, NativeMetaTransaction {
             .category(_category);
         if (roleAuthorized == uint256(IMemberRoles.Role.TokenHolder)) {
             check =
-                (allProposalData[_proposalId].totalVoteValue).mul(100).div(
-                    tokenController.totalSupply()
-                ) >=
+                (allProposalData[_proposalId].totalVoteValue).mul(100)
+                 >=
                 categoryQuorumPerc;
         } else if (roleAuthorized == uint256(IMemberRoles.Role.DisputeResolution)) {
             (uint256 marketId, ) = abi.decode(allProposalSolutions[_proposalId][1], (uint256, uint256));
@@ -943,7 +941,8 @@ contract Governance is IGovernance, Iupgradable, NativeMetaTransaction {
             if(allProposalData[_proposalId].totalVoteValue > 0) {
                 check =
                     (allProposalData[_proposalId].totalVoteValue) >=
-                    (_minOf(totalStakeValueInPlot.mul(drQuorumMulitplier), (tokenController.totalSupply()).mul(100).div(totalSupplyCapForDRQrm)));
+                    (_minOf(totalStakeValueInPlot.mul(drQuorumMulitplier), totalSupplyCapForDRQrm));
+                    // (_minOf(totalStakeValueInPlot.mul(drQuorumMulitplier), (tokenController.totalSupply()).mul(100).div(totalSupplyCapForDRQrm)));
             } else {
                 check = false;
             }

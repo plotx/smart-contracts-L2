@@ -28,7 +28,7 @@ contract BLOT is Iupgradable {
 
     Roles.Role private _minters;
 
-    address public operator;
+    address public authorized;
     address public plotToken;
     address public constant authController = 0x1A572Ad98557Baa0C908E5bD91D9c626106837e0;
     address public constant migrationController = 0x004B7D0721cbffcB87Aeae35Bf88196dd07281D1;
@@ -66,10 +66,10 @@ contract BLOT is Iupgradable {
     event Migrate(address indexed from, address indexed to, uint256 value);
 
     /**
-     * @dev Checks if msg.sender is token operator address.
+     * @dev Checks if msg.sender is address to convert bPLOT to PLOT.
      */
-    modifier onlyOperator() {
-        require(msg.sender == operator, "Only operator");
+    modifier onlyAuthorizedToConvert() {
+        require(msg.sender == authorized, "Only authorized");
         _;
     }
 
@@ -101,7 +101,7 @@ contract BLOT is Iupgradable {
         require(plotToken == address(0), "Already Initialized");
         IMaster ms = IMaster(msg.sender);
         plotToken = ms.dAppToken();
-        operator = ms.getLatestAddress("TC");
+        authorized = ms.getLatestAddress("AM");
     }
     
  
@@ -180,7 +180,7 @@ contract BLOT is Iupgradable {
         address _of,
         address _to,
         uint256 amount
-    ) public onlyOperator {
+    ) public onlyAuthorizedToConvert {
         _burn(_of, amount);
         require(IERC20(plotToken).transfer(_to, amount), "Error in transfer");
     }

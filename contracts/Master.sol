@@ -21,7 +21,6 @@ import "./external/govblocks-protocol/interfaces/IMemberRoles.sol";
 import "./interfaces/IMarketRegistry.sol";
 import "./interfaces/IMarketUtility.sol";
 import "./interfaces/IbLOTToken.sol";
-import "./interfaces/ITokenController.sol";
 import "./interfaces/Iupgradable.sol";
 
 contract Master is Governed {
@@ -63,7 +62,6 @@ contract Master is Governed {
         allContractNames.push("MR");
         allContractNames.push("PC");
         allContractNames.push("GV");
-        allContractNames.push("TC");
         allContractNames.push("AM");
         allContractNames.push("MC");
         allContractNames.push("MU");
