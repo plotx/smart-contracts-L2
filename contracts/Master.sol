@@ -16,30 +16,21 @@
 pragma solidity 0.5.7;
 
 import "./external/proxy/OwnedUpgradeabilityProxy.sol";
-import "./external/govblocks-protocol/Governed.sol";
-import "./external/govblocks-protocol/interfaces/IMemberRoles.sol";
 import "./interfaces/IMarketRegistry.sol";
 import "./interfaces/IMarketUtility.sol";
 import "./interfaces/IbLOTToken.sol";
 import "./interfaces/Iupgradable.sol";
+import "./IAuth.sol";
 
-contract Master is Governed {
+contract Master is IAuth {
     bytes2[] public allContractNames;
     address public dAppToken;
-    address public dAppLocker;
     bool public masterInitialised;
 
     mapping(address => bool) public contractsActive;
     mapping(address => bool) public whitelistedSponsor;
     mapping(bytes2 => address payable) public contractAddress;
 
-    /**
-     * @dev modifier that allows only the authorized addresses to execute the function
-     */
-    modifier onlyAuthorizedToGovern() {
-        require(getLatestAddress("GV") == msg.sender, "Not authorized");
-        _;
-    }
 
     /**
      * @dev Initialize the Master.
@@ -59,9 +50,6 @@ contract Master is Governed {
         masterInitialised = true;
 
         //Initial contract names
-        allContractNames.push("MR");
-        allContractNames.push("PC");
-        allContractNames.push("GV");
         allContractNames.push("AM");
         allContractNames.push("MC");
         allContractNames.push("MU");
@@ -77,13 +65,11 @@ contract Master is Governed {
         for (uint256 i = 0; i < allContractNames.length; i++) {
             _generateProxy(allContractNames[i], _implementations[i]);
         }
-        dAppLocker = contractAddress["TC"];
 
         _setMasterAddress();
 
         IMarketUtility(contractAddress["MU"]).initialize(_defaultAddress);
         IbLOTToken(contractAddress["BL"]).initiatebLOT(_defaultAddress);
-        IMemberRoles(contractAddress["MR"]).setInititorAddress(_defaultAddress);
     }
 
     /**
@@ -91,7 +77,7 @@ contract Master is Governed {
      */
     function addNewContract(bytes2 _contractName, address _contractAddress)
         external
-        onlyAuthorizedToGovern
+        onlyAuthorized
     {
         require(_contractName != "MS", "Name cannot be master");
         require(_contractAddress != address(0), "Zero address");
@@ -111,7 +97,7 @@ contract Master is Governed {
     function upgradeMultipleImplementations(
         bytes2[] calldata _contractNames,
         address[] calldata _contractAddresses
-    ) external onlyAuthorizedToGovern {
+    ) external onlyAuthorized {
         require(
             _contractNames.length == _contractAddresses.length,
             "Array length should be equal."
@@ -125,7 +111,7 @@ contract Master is Governed {
         }
     }
 
-    function whitelistSponsor(address _address) external onlyAuthorizedToGovern {
+    function whitelistSponsor(address _address) external onlyAuthorized {
         whitelistedSponsor[_address] = true;
     }
 
@@ -148,13 +134,6 @@ contract Master is Governed {
         returns (address)
     {
         return contractAddress[_contractName];
-    }
-
-    /**
-     * @dev checks if an address is authorized to govern
-     */
-    function isAuthorizedToGovern(address _toCheck) public view returns (bool) {
-        return (getLatestAddress("GV") == _toCheck);
     }
 
     /**

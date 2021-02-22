@@ -3,14 +3,15 @@ pragma solidity 0.5.7;
 import "./external/proxy/OwnedUpgradeabilityProxy.sol";
 import "./external/openzeppelin-solidity/math/SafeMath.sol";
 import "./external/openzeppelin-solidity/math/Math.sol";
-import "./external/govblocks-protocol/Governed.sol";
 import "./interfaces/IChainLinkOracle.sol";
 import "./interfaces/IMarketUtility.sol";
 import "./interfaces/IToken.sol";
 import "./interfaces/IAllMarkets.sol";
+import "./interfaces/IMaster.sol";
+import "./IAuth.sol";
 import "./external/NativeMetaTransaction.sol";
 
-contract MarketCreationRewards is Governed, NativeMetaTransaction {
+contract MarketCreationRewards is IAuth, NativeMetaTransaction {
 
     using SafeMath for *;
 
@@ -37,7 +38,8 @@ contract MarketCreationRewards is Governed, NativeMetaTransaction {
     }
 	
 	  // uint16 internal maxRewardPoolPercForMC;
-   //  uint16 internal minRewardPoolPercForMC;
+    //  uint16 internal minRewardPoolPercForMC;
+    address internal masterAddress;
     address internal plotToken;
     address internal predictionToken;
     // uint256 internal tokenStakeForRewardPoolShare;
@@ -159,7 +161,7 @@ contract MarketCreationRewards is Governed, NativeMetaTransaction {
     /**
     * @dev Transfer `_amount` number of market registry assets contract to `_to` address
     */
-    function transferAssets(address _asset, address payable _to, uint _amount) external onlyAuthorizedToGovern {
+    function transferAssets(address _asset, address payable _to, uint _amount) external onlyAuthorized {
       _transferAsset(_asset, _to, _amount);
     }
 

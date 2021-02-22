@@ -17,13 +17,14 @@ pragma solidity 0.5.7;
 
 import "./external/openzeppelin-solidity/math/SafeMath.sol";
 import "./external/proxy/OwnedUpgradeabilityProxy.sol";
-import "./external/govblocks-protocol/Governed.sol";
 import "./interfaces/IMarketRegistry.sol";
 import "./interfaces/IChainLinkOracle.sol";
 import "./interfaces/IToken.sol";
+import "./interfaces/IMaster.sol";
 import "./interfaces/IAllMarkets.sol";
+import "./IAuth.sol";
 
-contract MarketUtility is Governed {
+contract MarketUtility is IAuth {
     using SafeMath for uint256;
     using SafeMath64 for uint64;
 
@@ -51,8 +52,9 @@ contract MarketUtility is Governed {
     mapping(bytes32 => uint) public marketTypeFeedPrice;
     
 
+    address internal masterAddress;
     IAllMarkets internal allMarkets;
-    modifier onlyAuthorized() {
+    modifier onlyAuthorizedUsers() {
         require(authorizedAddresses[msg.sender], "Not authorized");
         _;
     }
@@ -85,14 +87,14 @@ contract MarketUtility is Governed {
     /**
     * @dev Function to set authorized address
     **/
-    function addAuthorizedAddress(address _address) external onlyAuthorized {
+    function addAuthorizedAddress(address _address) external onlyAuthorizedUsers {
         authorizedAddresses[_address] = true;
     }
 
     /**
     * @dev Function to check if given `_address` is  authorized address
     **/
-    function isAuthorized(address _address) external view returns(bool) {
+    function isAuthorizedUser(address _address) external view returns(bool) {
       return authorizedAddresses[_address];
     }
 
@@ -131,7 +133,7 @@ contract MarketUtility is Governed {
      **/
     function updateUintParameters(bytes8 code, uint256 value)
         external
-        onlyAuthorizedToGovern
+        onlyAuthorized
     {
         if (code == "MINPRD") { // Minimum predictionamount
             minPredictionAmount = value;
@@ -156,7 +158,7 @@ contract MarketUtility is Governed {
     * @param _marketCurr currencyType
     * @param _val Price of currency
     */
-    function setFeedPriceForMarketType(bytes32 _marketCurr, uint _val) external onlyAuthorized {
+    function setFeedPriceForMarketType(bytes32 _marketCurr, uint _val) external onlyAuthorizedUsers {
       address _feedAddress = allMarkets.getMarketCurrencyData(_marketCurr); // getting feed address.
       require(_feedAddress == address(0)); // feed addess should be null.
       marketTypeFeedPrice[_marketCurr] = _val;
@@ -167,7 +169,7 @@ contract MarketUtility is Governed {
     * @param _asset Token Address
     * @param _rate `_asset` to PLOT conversion rate
     */
-    function setAssetPlotConversionRate(address _asset, uint256 _rate) public onlyAuthorized {
+    function setAssetPlotConversionRate(address _asset, uint256 _rate) public onlyAuthorizedUsers {
       conversionRate[_asset] = _rate;
     }
 
@@ -176,7 +178,7 @@ contract MarketUtility is Governed {
     * @param _user User address
     * @param _level user level indicator
     */
-    function setUserLevel(address _user, uint256 _level) public onlyAuthorized {
+    function setUserLevel(address _user, uint256 _level) public onlyAuthorizedUsers {
       userLevel[_user] = _level;
     }
 
@@ -185,7 +187,7 @@ contract MarketUtility is Governed {
     * @param _userLevels Array of levels
     * @param _multipliers Array of corresponding multipliers
     */
-    function setMultiplierLevels(uint256[] memory _userLevels, uint256[] memory _multipliers) public onlyAuthorizedToGovern {
+    function setMultiplierLevels(uint256[] memory _userLevels, uint256[] memory _multipliers) public onlyAuthorized {
       require(_userLevels.length == _multipliers.length);
       for(uint256 i = 0; i < _userLevels.length; i++) {
         levelMultiplier[_userLevels[i]] = _multipliers[i];

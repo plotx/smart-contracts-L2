@@ -17,12 +17,12 @@ pragma solidity 0.5.7;
 
 import "./external/openzeppelin-solidity/math/SafeMath.sol";
 import "./external/proxy/OwnedUpgradeabilityProxy.sol";
-import "./external/govblocks-protocol/interfaces/IGovernance.sol";
 import "./external/NativeMetaTransaction.sol";
 import "./interfaces/IMarketUtility.sol";   
 import "./interfaces/IToken.sol";
 import "./interfaces/IbLOTToken.sol";
 import "./interfaces/IMarketCreationRewards.sol";
+import "./IAuth.sol";
 
 contract IMaster {
     mapping(address => bool) public whitelistedSponsor;
@@ -31,20 +31,7 @@ contract IMaster {
 }
 
 
-contract Governed {
-
-    address public masterAddress; // Name of the dApp, needs to be set by contracts inheriting this contract
-    IGovernance internal governance;
-
-    /// @dev modifier that allows only the authorized addresses to execute the function
-    modifier onlyAuthorizedToGovern() {
-        require((address(governance)) == msg.sender);
-        _;
-    }
-
-}
-
-contract AllMarkets is Governed, NativeMetaTransaction {
+contract AllMarkets is IAuth, NativeMetaTransaction {
     using SafeMath32 for uint32;
     using SafeMath64 for uint64;
     using SafeMath128 for uint128;
@@ -161,7 +148,7 @@ contract AllMarkets is Governed, NativeMetaTransaction {
     mapping (address => uint256) public relayerFeeEarned;
     mapping(uint256 => PricingData) internal marketPricingData;
     
-
+    address internal masterAddress;
     address internal plotToken;
 
     address internal predictionToken;
@@ -192,7 +179,7 @@ contract AllMarkets is Governed, NativeMetaTransaction {
     mapping(uint256 => uint256) internal disputeProposalId;
 
     function setReferrer(address _referrer, address _referee) external {
-      require(marketUtility.isAuthorized(msg.sender));
+      require(marketUtility.isAuthorizedUser(msg.sender));
       UserData storage _userData = userData[_referee];
       require(_userData.totalStaked == 0);
       require(_userData.referrer == address(0));
@@ -228,7 +215,7 @@ contract AllMarkets is Governed, NativeMetaTransaction {
     * @param roundOfToNearest Round of the price to nearest number
     * @param _marketStartTime Start time of initial markets
     */
-    function addMarketCurrency(bytes32 _currencyName, address _marketFeed, uint8 decimals, uint8 roundOfToNearest, uint32 _marketStartTime) external onlyAuthorizedToGovern {
+    function addMarketCurrency(bytes32 _currencyName, address _marketFeed, uint8 decimals, uint8 roundOfToNearest, uint32 _marketStartTime) external onlyAuthorized {
       require((marketCurrencies[marketCurrency[_currencyName]].currencyName != _currencyName));
       require(decimals != 0);
       require(roundOfToNearest != 0);
@@ -251,7 +238,7 @@ contract AllMarkets is Governed, NativeMetaTransaction {
     * @param _optionRangePerc Option range percent of neutral min, max options (raised by 2 decimals)
     * @param _marketCooldownTime Cool down time of the market after market is settled
     */
-    function addMarketType(uint32 _predictionTime, uint32 _optionRangePerc, uint32 _marketStartTime, uint32 _marketCooldownTime, uint32 _minTimePassed) external onlyAuthorizedToGovern {
+    function addMarketType(uint32 _predictionTime, uint32 _optionRangePerc, uint32 _marketStartTime, uint32 _marketCooldownTime, uint32 _minTimePassed) external onlyAuthorized {
       require(marketTypeArray[marketType[_predictionTime]].predictionTime != _predictionTime);
       require(_predictionTime > 0);
       require(_optionRangePerc > 0);
@@ -271,7 +258,7 @@ contract AllMarkets is Governed, NativeMetaTransaction {
       return index;
     }
 
-    function updateMarketType(uint32 _marketType, uint32 _optionRangePerc, uint32 _marketCooldownTime, uint32 _minTimePassed) external onlyAuthorizedToGovern {
+    function updateMarketType(uint32 _marketType, uint32 _optionRangePerc, uint32 _marketCooldownTime, uint32 _minTimePassed) external onlyAuthorized {
       require(_optionRangePerc > 0);
       require(_marketCooldownTime > 0);
       require(_minTimePassed > 0);
@@ -286,7 +273,7 @@ contract AllMarkets is Governed, NativeMetaTransaction {
     /**
     * @dev function to update integer parameters
     */
-    function updateUintParameters(bytes8 code, uint256 value) external onlyAuthorizedToGovern {
+    function updateUintParameters(bytes8 code, uint256 value) external onlyAuthorized {
       if(code == "MDPA") { // Market creators default prediction amount
         mcDefaultPredictionAmount = uint64(value);
       } else {
@@ -318,7 +305,7 @@ contract AllMarkets is Governed, NativeMetaTransaction {
     /**
     * @dev Function to update address parameters
     */
-    function updateAddressParameters(bytes8 code, address _address) external onlyAuthorizedToGovern {
+    function updateAddressParameters(bytes8 code, address _address) external onlyAuthorized {
       if(code == "MULSIG") {
         authorizedMultiSig = _address;
       } else {
@@ -357,7 +344,6 @@ contract AllMarkets is Governed, NativeMetaTransaction {
       address _plotToken = ms.dAppToken();
       plotToken = _plotToken;
       predictionToken = _plotToken;
-      governance = IGovernance(ms.getLatestAddress("GV"));
       bPLOTInstance = IbLOTToken(ms.getLatestAddress("BL"));
     }
 
@@ -373,7 +359,7 @@ contract AllMarkets is Governed, NativeMetaTransaction {
       IMaster ms = IMaster(masterAddress);
       marketCreationRewards = IMarketCreationRewards(ms.getLatestAddress("MC"));
       marketUtility = IMarketUtility(ms.getLatestAddress("MU"));
-      require(marketUtility.isAuthorized(msg.sender));
+      require(marketUtility.isAuthorizedUser(msg.sender));
       
       authorizedMultiSig = _multiSig;
       totalOptions = 3;
@@ -514,7 +500,7 @@ contract AllMarkets is Governed, NativeMetaTransaction {
     /**
     * @dev Updates Flag to pause creation of market.
     */
-    function pauseMarketCreation() external onlyAuthorizedToGovern {
+    function pauseMarketCreation() external onlyAuthorized {
       require(!marketCreationPaused);
       marketCreationPaused = true;
     }
@@ -522,7 +508,7 @@ contract AllMarkets is Governed, NativeMetaTransaction {
     /**
     * @dev Updates Flag to resume creation of market.
     */
-    function resumeMarketCreation() external onlyAuthorizedToGovern {
+    function resumeMarketCreation() external onlyAuthorized {
       require(marketCreationPaused);
       marketCreationPaused = false;
     }
@@ -530,7 +516,7 @@ contract AllMarkets is Governed, NativeMetaTransaction {
     /**
     * @dev Set the flag to pause/resume market creation of particular market type
     */
-    function toggleMarketCreationType(uint64 _marketTypeIndex, bool _flag) external onlyAuthorizedToGovern {
+    function toggleMarketCreationType(uint64 _marketTypeIndex, bool _flag) external onlyAuthorized {
       require(marketTypeArray[_marketTypeIndex].paused != _flag);
       marketTypeArray[_marketTypeIndex].paused = _flag;
     }
@@ -1017,20 +1003,18 @@ contract AllMarkets is Governed, NativeMetaTransaction {
     * @param solutionHash The ipfs solution hash.
     */
     function raiseDispute(uint256 _marketId, uint256 _proposedValue, string memory proposalTitle, string memory description, string memory solutionHash) public {
-      address payable _msgSenderAddress = _msgSender();
-      MarketDataExtended storage _marketDataExtended = marketDataExtended[_marketId];
-      require(marketStatus(_marketId) == PredictionStatus.Cooling);
-      uint _stakeForDispute =  marketUtility.getDisputeResolutionParams();
-      _transferTokenFrom(plotToken, _msgSenderAddress, address(this), _stakeForDispute);
-      // marketRegistry.createGovernanceProposal(proposalTitle, description, solutionHash, abi.encode(address(this), proposedValue), _stakeForDispute, msg.sender, ethAmountToPool, tokenAmountToPool, proposedValue);
-      uint proposalId = governance.getProposalLength();
-      // marketBasicData[msg.sender].disputeStakes = DisputeStake(proposalId, _user, _stakeForDispute, _ethSentToPool, _tokenSentToPool);
-      _marketDataExtended.disputeRaisedBy = _msgSenderAddress;
-      _marketDataExtended.disputeStakeAmount = uint64(_stakeForDispute.div(10**predictionDecimalMultiplier));
-      disputeProposalId[proposalId] = _marketId;
-      governance.createProposalwithSolution(proposalTitle, proposalTitle, description, 9, solutionHash, abi.encode(_marketId, _proposedValue));
-      emit DisputeRaised(_marketId, _msgSenderAddress, proposalId, _proposedValue);
-      _setMarketStatus(_marketId, PredictionStatus.InDispute);
+      // address payable _msgSenderAddress = _msgSender();
+      // MarketDataExtended storage _marketDataExtended = marketDataExtended[_marketId];
+      // require(marketStatus(_marketId) == PredictionStatus.Cooling);
+      // uint _stakeForDispute =  marketUtility.getDisputeResolutionParams();
+      // _transferTokenFrom(plotToken, _msgSenderAddress, address(this), _stakeForDispute);
+      // uint proposalId = governance.getProposalLength();
+      // _marketDataExtended.disputeRaisedBy = _msgSenderAddress;
+      // _marketDataExtended.disputeStakeAmount = uint64(_stakeForDispute.div(10**predictionDecimalMultiplier));
+      // disputeProposalId[proposalId] = _marketId;
+      // governance.createProposalwithSolution(proposalTitle, proposalTitle, description, 9, solutionHash, abi.encode(_marketId, _proposedValue));
+      // emit DisputeRaised(_marketId, _msgSenderAddress, proposalId, _proposedValue);
+      // _setMarketStatus(_marketId, PredictionStatus.InDispute);
     }
 
     function _transferTokenFrom(address _token, address _from, address _to, uint256 _amount) internal {
@@ -1042,7 +1026,7 @@ contract AllMarkets is Governed, NativeMetaTransaction {
     * @param _marketId Index of market.
     * @param _result The final proposed result of the market.
     */
-    function resolveDispute(uint256 _marketId, uint256 _result) external onlyAuthorizedToGovern {
+    function resolveDispute(uint256 _marketId, uint256 _result) external onlyAuthorized {
       // delete marketCreationRewardData[_marketId].plotIncentive;
       // delete marketCreationRewardData[_marketId].ethIncentive;
       _resolveDispute(_marketId, true, _result);
@@ -1069,7 +1053,7 @@ contract AllMarkets is Governed, NativeMetaTransaction {
     * @dev Burns the tokens of member who raised the dispute, if dispute is rejected.
     * @param _proposalId Id of dispute resolution proposal
     */
-    function burnDisputedProposalTokens(uint _proposalId) external onlyAuthorizedToGovern {
+    function burnDisputedProposalTokens(uint _proposalId) external onlyAuthorized {
       uint256 _marketId = disputeProposalId[_proposalId];
       _resolveDispute(_marketId, false, 0);
       emit DisputeResolved(_marketId, false);
