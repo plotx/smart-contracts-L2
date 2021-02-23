@@ -28,4 +28,8 @@ contract IAllMarkets {
 
     function getMarketData(uint256 _marketId) external view returns
        (bytes32 _marketCurrency,uint neutralMinValue,uint neutralMaxValue, uint[] memory _tokenStaked,uint _predictionTime,uint _expireTime, PredictionStatus _predictionStatus);
+ 
+    function setMarketStatus(uint256 _marketId, PredictionStatus _status) public;
+ 
+    function postMarketResult(uint256 _marketId, uint256 _marketSettleValue) external;
 }

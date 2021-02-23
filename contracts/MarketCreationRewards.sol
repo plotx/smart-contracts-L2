@@ -3,8 +3,6 @@ pragma solidity 0.5.7;
 import "./external/proxy/OwnedUpgradeabilityProxy.sol";
 import "./external/openzeppelin-solidity/math/SafeMath.sol";
 import "./external/openzeppelin-solidity/math/Math.sol";
-import "./interfaces/IChainLinkOracle.sol";
-import "./interfaces/IMarketUtility.sol";
 import "./interfaces/IToken.sol";
 import "./interfaces/IAllMarkets.sol";
 import "./interfaces/IMaster.sol";
@@ -26,8 +24,6 @@ contract MarketCreationRewards is IAuth, NativeMetaTransaction {
     
     struct MarketCreationRewardData {
       uint tokenIncentive;
-      // uint64 tokenDeposited;
-      // uint16 rewardPoolSharePerc;
       address createdBy;
     }
 
@@ -37,15 +33,10 @@ contract MarketCreationRewards is IAuth, NativeMetaTransaction {
       uint64[] marketsCreated;
     }
 	
-	  // uint16 internal maxRewardPoolPercForMC;
-    //  uint16 internal minRewardPoolPercForMC;
     address internal masterAddress;
     address internal plotToken;
     address internal predictionToken;
-    // uint256 internal tokenStakeForRewardPoolShare;
-    // uint256 internal rewardPoolShareThreshold;
     uint internal predictionDecimalMultiplier;
-    // ITokenController internal tokenController;
     IAllMarkets internal allMarkets;
     mapping(uint256 => MarketCreationRewardData) internal marketCreationRewardData; //Of market
     mapping(address => MarketCreationRewardUserData) internal marketCreationRewardUserData; //Of user

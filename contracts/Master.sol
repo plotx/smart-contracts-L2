@@ -55,6 +55,7 @@ contract Master is IAuth {
         allContractNames.push("MU");
         allContractNames.push("BL");
         allContractNames.push("PM");
+        allContractNames.push("DR");
 
         require(
             allContractNames.length == _implementations.length,

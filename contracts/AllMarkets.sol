@@ -25,7 +25,6 @@ import "./interfaces/IMarketCreationRewards.sol";
 import "./IAuth.sol";
 
 contract IMaster {
-    mapping(address => bool) public whitelistedSponsor;
     function dAppToken() public view returns(address);
     function getLatestAddress(bytes2 _module) public view returns(address);
 }
@@ -54,8 +53,6 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     event MarketResult(uint256 indexed marketIndex, uint256 totalReward, uint256 winningOption, uint256 closeValue, uint256 roundId, uint256 daoFee, uint256 marketCreatorFee);
     event ReturnClaimed(address indexed user, uint256 amount);
     event PlacePrediction(address indexed user,uint256 value, uint256 predictionPoints, address predictionAsset,uint256 prediction,uint256 indexed marketIndex);
-    event DisputeRaised(uint256 indexed marketIndex, address raisedBy, uint256 proposalId, uint256 proposedValue);
-    event DisputeResolved(uint256 indexed marketIndex, bool status);
     event ReferralLog(address indexed referrer, address indexed referee, uint256 referredOn);
 
     struct PredictionData {
@@ -96,8 +93,6 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     struct MarketDataExtended {
       uint32 WinningOption;
       uint32 settleTime;
-      address disputeRaisedBy;
-      uint64 disputeStakeAmount;
       uint incentiveToDistribute;
       uint rewardToDistribute;
       uint totalStaked;
@@ -108,8 +103,8 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       uint32 predictionTime;
       uint32 optionRangePerc;
       uint32 cooldownTime;
-      bool paused;
       uint32 minTimePassed;
+      bool paused;
     }
 
     struct MarketCurrency {
@@ -150,6 +145,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     
     address internal masterAddress;
     address internal plotToken;
+    address internal disputeResolution;
 
     address internal predictionToken;
 
@@ -176,7 +172,6 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     mapping(address => UserData) internal userData;
 
     mapping(uint =>mapping(uint=>PredictionData)) internal marketOptionsAvailable;
-    mapping(uint256 => uint256) internal disputeProposalId;
 
     function setReferrer(address _referrer, address _referee) external {
       require(marketUtility.isAuthorizedUser(msg.sender));
@@ -253,7 +248,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     function _addMarketType(uint32 _predictionTime, uint32 _optionRangePerc, uint32 _marketCooldownTime, uint32 _minTimePassed) internal returns(uint32) {
       uint32 index = uint32(marketTypeArray.length);
       marketType[_predictionTime] = index;
-      marketTypeArray.push(MarketTypeData(_predictionTime, _optionRangePerc, _marketCooldownTime, false, _minTimePassed));
+      marketTypeArray.push(MarketTypeData(_predictionTime, _optionRangePerc, _marketCooldownTime, _minTimePassed, false));
       emit MarketTypes(index, _predictionTime, _marketCooldownTime, _optionRangePerc, true, _minTimePassed);
       return index;
     }
@@ -359,6 +354,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       IMaster ms = IMaster(masterAddress);
       marketCreationRewards = IMarketCreationRewards(ms.getLatestAddress("MC"));
       marketUtility = IMarketUtility(ms.getLatestAddress("MU"));
+      disputeResolution = ms.getLatestAddress("DR");
       require(marketUtility.isAuthorizedUser(msg.sender));
       
       authorizedMultiSig = _multiSig;
@@ -684,11 +680,14 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     * @param _marketSettleValue The current price of market currency.
     */
     function postMarketResult(uint256 _marketId, uint256 _marketSettleValue) external {
-      require(msg.sender == authorizedMultiSig);
-      require(marketBasicData[_marketId].feedAddress == address(0));
-      if(marketStatus(_marketId) == PredictionStatus.InSettlement) {
-        _postResult(_marketSettleValue, 0, _marketId);
+      if(msg.sender == authorizedMultiSig) {
+        require(marketBasicData[_marketId].feedAddress == address(0));
+        require(marketStatus(_marketId) == PredictionStatus.InSettlement);
+      } else {
+        require(msg.sender == disputeResolution);
+        require(marketStatus(_marketId) == PredictionStatus.InDispute);
       }
+      _postResult(_marketSettleValue, 0, _marketId);
     }
 
     /**
@@ -723,7 +722,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       } else {
         delete _marketDataExtended.settleTime;
       }
-      _setMarketStatus(_marketId, PredictionStatus.Settled);
+      marketDataExtended[_marketId].predictionStatus = PredictionStatus.Settled;
       uint32 _winningOption; 
       if(_value < _marketBasicData.neutralMinValue) {
         _winningOption = 1;
@@ -995,70 +994,8 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       }
     }
 
-    /**
-    * @dev Raise the dispute if wrong value passed at the time of market result declaration.
-    * @param _proposedValue The proposed value of market currency.
-    * @param proposalTitle The title of proposal created by user.
-    * @param description The description of dispute.
-    * @param solutionHash The ipfs solution hash.
-    */
-    function raiseDispute(uint256 _marketId, uint256 _proposedValue, string memory proposalTitle, string memory description, string memory solutionHash) public {
-      // address payable _msgSenderAddress = _msgSender();
-      // MarketDataExtended storage _marketDataExtended = marketDataExtended[_marketId];
-      // require(marketStatus(_marketId) == PredictionStatus.Cooling);
-      // uint _stakeForDispute =  marketUtility.getDisputeResolutionParams();
-      // _transferTokenFrom(plotToken, _msgSenderAddress, address(this), _stakeForDispute);
-      // uint proposalId = governance.getProposalLength();
-      // _marketDataExtended.disputeRaisedBy = _msgSenderAddress;
-      // _marketDataExtended.disputeStakeAmount = uint64(_stakeForDispute.div(10**predictionDecimalMultiplier));
-      // disputeProposalId[proposalId] = _marketId;
-      // governance.createProposalwithSolution(proposalTitle, proposalTitle, description, 9, solutionHash, abi.encode(_marketId, _proposedValue));
-      // emit DisputeRaised(_marketId, _msgSenderAddress, proposalId, _proposedValue);
-      // _setMarketStatus(_marketId, PredictionStatus.InDispute);
-    }
-
     function _transferTokenFrom(address _token, address _from, address _to, uint256 _amount) internal {
       IToken(_token).transferFrom(_from, _to, _amount);
-    }
-
-    /**
-    * @dev Resolve the dispute if wrong value passed at the time of market result declaration.
-    * @param _marketId Index of market.
-    * @param _result The final proposed result of the market.
-    */
-    function resolveDispute(uint256 _marketId, uint256 _result) external onlyAuthorized {
-      // delete marketCreationRewardData[_marketId].plotIncentive;
-      // delete marketCreationRewardData[_marketId].ethIncentive;
-      _resolveDispute(_marketId, true, _result);
-      emit DisputeResolved(_marketId, true);
-      MarketDataExtended storage _marketDataExtended = marketDataExtended[_marketId];
-      _transferAsset(plotToken, _marketDataExtended.disputeRaisedBy, (10**predictionDecimalMultiplier).mul(_marketDataExtended.disputeStakeAmount));
-    }
-
-    /**
-    * @dev Resolve the dispute
-    * @param _marketId Index of market.
-    * @param accepted Flag mentioning if dispute is accepted or not
-    * @param finalResult The final correct value of market currency.
-    */
-    function _resolveDispute(uint256 _marketId, bool accepted, uint256 finalResult) internal {
-      require(marketStatus(_marketId) == PredictionStatus.InDispute);
-      if(accepted) {
-        _postResult(finalResult, 0, _marketId);
-      }
-      _setMarketStatus(_marketId, PredictionStatus.Settled);
-    }
-
-    /**
-    * @dev Burns the tokens of member who raised the dispute, if dispute is rejected.
-    * @param _proposalId Id of dispute resolution proposal
-    */
-    function burnDisputedProposalTokens(uint _proposalId) external onlyAuthorized {
-      uint256 _marketId = disputeProposalId[_proposalId];
-      _resolveDispute(_marketId, false, 0);
-      emit DisputeResolved(_marketId, false);
-      _transferAsset(plotToken, address(marketCreationRewards), (10**predictionDecimalMultiplier).mul(marketDataExtended[_marketId].disputeStakeAmount));
-      // IToken(plotToken).transfer(address(marketCreationRewards),(10**predictionDecimalMultiplier).mul(marketDataExtended[_marketId].disputeStakeAmount));
     }
 
     /**
@@ -1094,7 +1031,9 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     * @param _marketId Index of market
     * @param _status Status of market to set
     */    
-    function _setMarketStatus(uint256 _marketId, PredictionStatus _status) internal {
+    function setMarketStatus(uint256 _marketId, PredictionStatus _status) public {
+      require(msg.sender == disputeResolution);
+      require(marketStatus(_marketId) == PredictionStatus.InDispute);
       marketDataExtended[_marketId].predictionStatus = _status;
     }
 
