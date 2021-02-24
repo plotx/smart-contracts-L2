@@ -2,7 +2,7 @@ pragma solidity 0.5.7;
 
 contract IMarketCreationRewards {
 
-    function calculateMarketCreationIncentive(address _createdBy, uint64 _marketId) external;    
+    function updateMarketCreationData(address _createdBy, uint64 _marketId) external;    
 
     // function depositMarketRewardPoolShare(uint256 _marketId, uint256 _plotShare, uint64 _plotDeposit) external payable;
     function depositMarketCreationReward(uint256 _marketId, uint256 _creatorFee) external payable;

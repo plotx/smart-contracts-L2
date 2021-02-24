@@ -28,12 +28,9 @@ contract MarketUtility is IAuth {
     using SafeMath for uint256;
     using SafeMath64 for uint64;
 
-    uint256 constant updatePeriod = 1 hours;
-
     uint256 internal minPredictionAmount;
     uint256 internal maxPredictionAmount;
     uint256 internal positionDecimals;
-    uint256 internal tokenStakeForDispute;
     bool public initialized;
 
     // Minimum prediction amount in market needed to kick-in staking factor in option pricing calculation
@@ -47,18 +44,18 @@ contract MarketUtility is IAuth {
     mapping(address => uint256) public conversionRate;
     mapping(address => uint256) public userLevel;
     mapping(uint256 => uint256) public levelMultiplier;
-    mapping (address => bool) internal authorizedAddresses;
     // Mapping to store latest price of currency type if it's feed address is null.
     mapping(bytes32 => uint) public marketTypeFeedPrice;
     
 
     address internal masterAddress;
     IAllMarkets internal allMarkets;
-    modifier onlyAuthorizedUsers() {
-        require(authorizedAddresses[msg.sender], "Not authorized");
+
+modifier onlyAuthorizedUsers() {
+        // require(authorizedAddresses[msg.sender], "Not authorized");
         _;
     }
-
+    
     /**
      * @dev Changes the master address and update it's instance
      */
@@ -81,22 +78,10 @@ contract MarketUtility is IAuth {
         require(!initialized, "Already initialized");
         initialized = true;
         _setInitialParameters();
-        authorizedAddresses[_initiater] = true;
+        // authorizedAddresses[_initiater] = true;
     }
 
-    /**
-    * @dev Function to set authorized address
-    **/
-    function addAuthorizedAddress(address _address) external onlyAuthorizedUsers {
-        authorizedAddresses[_address] = true;
-    }
-
-    /**
-    * @dev Function to check if given `_address` is  authorized address
-    **/
-    function isAuthorizedUser(address _address) external view returns(bool) {
-      return authorizedAddresses[_address];
-    }
+    
 
     /**
      * @dev Internal function to set initial value
@@ -105,27 +90,9 @@ contract MarketUtility is IAuth {
         minPredictionAmount = 10 ether;// need to change the value according to prediction token
         maxPredictionAmount = 100000 ether; // need to change the value according to prediction token
         positionDecimals = 1e2;
-        tokenStakeForDispute = 500 ether;
         stakingFactorMinStake = uint(20000).mul(10**8);
         stakingFactorWeightage = 40;
         currentPriceWeightage = 60;
-    }
-
-    /**
-    * @dev Check if user gets any multiplier on his positions
-    * @param _user User address
-    * @param predictionPoints The actual positions user got during prediction.
-    * @return uint256 representing multiplied positions
-    * @return bool returns true if multplier applied
-    */
-    function checkMultiplier(address _user, uint predictionPoints) public view returns(uint, bool) {
-      bool multiplierApplied;
-      uint _muliplier = 100;
-      if(userLevel[_user] > 0) {
-        _muliplier = _muliplier + levelMultiplier[userLevel[_user]];
-        multiplierApplied = true;
-      }
-      return (predictionPoints.mul(_muliplier).div(100),multiplierApplied);
     }
 
     /**
@@ -141,8 +108,6 @@ contract MarketUtility is IAuth {
             maxPredictionAmount = value;
         } else if (code == "PDEC") { // Position's Decimals
             positionDecimals = value;
-        } else if (code == "TSDISP") { // Amount of tokens to be staked for raising a dispute
-            tokenStakeForDispute = value;
         } else if (code == "SFMS") { // Minimum amount of tokens to be staked for considering staking factor
             stakingFactorMinStake = value;
         } else if (code == "SFCPW") { // Staking Factor Weightage and Current Price weightage
@@ -171,27 +136,6 @@ contract MarketUtility is IAuth {
     */
     function setAssetPlotConversionRate(address _asset, uint256 _rate) public onlyAuthorizedUsers {
       conversionRate[_asset] = _rate;
-    }
-
-    /**
-    * @dev Function to set `_user` level for prediction points multiplier
-    * @param _user User address
-    * @param _level user level indicator
-    */
-    function setUserLevel(address _user, uint256 _level) public onlyAuthorizedUsers {
-      userLevel[_user] = _level;
-    }
-
-    /**
-    * @dev Function to set multiplier per level (With 2 decimals)
-    * @param _userLevels Array of levels
-    * @param _multipliers Array of corresponding multipliers
-    */
-    function setMultiplierLevels(uint256[] memory _userLevels, uint256[] memory _multipliers) public onlyAuthorized {
-      require(_userLevels.length == _multipliers.length);
-      for(uint256 i = 0; i < _userLevels.length; i++) {
-        levelMultiplier[_userLevels[i]] = _multipliers[i];
-      }
     }
 
     /**
@@ -281,20 +225,6 @@ contract MarketUtility is IAuth {
             (uint256(currentRoundAnswer), currentRoundId);
     }
 
-    /**
-     * @dev Get amount of stake required to raise a dispute
-     **/
-    function getDisputeResolutionParams() public view returns (uint256) {
-        return tokenStakeForDispute;
-    }
-
-    function calculateOptionRange(uint _optionRangePerc, uint64 _decimals, uint8 _roundOfToNearest, address _marketFeed, bytes32 _marketCurr) external view returns(uint64 _minValue, uint64 _maxValue) {
-      uint currentPrice = getAssetPriceUSD(_marketFeed, _marketCurr);
-      uint optionRangePerc = currentPrice.mul(_optionRangePerc.div(2)).div(10000);
-      _minValue = uint64((ceil(currentPrice.sub(optionRangePerc).div(_roundOfToNearest), 10**_decimals)).mul(_roundOfToNearest));
-      _maxValue = uint64((ceil(currentPrice.add(optionRangePerc).div(_roundOfToNearest), 10**_decimals)).mul(_roundOfToNearest));
-    }
-
     function calculatePredictionPoints(uint _marketId, uint256 _prediction, address _user, bool multiplierApplied, uint _predictionStake) external view returns(uint64 predictionPoints, bool isMultiplierApplied) {
       uint _stakeValue = _predictionStake.mul(1e10);
       if(_stakeValue < minPredictionAmount || _stakeValue > maxPredictionAmount) {
@@ -304,7 +234,7 @@ contract MarketUtility is IAuth {
       predictionPoints = uint64(_predictionStake).div(_optionPrice);
       if(!multiplierApplied) {
         uint256 _predictionPoints;
-        (_predictionPoints, isMultiplierApplied) = checkMultiplier(_user,  predictionPoints);
+        // (_predictionPoints, isMultiplierApplied) = checkMultiplier(_user,  predictionPoints);
         predictionPoints = uint64(_predictionPoints);
       }
     }
@@ -410,9 +340,5 @@ contract MarketUtility is IAuth {
       } else {
         return b.sub(a);
       }
-    }
-
-    function ceil(uint256 a, uint256 m) internal pure returns (uint256) {
-        return ((a + m - 1) / m) * m;
     }
 }

@@ -118,7 +118,7 @@ contract MarketCreationRewards is IAuth, NativeMetaTransaction {
     * @param _createdBy Address of market creator
     * @param _marketId Index of market
     */
-    function calculateMarketCreationIncentive(address _createdBy, uint64 _marketId) external onlyInternal {
+    function updateMarketCreationData(address _createdBy, uint64 _marketId) external onlyInternal {
       marketCreationRewardData[_marketId].createdBy = _createdBy;
       // _checkIfCreatorStaked(_createdBy, _marketId);
       marketCreationRewardUserData[_createdBy].marketsCreated.push(_marketId);
