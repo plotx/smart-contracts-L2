@@ -17,7 +17,6 @@ pragma solidity 0.5.7;
 
 import "./external/proxy/OwnedUpgradeabilityProxy.sol";
 import "./interfaces/IMarketRegistry.sol";
-import "./interfaces/IMarketUtility.sol";
 import "./interfaces/IbLOTToken.sol";
 import "./interfaces/Iupgradable.sol";
 import "./IAuth.sol";
@@ -69,7 +68,6 @@ contract Master is IAuth {
 
         _setMasterAddress();
 
-        IMarketUtility(contractAddress["MU"]).initialize(_defaultAddress);
         IbLOTToken(contractAddress["BL"]).initiatebLOT(_defaultAddress);
     }
 

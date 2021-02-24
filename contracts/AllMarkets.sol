@@ -18,7 +18,6 @@ pragma solidity 0.5.7;
 import "./external/openzeppelin-solidity/math/SafeMath.sol";
 import "./external/proxy/OwnedUpgradeabilityProxy.sol";
 import "./external/NativeMetaTransaction.sol";
-import "./interfaces/IMarketUtility.sol";   
 import "./interfaces/IToken.sol";
 import "./interfaces/IbLOTToken.sol";
 import "./interfaces/IMarketCreationRewards.sol";
@@ -152,7 +151,6 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     address internal predictionToken;
 
     IbLOTToken internal bPLOTInstance;
-    IMarketUtility internal marketUtility;
     IMarketCreationRewards internal marketCreationRewards;
 
     address public authorizedMultiSig;
@@ -407,7 +405,6 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       
       IMaster ms = IMaster(masterAddress);
       marketCreationRewards = IMarketCreationRewards(ms.getLatestAddress("MC"));
-      marketUtility = IMarketUtility(ms.getLatestAddress("MU"));
       disputeResolution = ms.getLatestAddress("DR");
       
       authorizedMultiSig = _multiSig;
@@ -725,13 +722,13 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     function _calculatePredictionPointsAndMultiplier(address _user, uint256 _marketId, uint256 _prediction, uint64 _stake) internal returns(uint64 predictionPoints){
       bool isMultiplierApplied;
       UserData storage _userData = userData[_user];
-      (predictionPoints, isMultiplierApplied) = marketUtility.calculatePredictionPoints(_marketId, _prediction, _user, _userData.userMarketData[_marketId].multiplierApplied, _stake);
+      (predictionPoints, isMultiplierApplied) = calculatePredictionPoints(_marketId, _prediction, _user, _userData.userMarketData[_marketId].multiplierApplied, _stake);
       if(isMultiplierApplied) {
         _userData.userMarketData[_marketId].multiplierApplied = true; 
       }
     }
 
-    function calculatePredictionPoints(uint _marketId, uint256 _prediction, address _user, bool multiplierApplied, uint _predictionStake) external view returns(uint64 predictionPoints, bool isMultiplierApplied) {
+    function calculatePredictionPoints(uint _marketId, uint256 _prediction, address _user, bool multiplierApplied, uint _predictionStake) internal view returns(uint64 predictionPoints, bool isMultiplierApplied) {
       uint _stakeValue = _predictionStake.mul(1e10);
       if(_stakeValue < minPredictionAmount || _stakeValue > maxPredictionAmount) {
         return (0, isMultiplierApplied);
