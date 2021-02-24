@@ -17,7 +17,7 @@ pragma solidity 0.5.7;
 
 contract IOracle {
   
-  function getSettlementPrice(uint256 _marketSettleTime) external view returns(uint256 _value, uint256 _roundId);
+  function getSettlementPrice(uint256 _marketSettleTime, uint80 _roundId) external view returns(uint256 _value, uint256 _roundIdUsed);
 
   function getLatestPrice() external view returns(uint256 _value);
 }

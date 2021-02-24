@@ -16,7 +16,6 @@
 pragma solidity 0.5.7;
 
 import "./external/proxy/OwnedUpgradeabilityProxy.sol";
-import "./interfaces/IMarketRegistry.sol";
 import "./interfaces/IbLOTToken.sol";
 import "./interfaces/Iupgradable.sol";
 import "./IAuth.sol";
@@ -24,6 +23,7 @@ import "./IAuth.sol";
 contract Master is IAuth {
     bytes2[] public allContractNames;
     address public dAppToken;
+    address public initialAuthorizedAddress;
     bool public masterInitialised;
 
     mapping(address => bool) public contractsActive;
@@ -51,7 +51,6 @@ contract Master is IAuth {
         //Initial contract names
         allContractNames.push("AM");
         allContractNames.push("MC");
-        allContractNames.push("MU");
         allContractNames.push("BL");
         allContractNames.push("PM");
         allContractNames.push("DR");
@@ -66,9 +65,8 @@ contract Master is IAuth {
             _generateProxy(allContractNames[i], _implementations[i]);
         }
 
+        initialAuthorizedAddress = _defaultAddress;
         _setMasterAddress();
-
-        IbLOTToken(contractAddress["BL"]).initiatebLOT(_defaultAddress);
     }
 
     /**
@@ -87,7 +85,7 @@ contract Master is IAuth {
         allContractNames.push(_contractName);
         _generateProxy(_contractName, _contractAddress);
         Iupgradable up = Iupgradable(contractAddress[_contractName]);
-        up.setMasterAddress();
+        up.setMasterAddress(initialAuthorizedAddress);
     }
 
     /**
@@ -141,7 +139,7 @@ contract Master is IAuth {
     function _setMasterAddress() internal {
         for (uint256 i = 0; i < allContractNames.length; i++) {
             Iupgradable up = Iupgradable(contractAddress[allContractNames[i]]);
-            up.setMasterAddress();
+            up.setMasterAddress(initialAuthorizedAddress);
         }
     }
 

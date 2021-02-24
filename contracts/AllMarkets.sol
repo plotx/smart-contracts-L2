@@ -61,7 +61,6 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     }
     
     struct UserMarketData {
-      bool claimedReward;
       bool predictedWithBlot;
       bool multiplierApplied;
       mapping(uint => PredictionData) predictionData;
@@ -142,7 +141,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     uint64 internal mcDefaultPredictionAmount;
     mapping (address => uint256) public relayerFeeEarned;
     mapping(uint256 => PricingData) internal marketPricingData;
-    mapping(address => uint256) public conversionRate;
+    // mapping(address => uint256) public conversionRate;
     
     address internal masterAddress;
     address internal plotToken;
@@ -174,7 +173,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
 
     MarketBasicData[] internal marketBasicData;
 
-    mapping(address => bool) internal authorizedAddresses;
+    mapping(address => bool) public authorizedAddresses;
     mapping(uint256 => MarketDataExtended) internal marketDataExtended;
     mapping(address => UserData) internal userData;
     mapping(address => uint256) public userLevel;
@@ -183,11 +182,11 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     mapping(uint =>mapping(uint=>PredictionData)) internal marketOptionsAvailable;
 
     modifier onlyAuthorizedUsers() {
-        require(authorizedAddresses[msg.sender], "Not authorized");
+        require(authorizedAddresses[msg.sender]);
         _;
     }
 
-    function setReferrer(address _referrer, address _referee) external {
+    function setReferrer(address _referrer, address _referee) external onlyAuthorizedUsers {
       require(authorizedAddresses[msg.sender]);
       UserData storage _userData = userData[_referee];
       require(_userData.totalStaked == 0);
@@ -244,14 +243,14 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       }
     }
 
-    /**
-    * @dev Function to set `_asset` to PLOT token value conversion rate
-    * @param _asset Token Address
-    * @param _rate `_asset` to PLOT conversion rate
-    */
-    function setAssetPlotConversionRate(address _asset, uint256 _rate) public onlyAuthorizedUsers {
-      conversionRate[_asset] = _rate;
-    }
+    // /**
+    // * @dev Function to set `_asset` to PLOT token value conversion rate
+    // * @param _asset Token Address
+    // * @param _rate `_asset` to PLOT conversion rate
+    // */
+    // function setAssetPlotConversionRate(address _asset, uint256 _rate) public onlyAuthorizedUsers {
+    //   conversionRate[_asset] = _rate;
+    // }
 
     /**
     * @dev Add new market currency.
@@ -383,7 +382,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     /**
      * @dev Changes the master address and update it's instance
      */
-    function setMasterAddress() public {
+    function setMasterAddress(address _defaultAuthorizedAddress) public {
       OwnedUpgradeabilityProxy proxy =  OwnedUpgradeabilityProxy(address(uint160(address(this))));
       require(msg.sender == proxy.proxyOwner());
       IMaster ms = IMaster(msg.sender);
@@ -392,6 +391,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       plotToken = _plotToken;
       predictionToken = _plotToken;
       bPLOTInstance = IbLOTToken(ms.getLatestAddress("BL"));
+      authorizedAddresses[_defaultAuthorizedAddress] = true;
     }
 
     /**
@@ -433,8 +433,8 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
 
       marketBasicData.push(MarketBasicData(0,0,0, 0,0,0,0, address(0)));
       for(uint32 i = 0;i < marketTypeArray.length; i++) {
-          createMarket(0, i);
-          createMarket(1, i);
+          createMarket(0, i, 0);
+          createMarket(1, i, 0);
       }
       _initializeEIP712("AM");
     }
@@ -443,12 +443,13 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     * @dev Create the market.
     * @param _marketCurrencyIndex The index of market currency feed
     * @param _marketTypeIndex The time duration of market.
+    * @param _roundId Round Id to settle previous market (If applicable, else pass 0)
     */
-    function createMarket(uint32 _marketCurrencyIndex,uint32 _marketTypeIndex) public {
+    function createMarket(uint32 _marketCurrencyIndex,uint32 _marketTypeIndex, uint80 _roundId) public {
       MarketTypeData storage _marketType = marketTypeArray[_marketTypeIndex];
       MarketCurrency storage _marketCurrency = marketCurrencies[_marketCurrencyIndex];
       require(!marketCreationPaused && !_marketType.paused);
-      _closePreviousMarket( _marketTypeIndex, _marketCurrencyIndex);
+      _closePreviousMarketWithRoundId( _marketTypeIndex, _marketCurrencyIndex, _roundId);
       uint32 _startTime = calculateStartTimeForMarket(_marketCurrencyIndex, _marketTypeIndex);
       (uint64 _minValue, uint64 _maxValue) = _calculateOptionRange(_marketType.optionRangePerc, _marketCurrency.decimals, _marketCurrency.roundOfToNearest, _marketCurrency.marketFeed);
       uint64 _marketIndex = uint64(marketBasicData.length);
@@ -478,9 +479,10 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       if(_tokenLeft.add(_tokenReward) < _defaultAmount) {
         _deposit(_defaultAmount);
       }
-      _placePrediction(_marketId, predictionToken, _mcDefaultPredictionAmount/3, 1);
-      _placePrediction(_marketId, predictionToken, _mcDefaultPredictionAmount/3, 2);
-      _placePrediction(_marketId, predictionToken, _mcDefaultPredictionAmount - 2*(_mcDefaultPredictionAmount/3), 3);
+      address _predictionToken = predictionToken;
+      _placePrediction(_marketId, _predictionToken, _mcDefaultPredictionAmount/3, 1);
+      _placePrediction(_marketId, _predictionToken, _mcDefaultPredictionAmount/3, 2);
+      _placePrediction(_marketId, _predictionToken, _mcDefaultPredictionAmount - 2*(_mcDefaultPredictionAmount/3), 3);
     }
 
     /**
@@ -509,14 +511,14 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     /**
     * @dev Internal function to settle the previous market 
     */
-    function _closePreviousMarket(uint64 _marketTypeIndex, uint64 _marketCurrencyIndex) internal {
+    function _closePreviousMarketWithRoundId(uint64 _marketTypeIndex, uint64 _marketCurrencyIndex, uint80 _roundId) internal {
       MarketCreationData storage _marketCreationData = marketCreationData[_marketTypeIndex][_marketCurrencyIndex];
       uint64 currentMarket = _marketCreationData.latestMarket;
       if(currentMarket != 0) {
         require(marketStatus(currentMarket) >= PredictionStatus.InSettlement);
         uint64 penultimateMarket = _marketCreationData.penultimateMarket;
         if(penultimateMarket > 0 && now >= marketSettleTime(penultimateMarket)) {
-          _settleMarket(penultimateMarket);
+          _settleMarket(penultimateMarket, _roundId);
         }
       }
     }
@@ -526,10 +528,12 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     * @return the time at which the market result will be declared
     */
     function marketSettleTime(uint256 _marketId) public view returns(uint32) {
-      if(marketDataExtended[_marketId].settleTime > 0) {
-        return marketDataExtended[_marketId].settleTime;
+      MarketDataExtended storage _marketDataExtended = marketDataExtended[_marketId];
+      MarketBasicData storage _marketBasicData = marketBasicData[_marketId];
+      if(_marketDataExtended.settleTime > 0) {
+        return _marketDataExtended.settleTime;
       }
-      return marketBasicData[_marketId].startTime + (marketBasicData[_marketId].predictionTime * 2);
+      return _marketBasicData.startTime + (_marketBasicData.predictionTime * 2);
     }
 
     /**
@@ -574,8 +578,9 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     * @dev Set the flag to pause/resume market creation of particular market type
     */
     function toggleMarketCreationType(uint64 _marketTypeIndex, bool _flag) external onlyAuthorized {
-      require(marketTypeArray[_marketTypeIndex].paused != _flag);
-      marketTypeArray[_marketTypeIndex].paused = _flag;
+      MarketTypeData storage _marketType = marketTypeArray[_marketTypeIndex];
+      require(_marketType.paused != _flag);
+      _marketType.paused = _flag;
     }
 
     /**
@@ -585,7 +590,8 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     function _deposit(uint _amount) internal {
       address payable _msgSenderAddress = _msgSender();
       _transferTokenFrom(predictionToken, _msgSenderAddress, address(this), _amount);
-      userData[_msgSenderAddress].unusedBalance = userData[_msgSenderAddress].unusedBalance.add(_amount);
+      UserData storage _userData = userData[_msgSenderAddress];
+      _userData.unusedBalance = _userData.unusedBalance.add(_amount);
       emit Deposited(_msgSenderAddress, _amount, now);
     }
 
@@ -620,7 +626,8 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     * @return the time upto which user can place predictions in market
     */
     function marketExpireTime(uint _marketId) internal view returns(uint256) {
-      return marketBasicData[_marketId].startTime + (marketBasicData[_marketId].predictionTime);
+      MarketBasicData storage _marketBasicData = marketBasicData[_marketId];
+      return _marketBasicData.startTime + (_marketBasicData.predictionTime);
     }
 
     /**
@@ -745,18 +752,19 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     /**
     * @dev Check if user gets any multiplier on his positions
     * @param _user User address
-    * @param predictionPoints The actual positions user got during prediction.
+    * @param _predictionPoints The actual positions user got during prediction.
     * @return uint256 representing multiplied positions
     * @return bool returns true if multplier applied
     */
-    function checkMultiplier(address _user, uint predictionPoints) internal view returns(uint, bool) {
+    function checkMultiplier(address _user, uint _predictionPoints) internal view returns(uint, bool) {
       bool multiplierApplied;
       uint _muliplier = 100;
-      if(userLevel[_user] > 0) {
-        _muliplier = _muliplier + levelMultiplier[userLevel[_user]];
+      uint256 _userLevel = userLevel[_user];
+      if(_userLevel > 0) {
+        _muliplier = _muliplier + levelMultiplier[_userLevel];
         multiplierApplied = true;
       }
-      return (predictionPoints.mul(_muliplier).div(100),multiplierApplied);
+      return (_predictionPoints.mul(_muliplier).div(100),multiplierApplied);
     }
 
     /**
@@ -798,6 +806,19 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
 
       // option price for `_prediction` in 10^5 format
       return uint64(optionPrice);
+
+    }
+
+    /**
+     * @dev Gets price for all the options in a market
+     * @param _marketId  Market ID
+     * @return _optionPrices array consisting of prices for all available options
+     **/
+    function getAllOptionPrices(uint _marketId) external view returns(uint64[] memory _optionPrices) {
+      _optionPrices = new uint64[](3);
+      for(uint i=0;i<3;i++) {
+        _optionPrices[i] = getOptionPrice(_marketId,i+1);
+      }
 
     }
 
@@ -851,8 +872,8 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     /**
     * @dev Settle the market, setting the winning option
     */
-    function settleMarket(uint256 _marketId) external {
-      _settleMarket(_marketId);
+    function settleMarket(uint256 _marketId, uint80 _roundId) external {
+      _settleMarket(_marketId, _roundId);
     }
 
     /**
@@ -861,12 +882,13 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     * @param _marketSettleValue The current price of market currency.
     */
     function postMarketResult(uint256 _marketId, uint256 _marketSettleValue) external {
+      PredictionStatus _status = marketStatus(_marketId);
       if(msg.sender == authorizedMultiSig) {
         require(marketBasicData[_marketId].feedAddress == address(0));
-        require(marketStatus(_marketId) == PredictionStatus.InSettlement);
+        require(_status == PredictionStatus.InSettlement);
       } else {
         require(msg.sender == disputeResolution);
-        require(marketStatus(_marketId) == PredictionStatus.InDispute);
+        require(_status == PredictionStatus.InDispute);
       }
       _postResult(_marketSettleValue, 0, _marketId);
     }
@@ -874,11 +896,11 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     /**
     * @dev Settle the market, setting the winning option
     */
-    function _settleMarket(uint256 _marketId) internal {
-      address _feedAdd = marketCurrencies[marketBasicData[_marketId].currency].marketFeed;
+    function _settleMarket(uint256 _marketId, uint80 _roundId) internal {
+      address _feedAdd = marketBasicData[_marketId].feedAddress;
       if(marketStatus(_marketId) == PredictionStatus.InSettlement && _feedAdd != address(0)) {
-        (uint256 _value, uint256 _roundId) = IOracle(_feedAdd).getSettlementPrice(marketSettleTime(_marketId));
-        _postResult(_value, _roundId, _marketId);
+        (uint256 _value, uint256 _roundIdUsed) = IOracle(_feedAdd).getSettlementPrice(marketSettleTime(_marketId), _roundId);
+        _postResult(_value, _roundIdUsed, _marketId);
       }
     }
 
@@ -898,8 +920,9 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
         uint64 amountToTransfer;
         MarketFeeParams storage _marketFeeParams = marketFeeParams;
         amountToTransfer = (_marketFeeParams.daoFee[_marketId]).add(_marketFeeParams.marketCreatorFee[_marketId]);
-        _transferAsset(predictionToken, address(marketCreationRewards), (10**predictionDecimalMultiplier).mul(amountToTransfer));
-        marketCreationRewards.depositMarketCreationReward(_marketId, (10**predictionDecimalMultiplier).mul(_marketFeeParams.marketCreatorFee[_marketId]));
+        uint _decimalMultiplier = 10**predictionDecimalMultiplier;
+        _transferAsset(predictionToken, address(marketCreationRewards), _decimalMultiplier.mul(amountToTransfer));
+        marketCreationRewards.depositMarketCreationReward(_marketId, _decimalMultiplier.mul(_marketFeeParams.marketCreatorFee[_marketId]));
       } else {
         delete _marketDataExtended.settleTime;
       }
@@ -1021,7 +1044,8 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
         MarketBasicData storage _marketBasicData = marketBasicData[_marketId];
         _marketCurrency = marketCurrencies[_marketBasicData.currency].currencyName;
         _predictionTime = _marketBasicData.predictionTime;
-        _expireTime =marketExpireTime(_marketId);
+        
+        _expireTime = marketExpireTime(_marketId);
         _predictionStatus = marketStatus(_marketId);
         neutralMinValue = _marketBasicData.neutralMinValue;
         neutralMaxValue = _marketBasicData.neutralMaxValue;
@@ -1043,11 +1067,6 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       if(marketStatus(_marketId) != PredictionStatus.Settled) {
         return (0, 0);
       }
-      UserData storage _userData = userData[_user];
-      if(_userData.userMarketData[_marketId].claimedReward) {
-        return (1, 0);
-      }
-      _userData.userMarketData[_marketId].claimedReward = true;
       return (2, getReturn(_user, _marketId));
     }
 
@@ -1100,7 +1119,8 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     * @return tokenStaked Total prediction token staked on market value in PLOT
     */
     function getTotalStakedWorthInPLOT(uint256 _marketId) public view returns(uint256 _tokenStakedWorth) {
-      return (marketDataExtended[_marketId].totalStaked).mul(conversionRate[plotToken]).mul(10**predictionDecimalMultiplier);
+      return (marketDataExtended[_marketId].totalStaked).mul(10**predictionDecimalMultiplier);
+      // return (marketDataExtended[_marketId].totalStaked).mul(conversionRate[plotToken]).mul(10**predictionDecimalMultiplier);
     }
 
     /**

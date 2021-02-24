@@ -54,7 +54,7 @@ contract DisputeResolution is IAuth, NativeMetaTransaction {
   /**
    * @dev Changes the master address and update it's instance
    */
-  function setMasterAddress() public {
+  function setMasterAddress(address _defaultAuthorizedAddress) public {
     OwnedUpgradeabilityProxy proxy =  OwnedUpgradeabilityProxy(address(uint160(address(this))));
     require(msg.sender == proxy.proxyOwner());
     IMaster ms = IMaster(msg.sender);
@@ -69,6 +69,10 @@ contract DisputeResolution is IAuth, NativeMetaTransaction {
 
   /**
   * @dev Raise the dispute if wrong value passed at the time of market result declaration.
+  * User should deposit `tokenStakeForDispute` number of tokens to raise a dispute
+  * The deposited tokens can be claimable if the dispute is accepted,
+  * If the dispute is rejected the deposited tokens will be sent to dao when the result is declared.
+  * Users are allowed to vote to resolve the dispute by depositing their tokens, which can be claimable after some time
   * @param _marketId Index of market.
   * @param _proposedValue The proposed value of market currency.
   * @param _description The description of dispute.
@@ -87,6 +91,13 @@ contract DisputeResolution is IAuth, NativeMetaTransaction {
     _setMarketStatus(_marketId, IAllMarkets.PredictionStatus.InDispute);
   }
 
+  /**
+  * @dev Submit a vote to resolve a disputed market, by depositing tokens to the contract
+  * deposited tokens will be locked for `drTokenLockPeriod` period of time and then they can be claimable
+  * @param _marketId Index of market.
+  * @param _voteValue The Number of tokens to deposit, these will be counted as the vote value of the user
+  * @param _choice Boolean variable defining user accepting or rejecting the dispute
+  */
   function submitVote(uint256 _marketId, uint256 _voteValue, bool _choice) external {
     address payable _msgSenderAddress = _msgSender();
     DisputeData storage _marketDisputeData = marketDisputeData[_marketId];
@@ -97,6 +108,10 @@ contract DisputeResolution is IAuth, NativeMetaTransaction {
     emit Vote(_marketId, _msgSenderAddress, _choice, _voteValue, now);
   }
 
+  /**
+  * @dev Declare the result of the disputed market after the voting time is completed
+  * @param _marketId Index of market.
+  */
   function declareResult(uint256 _marketId) external {
     DisputeData storage _marketDisputeData = marketDisputeData[_marketId];
     require(now > _marketDisputeData.allowVoteUntil);
@@ -129,6 +144,10 @@ contract DisputeResolution is IAuth, NativeMetaTransaction {
     emit DisputeResolved(_marketId, accepted);
   }
 
+  /**
+  * @dev Function to withdraw tokens, deposited by user while submitting the vote
+  * @param _marketId Index of market
+  */ 
   function withdrawLockedTokens(uint256 _marketId) external {
     address payable _msgSenderAddress = _msgSender();
     DisputeData storage _marketDisputeData = marketDisputeData[_marketId];
@@ -161,6 +180,12 @@ contract DisputeResolution is IAuth, NativeMetaTransaction {
     allMarkets.setMarketStatus(_marketId, _status);
   }
 
+  /**
+  * @dev Internal function to call transferFrom function of PLOT token
+  * @param _from From address
+  * @param _to Recipient Address
+  * @param _amount Number of tokens in wei
+  */
   function _transferTokenFrom(address _from, address _to, uint256 _amount) internal {
     IToken(plotToken).transferFrom(_from, _to, _amount);
   }

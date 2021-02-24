@@ -5,5 +5,5 @@ contract Iupgradable {
     /**
      * @dev change master address
      */
-    function setMasterAddress() public;
+    function setMasterAddress(address _defaultAuthorizedAddress) public;
 }

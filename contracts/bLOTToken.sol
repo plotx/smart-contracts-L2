@@ -46,7 +46,6 @@ contract BLOT is Iupgradable {
 
     mapping (address => uint256) internal _balances;
 
-    bool private initiated;
     uint256 private _totalSupply;
 
     /**
@@ -82,18 +81,9 @@ contract BLOT is Iupgradable {
     }
 
     /**
-     * @dev Initiates the BLOT with default minter address
-     */
-    function initiatebLOT(address _defaultMinter) public {
-        require(!initiated);
-        initiated = true;
-        _addMinter(_defaultMinter);
-    }
-
-    /**
      * @dev Changes the master address and update it's instance
      */
-    function setMasterAddress() public {
+    function setMasterAddress(address _defaultMinter) public {
         OwnedUpgradeabilityProxy proxy = OwnedUpgradeabilityProxy(
             address(uint160(address(this)))
         );
@@ -102,6 +92,7 @@ contract BLOT is Iupgradable {
         IMaster ms = IMaster(msg.sender);
         plotToken = ms.dAppToken();
         authorized = ms.getLatestAddress("AM");
+        _addMinter(_defaultMinter);
     }
     
  
