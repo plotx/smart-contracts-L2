@@ -2,16 +2,11 @@ const { assert } = require("chai");
 
 const OwnedUpgradeabilityProxy = artifacts.require("OwnedUpgradeabilityProxy");
 const Master = artifacts.require("Master");
-const MarketConfig = artifacts.require("MockConfig");
 const PlotusToken = artifacts.require("MockPLOT");
-const Governance = artifacts.require("Governance");
-const ProposalCategory = artifacts.require("ProposalCategory");
-const TokenController = artifacts.require("TokenController");
 const BLOT = artifacts.require("BLOT");
 const AllMarkets = artifacts.require("MockAllMarkets");
-const MarketUtility = artifacts.require("MockConfig"); //mock
-const MemberRoles = artifacts.require("MemberRoles");
 const MarketCreationRewards = artifacts.require('MarketCreationRewards');
+const DisputeResolution = artifacts.require('DisputeResolution');
 const BigNumber = require("bignumber.js");
 const { increaseTimeTo } = require("./utils/increaseTime.js");
 const encode1 = require('./utils/encoder.js').encode1;
@@ -39,7 +34,8 @@ let timeNow,
 	option2RangeMAX,
 	option3RangeMIX,
 	marketStatus,
-	option3RangeMAX, governance,
+	option3RangeMAX,
+	disputeResolution,
 	marketETHBalanceBeforeDispute,
 	marketIncentives;
 
@@ -53,29 +49,23 @@ contract("Rewards-Market", async function(users) {
 			masterInstance = await Master.at(masterInstance.address);
 			plotusToken = await PlotusToken.deployed();
 			BLOTInstance = await BLOT.deployed();
-			tokenController  =await TokenController.at(await masterInstance.getLatestAddress(web3.utils.toHex("TC")));
-			governance = await masterInstance.getLatestAddress(web3.utils.toHex("GV"));
-			governance = await Governance.at(governance);
-			marketConfig = await masterInstance.getLatestAddress(web3.utils.toHex("MU"));
-			marketConfig = await MarketConfig.at(marketConfig);
 			timeNow = await latestTime();
 
 			allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
 			marketIncentives = await MarketCreationRewards.at(await masterInstance.getLatestAddress(web3.utils.toHex("MC")));
+			disputeResolution = await DisputeResolution.at(await masterInstance.getLatestAddress(web3.utils.toHex("DR")));
             await increaseTime(5 * 3600);
             await plotusToken.transfer(users[12],toWei(100000));
             await plotusToken.transfer(users[11],toWei(100000));
             await plotusToken.transfer(marketIncentives.address,toWei(500));
-            await plotusToken.approve(tokenController.address,toWei(200000),{from:users[11]});
-            await tokenController.lock(toHex("SM"),toWei(100000),30*3600*24,{from:users[11]});
-
+            
 			let nullAddress = "0x0000000000000000000000000000";
          
             await plotusToken.transfer(users[11],toWei(100));
             await plotusToken.approve(allMarkets.address,toWei(200000),{from:users[11]});
-			await marketConfig.setNextOptionPrice(18);
+			await allMarkets.setNextOptionPrice(18);
 			await allMarkets.claimRelayerRewards();
-            await allMarkets.createMarket(0, 0,{from:users[11],gasPrice:500000});
+            await allMarkets.createMarket(0, 0, 0,{from:users[11],gasPrice:500000});
             // await marketIncentives.claimCreationReward(100,{from:users[11]});
 		});
 
@@ -96,7 +86,7 @@ contract("Rewards-Market", async function(users) {
 				await plotusToken.transfer(users[i], toWei(2000));
 			    await plotusToken.approve(allMarkets.address, toWei(1000000), { from: users[i] });
 			    let functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", totalDepositedPlot, 7, plotusToken.address, predictionVal[i]*1e8, options[i]);
-				await marketConfig.setNextOptionPrice(options[i]*9);
+				await allMarkets.setNextOptionPrice(options[i]*9);
 				let daoBalanceBefore = await plotusToken.balanceOf(marketIncentives.address);
 				// await allMarkets.depositAndPlacePrediction(totalDepositedPlot, 7, plotusToken.address, predictionVal[i]*1e8, options[i]);
 				await signAndExecuteMetaTx(
@@ -144,14 +134,13 @@ contract("Rewards-Market", async function(users) {
 			let daoBalanceAfter = await plotusToken.balanceOf(marketIncentives.address);
 			assert.equal((daoBalanceAfter/1e18).toFixed(2), (daoBalanceBefore/1e18 + marketCreatoFee+daoFee).toFixed(2));
 			await plotusToken.transfer(users[12], "700000000000000000000");
-			await plotusToken.approve(allMarkets.address, "500000000000000000000", {
+			await plotusToken.approve(disputeResolution.address, "500000000000000000000", {
 				from: users[12],
 			});
-			let proposalId = await governance.getProposalLength();
-			await allMarkets.raiseDispute(7, "500000000000000000000","","","", {from: users[12]});
+			await disputeResolution.raiseDispute(7, "500000000000000000000", "", {from: users[12]});
 			await increaseTime(604810);
-			await governance.closeProposal(proposalId/1);
-
+			await disputeResolution.declareResult(7);
+			
 			await increaseTime(60*61);
 
 			let userRewardPlot = [0,0,0,0,0,1118.14308219,1565.400315,0,0,0,0];
@@ -229,11 +218,6 @@ contract("Rewards-Market Stake less than 1 ether", async function(users) {
 			masterInstance = await Master.at(masterInstance.address);
 			plotusToken = await PlotusToken.deployed();
 			BLOTInstance = await BLOT.deployed();
-			tokenController  =await TokenController.at(await masterInstance.getLatestAddress(web3.utils.toHex("TC")));
-			governance = await masterInstance.getLatestAddress(web3.utils.toHex("GV"));
-			governance = await Governance.at(governance);
-			marketConfig = await masterInstance.getLatestAddress(web3.utils.toHex("MU"));
-			marketConfig = await MarketConfig.at(marketConfig);
 			timeNow = await latestTime();
 
 			allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
@@ -242,16 +226,14 @@ contract("Rewards-Market Stake less than 1 ether", async function(users) {
             await plotusToken.transfer(users[12],toWei(100000));
             await plotusToken.transfer(users[11],toWei(100000));
             await plotusToken.transfer(marketIncentives.address,toWei(500));
-            await plotusToken.approve(tokenController.address,toWei(200000),{from:users[11]});
-            await tokenController.lock(toHex("SM"),toWei(100000),30*3600*24,{from:users[11]});
-
+            
 			let nullAddress = "0x0000000000000000000000000000";
          
             await plotusToken.transfer(users[11],toWei(100));
             await plotusToken.approve(allMarkets.address,toWei(200000),{from:users[11]});
-			await marketConfig.setNextOptionPrice(18);
+			await allMarkets.setNextOptionPrice(18);
 			await allMarkets.claimRelayerRewards();
-            await allMarkets.createMarket(0, 0,{from:users[11],gasPrice:500000});
+            await allMarkets.createMarket(0, 0, 0,{from:users[11],gasPrice:500000});
             // await marketIncentives.claimCreationReward(100,{from:users[11]});
 		});
 
@@ -271,7 +253,7 @@ contract("Rewards-Market Stake less than 1 ether", async function(users) {
 			await allMarkets.claimRelayerRewards({from:users[11]});
 			relayerBalAfter = await plotusToken.balanceOf(users[11]);
 
-			assert.equal(((relayerBalAfter-relayerBalBefore)/1e18),1.00000002);
+			assert.equal(~~((relayerBalAfter-relayerBalBefore)/1e10),100000002);
 
 
 			let betpoints = [1814.81481, 1814.81481, 1814.81481];
@@ -340,29 +322,23 @@ contract("Rewards-Market Raise dispute and pass the proposal ", async function(u
 			masterInstance = await Master.at(masterInstance.address);
 			plotusToken = await PlotusToken.deployed();
 			BLOTInstance = await BLOT.deployed();
-			tokenController  =await TokenController.at(await masterInstance.getLatestAddress(web3.utils.toHex("TC")));
-			governance = await masterInstance.getLatestAddress(web3.utils.toHex("GV"));
-			governance = await Governance.at(governance);
-			marketConfig = await masterInstance.getLatestAddress(web3.utils.toHex("MU"));
-			marketConfig = await MarketConfig.at(marketConfig);
 			timeNow = await latestTime();
 
 			allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
 			marketIncentives = await MarketCreationRewards.at(await masterInstance.getLatestAddress(web3.utils.toHex("MC")));
+			disputeResolution = await DisputeResolution.at(await masterInstance.getLatestAddress(web3.utils.toHex("DR")));
             await increaseTime(5 * 3600);
             await plotusToken.transfer(users[12],toWei(100000));
             await plotusToken.transfer(users[11],toWei(100000));
             await plotusToken.transfer(marketIncentives.address,toWei(500));
-            await plotusToken.approve(tokenController.address,toWei(200000),{from:users[11]});
-            await tokenController.lock(toHex("SM"),toWei(100000),30*3600*24,{from:users[11]});
-
+            
 			let nullAddress = "0x0000000000000000000000000000";
          
             await plotusToken.transfer(users[11],toWei(100));
             await plotusToken.approve(allMarkets.address,toWei(200000),{from:users[11]});
-			await marketConfig.setNextOptionPrice(18);
+			await allMarkets.setNextOptionPrice(18);
 			await allMarkets.claimRelayerRewards();
-            await allMarkets.createMarket(0, 0,{from:users[11],gasPrice:500000});
+            await allMarkets.createMarket(0, 0, 0,{from:users[11],gasPrice:500000});
             await assertRevert(marketIncentives.claimCreationReward(100,{from:users[11]}));
 		});
 
@@ -381,7 +357,7 @@ contract("Rewards-Market Raise dispute and pass the proposal ", async function(u
 				await plotusToken.transfer(users[i], toWei(2000));
 			    await plotusToken.approve(allMarkets.address, toWei(1000000), { from: users[i] });
 			    let functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", totalDepositedPlot, 7, plotusToken.address, predictionVal[i]*1e8, options[i]);
-				await marketConfig.setNextOptionPrice(options[i]*9);
+				await allMarkets.setNextOptionPrice(options[i]*9);
 				let daoBalanceBefore = await plotusToken.balanceOf(marketIncentives.address);
 				// await allMarkets.depositAndPlacePrediction(totalDepositedPlot, 7, plotusToken.address, predictionVal[i]*1e8, options[i]);
 				await signAndExecuteMetaTx(
@@ -426,29 +402,32 @@ contract("Rewards-Market Raise dispute and pass the proposal ", async function(u
 
 			await allMarkets.postResultMock(1,7);
 			await plotusToken.transfer(users[12], "700000000000000000000");
-			await plotusToken.approve(allMarkets.address, "500000000000000000000", {
+			await plotusToken.approve(disputeResolution.address, "500000000000000000000", {
 				from: users[12],
 			});
-			let proposalId = await governance.getProposalLength();
-			await allMarkets.raiseDispute(7, "500000000000000000000","","","", {from: users[12]});
+
+			await disputeResolution.raiseDispute(7, "500000000000000000000", "", {from: users[12]});
+			
 			await plotusToken.transfer(users[13], "20000000000000000000000");
 			await plotusToken.transfer(users[14], "20000000000000000000000");
 			await plotusToken.transfer(users[15], "20000000000000000000000");
-			await plotusToken.approve(tokenController.address, "20000000000000000000000",{from : users[13]});
-		    await tokenController.lock("0x4452","20000000000000000000000",(86400*20),{from : users[13]});
-		    
-		    await plotusToken.approve(tokenController.address, "20000000000000000000000",{from : users[14]});
-		    await tokenController.lock("0x4452","20000000000000000000000",(86400*20),{from : users[14]});
-
-		  
-		    await plotusToken.approve(tokenController.address, "20000000000000000000000",{from : users[15]});
-		    await tokenController.lock("0x4452","20000000000000000000000",(86400*20),{from : users[15]});
-
-			await governance.submitVote(proposalId, 1, {from:users[13]});
-		    await governance.submitVote(proposalId, 1, {from:users[14]});
-		    await governance.submitVote(proposalId, 1, {from:users[15]});
-		    await increaseTime(604800);
-			await governance.closeProposal(proposalId/1);
+			
+			await plotusToken.approve(disputeResolution.address, "20000000000000000000000", {
+				from: users[13],
+			});
+			await plotusToken.approve(disputeResolution.address, "20000000000000000000000", {
+				from: users[14],
+			});
+			await plotusToken.approve(disputeResolution.address, "20000000000000000000000", {
+				from: users[15],
+			});
+			await disputeResolution.submitVote(7, "20000000000000000000000", 1, {from:users[13]});
+		    await disputeResolution.submitVote(7, "20000000000000000000000", 1, {from:users[14]});
+		    await disputeResolution.submitVote(7, "20000000000000000000000", 1, {from:users[15]});
+		    await increaseTime(604810);
+			await disputeResolution.declareResult(7);
+			// await increaseTime(604800);
+			// await governance.closeProposal(proposalId/1);
 
 			await increaseTime(60*61);
 		    assert.equal((await allMarkets.getMarketResults(7))[0]/1, 3);

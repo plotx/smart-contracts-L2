@@ -1,11 +1,7 @@
 const { assert } = require("chai");
-const Governance = artifacts.require('Governance');
-const MemberRoles = artifacts.require('MemberRoles');
 const OwnedUpgradeabilityProxy = artifacts.require("OwnedUpgradeabilityProxy");
 const Master = artifacts.require("Master");
-// const TokenController = artifacts.require("TokenController");
 const PlotusToken = artifacts.require("MockPLOT");
-const MarketConfig = artifacts.require("MockConfig");
 // const BLOT = artifacts.require("BLOT");
 const ParticipationMining = artifacts.require('ParticipationMining');
 const AllMarkets = artifacts.require("MockAllMarkets");
@@ -37,12 +33,10 @@ contract("Market", async function(users) {
         masterInstance = await Master.at(masterInstance.address);
         plotusToken = await PlotusToken.deployed();
         allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
-        marketConfig = await MarketConfig.at(await masterInstance.getLatestAddress(web3.utils.toHex("MU")));
         pm = await ParticipationMining.at(await masterInstance.getLatestAddress(web3.utils.toHex("PM")));
         let address = await masterInstance.getLatestAddress('0x4756');
-        gv = await Governance.at(address);
 
-        await marketConfig.setMockPriceFlag(false);
+        await allMarkets.setNextOptionPrice(0);
 
         token1 = await TokenMock.new("Token1","Token1");
         token2 = await TokenMock.new("Token2","Token2");
@@ -62,7 +56,7 @@ contract("Market", async function(users) {
     });
 
     it("Should revert if non-owner tries to call setMasterAddress()", async () => {
-        await assertRevert(pm.setMasterAddress());
+        await assertRevert(pm.setMasterAddress(users[0], users[0]));
     });
 
     it("Should revert if non-whitlisted user tries to add sponsorship", async () => {
@@ -70,18 +64,7 @@ contract("Market", async function(users) {
     });
 
     it("Should revert if sponsered token is null", async () => {
-        let actionHash = encode(
-          'whitelistSponsor(address)',
-          users[0]
-        );
-        await gvProposal(
-          21,
-          actionHash,
-          await MemberRoles.at(await masterInstance.getLatestAddress(toHex('MR'))),
-          gv,
-          2,
-          0
-        );
+        await masterInstance.whitelistSponsor(users[0]);
         assert.equal(await masterInstance.whitelistedSponsor(users[0]), true);
         await assertRevert(pm.sponsorIncentives(1,ZERO_ADDRESS,toWei(100)));
     });
@@ -102,6 +85,7 @@ contract("Market", async function(users) {
     });
 
     it("Tx should be reverted if status of any of markets in array is other than 'Settled'.", async () => {
+        await increaseTime(8*3600);
         await allMarkets.postResultMock(1,1);
         await assertRevert(pm.claimParticipationMiningReward([1,2,3],token1.address));
 
@@ -143,7 +127,7 @@ contract("Market", async function(users) {
     it("No new prediction other than initial prediction", async () => {
         // Market ID 7, only initial predictions
 
-        await allMarkets.createMarket(0, 0);
+        await allMarkets.createMarket(0, 0, 0);
 
         await pm.sponsorIncentives(7,sponsoredTokens[0].address,sponseredAmount[0]);
 
@@ -155,7 +139,7 @@ contract("Market", async function(users) {
 
     it("User predicts in single options other than market creator", async () => {
         // Market ID 8, 3 players predicts in single option each other than initial predictions
-        await allMarkets.createMarket(0, 0);
+        await allMarkets.createMarket(0, 0, 0);
 
         await pm.sponsorIncentives(8,sponsoredTokens[1].address,sponseredAmount[1]);
 
@@ -202,7 +186,7 @@ contract("Market", async function(users) {
     it("User predicts in multiple options", async () => {
 
         // Market ID 9, players predicts in multiple options 
-        await allMarkets.createMarket(0, 0);
+        await allMarkets.createMarket(0, 0, 0);
         await pm.sponsorIncentives(9,sponsoredTokens[2].address,sponseredAmount[2]);
         await plotusToken.transfer(users[1], toWei(20000));
         await plotusToken.approve(allMarkets.address, toWei(200000), { from: users[1] });

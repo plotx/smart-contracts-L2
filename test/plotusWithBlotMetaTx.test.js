@@ -1,16 +1,11 @@
 const { assert } = require("chai");
 const OwnedUpgradeabilityProxy = artifacts.require("OwnedUpgradeabilityProxy");
 const Master = artifacts.require("Master");
-const MemberRoles = artifacts.require("MemberRoles");
 const PlotusToken = artifacts.require("MockPLOT");
-const MarketUtility = artifacts.require("MockConfig"); //mock
 const MockConfig = artifacts.require("MockConfig");
-const Governance = artifacts.require("Governance");
 const AllMarkets = artifacts.require("MockAllMarkets");
 const BLOT = artifacts.require("BLOT");
 const MarketCreationRewards = artifacts.require('MarketCreationRewards');
-const TokenController = artifacts.require("MockTokenController");
-const MockChainLinkAggregator = artifacts.require("MockChainLinkAggregator");
 const BigNumber = require("bignumber.js");
 
 const increaseTime = require("./utils/increaseTime.js").increaseTime;
@@ -32,29 +27,13 @@ describe("newPlotusWithBlot", () => {
         // Multiplier Sheet
         let masterInstance,
             plotusToken,
-            mockMarketConfig,
-            tokenControllerAdd,
-            tokenController,
-            plotusNewAddress,
-            plotusNewInstance,
-            governance,
             allMarkets,
-            marketUtility,
-            mockChainLinkAggregator,
             marketIncentives;
         let predictionPointsBeforeUser1, predictionPointsBeforeUser2, predictionPointsBeforeUser3, predictionPointsBeforeUser4;
         before(async () => {
             masterInstance = await OwnedUpgradeabilityProxy.deployed();
             masterInstance = await Master.at(masterInstance.address);
             plotusToken = await PlotusToken.deployed();
-            tokenControllerAdd = await masterInstance.getLatestAddress(web3.utils.toHex("TC"));
-            tokenController = await TokenController.at(tokenControllerAdd);
-            memberRoles = await masterInstance.getLatestAddress(web3.utils.toHex("MR"));
-            memberRoles = await MemberRoles.at(memberRoles);
-            governance = await masterInstance.getLatestAddress(web3.utils.toHex("GV"));
-            governance = await Governance.at(governance);
-            mockMarketConfig = await masterInstance.getLatestAddress(web3.utils.toHex("MU"));
-            mockMarketConfig = await MockConfig.at(mockMarketConfig);
             allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
             marketIncentives = await MarketCreationRewards.at(await masterInstance.getLatestAddress(web3.utils.toHex("MC")));
             await increaseTime(4 * 60 * 60 + 1);
@@ -62,8 +41,8 @@ describe("newPlotusWithBlot", () => {
             await plotusToken.transfer(marketIncentives.address,toWei(100000));
             await plotusToken.transfer(users[11],toWei(1000));
             await plotusToken.approve(allMarkets.address, toWei(10000), {from:users[11]});
-            await mockMarketConfig.setNextOptionPrice(18);
-            await allMarkets.createMarket(0, 0,{from: users[11]});
+            await allMarkets.setNextOptionPrice(18);
+            await allMarkets.createMarket(0, 0, 0,{from: users[11]});
             // await marketIncentives.claimCreationReward(100,{from:users[11]});
             BLOTInstance = await BLOT.at(await masterInstance.getLatestAddress(web3.utils.toHex("BL")));
             await assertRevert(BLOTInstance.convertToPLOT(users[0], users[1],toWei(100)));
@@ -101,7 +80,7 @@ describe("newPlotusWithBlot", () => {
               predictionToken = BLOTInstance.address;
             }
             let functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)",depositAmt , 7, predictionToken, to8Power(predictionVal[i]), options[i]);
-            await mockMarketConfig.setNextOptionPrice(options[i]*9);
+            await allMarkets.setNextOptionPrice(options[i]*9);
             await signAndExecuteMetaTx(
                 pkList[i],
                 users[i],

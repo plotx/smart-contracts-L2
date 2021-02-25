@@ -3,10 +3,7 @@ const OwnedUpgradeabilityProxy = artifacts.require("OwnedUpgradeabilityProxy");
 const Master = artifacts.require("Master");
 const MemberRoles = artifacts.require("MemberRoles");
 const PlotusToken = artifacts.require("MockPLOT");
-const MockConfig = artifacts.require("MockConfig"); //mock
-const Governance = artifacts.require("Governance");
 const AllMarkets = artifacts.require("MockAllMarkets");
-const TokenController = artifacts.require("MockTokenController");
 const MarketCreationRewards = artifacts.require('MarketCreationRewards');
 
 const ethAddress = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
@@ -26,13 +23,7 @@ let privateKeyList = ["fb437e3e01939d9d4fef43138249f23dc1d0852e69b0b5d1647c087f8
 describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
     let masterInstance,
         plotusToken,
-        mockMarketConfig,
         MockUniswapRouterInstance,
-        tokenControllerAdd,
-        tokenController,
-        plotusNewAddress,
-        plotusNewInstance,
-        governance,
         mockUniswapV2Pair,
         mockUniswapFactory,
         weth,
@@ -48,21 +39,13 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
             masterInstance = await OwnedUpgradeabilityProxy.deployed();
             masterInstance = await Master.at(masterInstance.address);
             plotusToken = await PlotusToken.deployed();
-            tokenControllerAdd = await masterInstance.getLatestAddress(web3.utils.toHex("TC"));
-            tokenController = await TokenController.at(tokenControllerAdd);
-            memberRoles = await masterInstance.getLatestAddress(web3.utils.toHex("MR"));
-            memberRoles = await MemberRoles.at(memberRoles);
-            governance = await masterInstance.getLatestAddress(web3.utils.toHex("GV"));
-            governance = await Governance.at(governance);
             marketIncentives = await MarketCreationRewards.at(await masterInstance.getLatestAddress(toHex("MC")));
-            mockMarketConfig = await masterInstance.getLatestAddress(web3.utils.toHex("MU"));
-            mockMarketConfig = await MockConfig.at(mockMarketConfig);
             allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
             marketId = 6;
             await increaseTime(4 * 60 * 60 + 1);
             await plotusToken.transfer(userMarketCreator, toWei(1000));
             await plotusToken.approve(allMarkets.address, toWei(1000), { from: userMarketCreator });
-            await allMarkets.createMarket(0, 0, { from: userMarketCreator });
+            await allMarkets.createMarket(0, 0, 0, { from: userMarketCreator });
             marketId++;
         });
         it("1.1 Position without User levels", async () => {
@@ -84,8 +67,8 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
             // await allMarkets.deposit(toWei(100), { from: user4 });
             // await allMarkets.deposit(toWei(10), { from: user5 });
 
-            await mockMarketConfig.setNextOptionPrice(9);
-            assert.equal((await mockMarketConfig.getOptionPrice(marketId, 1)) / 1, 9);
+            await allMarkets.setNextOptionPrice(9);
+            assert.equal((await allMarkets.getOptionPrice(marketId, 1)) / 1, 9);
             // await allMarkets.depositAndPlacePrediction(toWei(100), marketId, plotusToken.address, to8Power("100"), 1, { from: user3 });
             let functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", toWei(100), marketId, plotusToken.address, to8Power("100"), 1);
             await signAndExecuteMetaTx(
@@ -95,8 +78,8 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
               allMarkets,
               "AM"
             );
-            await mockMarketConfig.setNextOptionPrice(18);
-            assert.equal((await mockMarketConfig.getOptionPrice(marketId, 2)) / 1, 18);
+            await allMarkets.setNextOptionPrice(18);
+            assert.equal((await allMarkets.getOptionPrice(marketId, 2)) / 1, 18);
             // assert.equal((await allMarkets.getMarketData(marketId))._optionPrice[1] / 1, 18);
             // await allMarkets.depositAndPlacePrediction(toWei(100), marketId, plotusToken.address, to8Power("100"), 2, { from: user1 });
             functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", toWei(100), marketId, plotusToken.address, to8Power("100"), 2);
@@ -116,8 +99,8 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
               allMarkets,
               "AM"
             );
-            await mockMarketConfig.setNextOptionPrice(27);
-            assert.equal((await mockMarketConfig.getOptionPrice(marketId, 3)) / 1, 27);
+            await allMarkets.setNextOptionPrice(27);
+            assert.equal((await allMarkets.getOptionPrice(marketId, 3)) / 1, 27);
             // assert.equal((await allMarkets.getMarketData(marketId))._optionPrice[2] / 1, 27);
             // await allMarkets.depositAndPlacePrediction(toWei(100), marketId, plotusToken.address, to8Power("100"), 3, { from: user4 });
             functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", toWei(100), marketId, plotusToken.address, to8Power("100"), 3);
@@ -184,18 +167,19 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
                 multipliers
               ]
             );
-            await gvProposal(23, actionHash, memberRoles, governance, 1, 0);
+
+            await allMarkets.setMultiplierLevels(userLevels, multipliers);
+
+            await assertRevert(allMarkets.setMultiplierLevels(userLevels, multipliers, { from: user2 }));
             
-            await assertRevert(mockMarketConfig.setMultiplierLevels(userLevels, multipliers));
-            
-            await allMarkets.createMarket(0, 0, { from: userMarketCreator })
+            await allMarkets.createMarket(0, 0, 0, { from: userMarketCreator })
             marketId++;
             
-            await mockMarketConfig.setUserLevel(user1, 1);
-            await mockMarketConfig.setUserLevel(user2, 2);
-            await mockMarketConfig.setUserLevel(user3, 5);
-            await mockMarketConfig.setUserLevel(user4, 10);
-            await mockMarketConfig.setUserLevel(user5, 22);
+            await allMarkets.setUserLevel(user1, 1);
+            await allMarkets.setUserLevel(user2, 2);
+            await allMarkets.setUserLevel(user3, 5);
+            await allMarkets.setUserLevel(user4, 10);
+            await allMarkets.setUserLevel(user5, 22);
             await plotusToken.transfer(user1, toWei("100"));
             await plotusToken.transfer(user2, toWei("400"));
             await plotusToken.transfer(user3, toWei("100"));
@@ -214,8 +198,8 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
             // await allMarkets.deposit(toWei(100), { from: user4 });
             // await allMarkets.deposit(toWei(10), { from: user5 });
 
-            await mockMarketConfig.setNextOptionPrice(9);
-            assert.equal((await mockMarketConfig.getOptionPrice(marketId, 1)) / 1, 9);
+            await allMarkets.setNextOptionPrice(9);
+            assert.equal((await allMarkets.getOptionPrice(marketId, 1)) / 1, 9);
             // assert.equal((await allMarkets.getMarketData(marketId))._optionPrice[0] / 1, 9);
             // await allMarkets.depositAndPlacePrediction(toWei(100), marketId, plotusToken.address, to8Power("100"), 1, { from: user3 });
             let functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", toWei(100), marketId, plotusToken.address, to8Power("100"), 1);
@@ -226,8 +210,8 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
               allMarkets,
               "AM"
             );
-            await mockMarketConfig.setNextOptionPrice(18);
-            assert.equal((await mockMarketConfig.getOptionPrice(marketId, 2)) / 1, 18);
+            await allMarkets.setNextOptionPrice(18);
+            assert.equal((await allMarkets.getOptionPrice(marketId, 2)) / 1, 18);
             // assert.equal((await allMarkets.getMarketData(marketId))._optionPrice[1] / 1, 18);
             // await allMarkets.depositAndPlacePrediction(toWei(100), marketId, plotusToken.address, to8Power("100"), 2, { from: user1 });
             functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", toWei(100), marketId, plotusToken.address, to8Power("100"), 2);
@@ -247,8 +231,8 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
               allMarkets,
               "AM"
             );
-            await mockMarketConfig.setNextOptionPrice(27);
-            assert.equal((await mockMarketConfig.getOptionPrice(marketId, 3)) / 1, 27);
+            await allMarkets.setNextOptionPrice(27);
+            assert.equal((await allMarkets.getOptionPrice(marketId, 3)) / 1, 27);
             // assert.equal((await allMarkets.getMarketData(marketId))._optionPrice[2] / 1, 27);
             // await allMarkets.depositAndPlacePrediction(toWei(100), marketId, plotusToken.address, to8Power("100"), 3, { from: user4 });
             functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", toWei(100), marketId, plotusToken.address, to8Power("100"), 3);
@@ -330,14 +314,14 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
         //     await allMarkets.deposit(toWei(100), { from: user4 });
         //     await allMarkets.deposit(toWei(10), { from: user5 });
 
-        //     await mockMarketConfig.setNextOptionPrice(9);
+        //     await allMarkets.setNextOptionPrice(9);
         //     await allMarkets.placePrediction(marketId, plotusToken.address, to8Power("100"), 1, { from: user3 });
 
-        //     await mockMarketConfig.setNextOptionPrice(18);
+        //     await allMarkets.setNextOptionPrice(18);
         //     await allMarkets.placePrediction(marketId, plotusToken.address, to8Power("100"), 2, { from: user1 });
         //     await allMarkets.placePrediction(marketId, plotusToken.address, to8Power("400"), 2, { from: user2 });
 
-        //     await mockMarketConfig.setNextOptionPrice(27);
+        //     await allMarkets.setNextOptionPrice(27);
         //     await allMarkets.placePrediction(marketId, plotusToken.address, to8Power("100"), 3, { from: user4 });
         //     await allMarkets.placePrediction(marketId, plotusToken.address, to8Power("10"), 3, { from: user5 });
 

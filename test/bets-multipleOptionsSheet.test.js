@@ -1,12 +1,8 @@
 const { assert } = require("chai");
 const OwnedUpgradeabilityProxy = artifacts.require("OwnedUpgradeabilityProxy");
 const Master = artifacts.require("Master");
-const MemberRoles = artifacts.require("MemberRoles");
 const PlotusToken = artifacts.require("MockPLOT");
-const MockConfig = artifacts.require("MockConfig"); //mock
-const Governance = artifacts.require("Governance");
 const AllMarkets = artifacts.require("MockAllMarkets");
-const TokenController = artifacts.require("MockTokenController");
 const MockChainLinkAggregator = artifacts.require("MockChainLinkAggregator");
 const MarketCreationRewards = artifacts.require('MarketCreationRewards');
 
@@ -29,11 +25,8 @@ describe("Bets Multiple options sheet", () => {
             plotusToken,
             mockMarketConfig,
             MockUniswapRouterInstance,
-            tokenControllerAdd,
-            tokenController,
             plotusNewAddress,
             plotusNewInstance,
-            governance,
             allMarkets,
             marketUtility,
             mockChainLinkAggregator;
@@ -43,20 +36,13 @@ describe("Bets Multiple options sheet", () => {
             masterInstance = await OwnedUpgradeabilityProxy.deployed();
             masterInstance = await Master.at(masterInstance.address);
             plotusToken = await PlotusToken.deployed();
-            tokenControllerAdd = await masterInstance.getLatestAddress(web3.utils.toHex("TC"));
-            tokenController = await TokenController.at(tokenControllerAdd);
-            memberRoles = await masterInstance.getLatestAddress(web3.utils.toHex("MR"));
-            memberRoles = await MemberRoles.at(memberRoles);
-            governance = await masterInstance.getLatestAddress(web3.utils.toHex("GV"));
-            governance = await Governance.at(governance);
-            mockMarketConfig = await MockConfig.at(await masterInstance.getLatestAddress(web3.utils.toHex("MU")));
             allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
             marketId = 6;
             await increaseTime(4 * 60 * 60);
             await plotusToken.transfer(userMarketCreator, toWei(100000));
             await plotusToken.approve(allMarkets.address, toWei(100000), {from: userMarketCreator});
-            await mockMarketConfig.setNextOptionPrice(90);
-            await allMarkets.createMarket(0, 0, { from: userMarketCreator });
+            await allMarkets.setNextOptionPrice(90);
+            await allMarkets.createMarket(0, 0, 0, { from: userMarketCreator });
             marketId++;
         });
         it("3.1 Scenario 1: player purchase 2 position in same option, in same currency and wins", async () => {
@@ -70,7 +56,7 @@ describe("Bets Multiple options sheet", () => {
             // await allMarkets.deposit(toWei(400), { from: user2 });
             // await allMarkets.deposit(toWei(400), { from: user3 });
 
-            await mockMarketConfig.setNextOptionPrice(90);
+            await allMarkets.setNextOptionPrice(90);
             let functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", toWei(500), marketId, plotusToken.address, to8Power("100"), 1);
             await signAndExecuteMetaTx(
               privateKeyList[0],
@@ -98,7 +84,7 @@ describe("Bets Multiple options sheet", () => {
               "AM"
               );
             // await allMarkets.depositAndPlacePrediction(0, marketId, plotusToken.address, to8Power("400"), 1, { from: user2 });
-            await mockMarketConfig.setNextOptionPrice(180);
+            await allMarkets.setNextOptionPrice(180);
             functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", toWei(400), marketId, plotusToken.address, to8Power("400"), 2);
             await signAndExecuteMetaTx(
               privateKeyList[2],
@@ -147,7 +133,7 @@ describe("Bets Multiple options sheet", () => {
             }
         });
         it("3.2. Scenario 2", async () => {
-            await allMarkets.createMarket(0, 0, { from: userMarketCreator });
+            await allMarkets.createMarket(0, 0, 0, { from: userMarketCreator });
             marketId++;
 
             await plotusToken.transfer(user2, toWei("400"));
@@ -160,9 +146,9 @@ describe("Bets Multiple options sheet", () => {
             // await allMarkets.deposit(toWei(400), { from: user2 });
             // await allMarkets.deposit(toWei(400), { from: user3 });
 
-            await mockMarketConfig.setNextOptionPrice(90);
+            await allMarkets.setNextOptionPrice(90);
             await allMarkets.depositAndPlacePrediction(toWei(400), marketId, plotusToken.address, to8Power("400"), 1, { from: user2 });
-            await mockMarketConfig.setNextOptionPrice(180);
+            await allMarkets.setNextOptionPrice(180);
             await allMarkets.depositAndPlacePrediction(toWei(500), marketId, plotusToken.address, to8Power("100"), 2, { from: user1 });
             await allMarkets.depositAndPlacePrediction(0, marketId, plotusToken.address, to8Power("400"), 2, { from: user1 });
             await allMarkets.depositAndPlacePrediction(toWei(400), marketId, plotusToken.address, to8Power("400"), 2, { from: user3 });
@@ -204,7 +190,7 @@ describe("Bets Multiple options sheet", () => {
             }
         });
         it("3.3. Scenario 3", async () => {
-            await allMarkets.createMarket(0, 0, { from: userMarketCreator });
+            await allMarkets.createMarket(0, 0, 0, { from: userMarketCreator });
             // await allMarkets.createMarket(0, 0);
             marketId++;
 
@@ -218,11 +204,11 @@ describe("Bets Multiple options sheet", () => {
             // await allMarkets.deposit(toWei(400), { from: user2 });
             // await allMarkets.deposit(toWei(400), { from: user3 });
 
-            await mockMarketConfig.setNextOptionPrice(90);
+            await allMarkets.setNextOptionPrice(90);
             await allMarkets.depositAndPlacePrediction(toWei(500), marketId, plotusToken.address, to8Power("100"), 1, { from: user1 });
             await allMarkets.depositAndPlacePrediction(toWei(400), marketId, plotusToken.address, to8Power("400"), 1, { from: user2 });
 
-            await mockMarketConfig.setNextOptionPrice(180);
+            await allMarkets.setNextOptionPrice(180);
             await allMarkets.depositAndPlacePrediction(0, marketId, plotusToken.address, to8Power("400"), 2, { from: user1 });
             await allMarkets.depositAndPlacePrediction(toWei(400), marketId, plotusToken.address, to8Power("400"), 2, { from: user3 });
 
@@ -283,14 +269,14 @@ describe("Bets Multiple options sheet", () => {
         //     await allMarkets.deposit(toWei(400), { from: user2 });
         //     await allMarkets.deposit(toWei(400), { from: user3 });
 
-        //     await mockMarketConfig.setNextOptionPrice(90);
+        //     await allMarkets.setNextOptionPrice(90);
         //     await allMarkets.placePrediction(marketId, ethAddress, to8Power("4"), 1, { from: user1 });
         //     await allMarkets.placePrediction(marketId, plotusToken.address, to8Power("400"), 1, { from: user1 });
 
-        //     await mockMarketConfig.setNextOptionPrice(180);
+        //     await allMarkets.setNextOptionPrice(180);
         //     await allMarkets.placePrediction(marketId, plotusToken.address, to8Power("400"), 2, { from: user3 });
 
-        //     await mockMarketConfig.setNextOptionPrice(270);
+        //     await allMarkets.setNextOptionPrice(270);
         //     await allMarkets.placePrediction(marketId, plotusToken.address, to8Power("400"), 3, { from: user2 });
 
 
@@ -353,14 +339,14 @@ describe("Bets Multiple options sheet", () => {
         //     await allMarkets.deposit(toWei(400), { from: user2 });
         //     await allMarkets.deposit(toWei(400), { from: user3 });
 
-        //     await mockMarketConfig.setNextOptionPrice(90);
+        //     await allMarkets.setNextOptionPrice(90);
         //     await allMarkets.placePrediction(marketId, plotusToken.address, to8Power("400"), 1, { from: user3 });
 
-        //     await mockMarketConfig.setNextOptionPrice(180);
+        //     await allMarkets.setNextOptionPrice(180);
         //     await allMarkets.placePrediction(marketId, plotusToken.address, to8Power("100"), 2, { from: user1 });
         //     await allMarkets.placePrediction(marketId, ethAddress, to8Power("4"), 2, { from: user1 });
 
-        //     await mockMarketConfig.setNextOptionPrice(270);
+        //     await allMarkets.setNextOptionPrice(270);
         //     await allMarkets.placePrediction(marketId, plotusToken.address, to8Power("400"), 3, { from: user2 });
 
         //     predictionPointsBeforeUser1 = parseFloat(await allMarkets.getUserPredictionPoints(user1, marketId, 2)) /  1e5;
@@ -409,8 +395,8 @@ describe("Bets Multiple options sheet", () => {
         // });
         it("3.6. Scenario 6,7 and 8", async () => {
             await increaseTime(604800);
-            await mockMarketConfig.setNextOptionPrice(90);
-            await allMarkets.createMarket(0, 2, { from: userMarketCreator });
+            await allMarkets.setNextOptionPrice(90);
+            await allMarkets.createMarket(0, 2, 0, { from: userMarketCreator });
             marketId++;
             const scenario6MarketId = marketId;
 
@@ -424,16 +410,16 @@ describe("Bets Multiple options sheet", () => {
             // await allMarkets.deposit(toWei(400), { from: user2 });
             // await allMarkets.deposit(toWei(400), { from: user3 });
 
-            await mockMarketConfig.setNextOptionPrice(90);
+            await allMarkets.setNextOptionPrice(90);
             await allMarkets.depositAndPlacePrediction(toWei(500), marketId, plotusToken.address, to8Power("100"), 1, { from: user1 });
             await allMarkets.depositAndPlacePrediction(toWei(400), marketId, plotusToken.address, to8Power("400"), 1, { from: user2 });
 
-            await mockMarketConfig.setNextOptionPrice(180);
+            await allMarkets.setNextOptionPrice(180);
             await allMarkets.depositAndPlacePrediction(0, marketId, plotusToken.address, to8Power("400"), 2, { from: user1 });
             await allMarkets.depositAndPlacePrediction(toWei(400), marketId, plotusToken.address, to8Power("400"), 2, { from: user3 });
 
-            await mockMarketConfig.setNextOptionPrice(90);
-            await allMarkets.createMarket(0, 0, { from: userMarketCreator });
+            await allMarkets.setNextOptionPrice(90);
+            await allMarkets.createMarket(0, 0, 0, { from: userMarketCreator });
             // await allMarkets.createMarket(0, 0);
             marketId++;
             const scenario7MarketId = marketId;
@@ -449,16 +435,16 @@ describe("Bets Multiple options sheet", () => {
             // await allMarkets.deposit(toWei(400), { from: user2 });
             // await allMarkets.deposit(toWei(500), { from: user3 });
 
-            await mockMarketConfig.setNextOptionPrice(90);
+            await allMarkets.setNextOptionPrice(90);
             await allMarkets.depositAndPlacePrediction(toWei(200), marketId, plotusToken.address, to8Power("100"), 1, { from: user1 });
             await allMarkets.depositAndPlacePrediction(toWei(500), marketId, plotusToken.address, to8Power("500"), 1, { from: user3 });
-            await mockMarketConfig.setNextOptionPrice(180);
+            await allMarkets.setNextOptionPrice(180);
             await allMarkets.depositAndPlacePrediction(0, marketId, plotusToken.address, to8Power("100"), 2, { from: user1 });
-            await mockMarketConfig.setNextOptionPrice(270);
+            await allMarkets.setNextOptionPrice(270);
             await allMarkets.depositAndPlacePrediction(toWei(400), marketId, plotusToken.address, to8Power("400"), 3, { from: user2 });
 
-            await mockMarketConfig.setNextOptionPrice(90);
-            await allMarkets.createMarket(1, 0, { from: userMarketCreator });
+            await allMarkets.setNextOptionPrice(90);
+            await allMarkets.createMarket(1, 0, 0, { from: userMarketCreator });
             // await allMarkets.createMarket(1, 0);
             marketId++;
             const scenario8MarketId = marketId;
@@ -474,14 +460,14 @@ describe("Bets Multiple options sheet", () => {
             // await allMarkets.deposit(toWei(400), { from: user2 });
             // await allMarkets.deposit(toWei(200), { from: user3 });
 
-            await mockMarketConfig.setNextOptionPrice(90);
+            await allMarkets.setNextOptionPrice(90);
             await allMarkets.depositAndPlacePrediction(toWei(400), marketId, plotusToken.address, to8Power("100"), 1, { from: user1 });
             await allMarkets.depositAndPlacePrediction(toWei(200), marketId, plotusToken.address, to8Power("200"), 1, { from: user3 });
 
-            await mockMarketConfig.setNextOptionPrice(180);
+            await allMarkets.setNextOptionPrice(180);
             await allMarkets.depositAndPlacePrediction(0, marketId, plotusToken.address, to8Power("300"), 2, { from: user1 });
 
-            await mockMarketConfig.setNextOptionPrice(270);
+            await allMarkets.setNextOptionPrice(270);
             await allMarkets.depositAndPlacePrediction(toWei(400), marketId, plotusToken.address, to8Power("400"), 3, { from: user2 });
 
             await increaseTime(8 * 60 * 60);

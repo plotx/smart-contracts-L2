@@ -30,7 +30,7 @@ module.exports = function(deployer, network, accounts){
       let dr = await deployer.deploy(DisputeResolution);
       master = await Master.at(master.address);
       let implementations = [allMarkets.address, mcr.address, blotToken.address, participationMining.address, dr.address];
-      await master.initiateMaster(implementations, deployPlotusToken.address, accounts[0]);
+      await master.initiateMaster(implementations, deployPlotusToken.address, accounts[0], accounts[0]);
       master = await OwnedUpgradeabilityProxy.at(master.address);
       await master.transferProxyOwnership(accounts[0]);
       master = await Master.at(master.address);
@@ -54,6 +54,6 @@ module.exports = function(deployer, network, accounts){
       assert.equal(await master.isInternal(mcr.address), true);
       // await mcr.initialise()
       await plotusToken.approve(allMarkets.address, "1000000000000000000000000")
-      await allMarkets.addInitialMarketTypesAndStart(date, ethChainlinkOracle.address, ethChainlinkOracle.address, accounts[0]);
+      await allMarkets.addInitialMarketTypesAndStart(date, ethChainlinkOracle.address, ethChainlinkOracle.address);
   });
 };
