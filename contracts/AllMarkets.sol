@@ -264,6 +264,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       require((marketCurrencies[marketCurrency[_currencyName]].currencyName != _currencyName));
       require(decimals != 0);
       require(roundOfToNearest != 0);
+      require(_marketFeed != address(0));
       _addMarketCurrency(_currencyName, _marketFeed, decimals, roundOfToNearest, _marketStartTime);
     }
 
