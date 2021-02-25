@@ -152,7 +152,6 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     IbLOTToken internal bPLOTInstance;
     IMarketCreationRewards internal marketCreationRewards;
 
-    address public authorizedMultiSig;
     uint internal totalOptions;
     uint internal predictionDecimalMultiplier;
     uint internal defaultMaxRecords;
@@ -354,7 +353,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     */
     function updateAddressParameters(bytes8 code, address _address) external onlyAuthorized {
       if(code == "MULSIG") {
-        authorizedMultiSig = _address;
+        // authorizedMultiSig = _address;
       } else {
         revert("Invalid code");
       }
@@ -408,7 +407,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       marketCreationRewards = IMarketCreationRewards(ms.getLatestAddress("MC"));
       disputeResolution = ms.getLatestAddress("DR");
       
-      authorizedMultiSig = _multiSig;
+      authorized = _multiSig;
       totalOptions = 3;
       predictionDecimalMultiplier = 10;
       defaultMaxRecords = 20;
@@ -878,19 +877,13 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     }
 
     /**
-    * @dev Settle the market explicitly by manually passing the price of market currency
+    * @dev Function to settle the market when a dispute is raised
     * @param _marketId Index of market
     * @param _marketSettleValue The current price of market currency.
     */
     function postMarketResult(uint256 _marketId, uint256 _marketSettleValue) external {
-      PredictionStatus _status = marketStatus(_marketId);
-      if(msg.sender == authorizedMultiSig) {
-        require(marketBasicData[_marketId].feedAddress == address(0));
-        require(_status == PredictionStatus.InSettlement);
-      } else {
-        require(msg.sender == disputeResolution);
-        require(_status == PredictionStatus.InDispute);
-      }
+      require(msg.sender == disputeResolution);
+      require(marketStatus(_marketId) == PredictionStatus.InDispute);
       _postResult(_marketSettleValue, 0, _marketId);
     }
 
