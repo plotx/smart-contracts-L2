@@ -382,7 +382,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     /**
      * @dev Changes the master address and update it's instance
      */
-    function setMasterAddress(address _defaultAuthorizedAddress) public {
+    function setMasterAddress(address _authorizedMultiSig, address _defaultAuthorizedAddress) public {
       OwnedUpgradeabilityProxy proxy =  OwnedUpgradeabilityProxy(address(uint160(address(this))));
       require(msg.sender == proxy.proxyOwner());
       IMaster ms = IMaster(msg.sender);
@@ -392,22 +392,21 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       predictionToken = _plotToken;
       bPLOTInstance = IbLOTToken(ms.getLatestAddress("BL"));
       authorizedAddresses[_defaultAuthorizedAddress] = true;
+      authorized = _authorizedMultiSig;
     }
 
     /**
     * @dev Start the initial market and set initial variables.
     */
-    function addInitialMarketTypesAndStart(uint32 _marketStartTime, address _ethFeed, address _btcFeed, address _multiSig) external onlyAuthorizedUsers {
+    function addInitialMarketTypesAndStart(uint32 _marketStartTime, address _ethFeed, address _btcFeed) external onlyAuthorizedUsers {
       require(marketTypeArray.length == 0);
       require(_ethFeed != address(0));
       require(_btcFeed != address(0));
-      require(_multiSig != address(0));
       
       IMaster ms = IMaster(masterAddress);
       marketCreationRewards = IMarketCreationRewards(ms.getLatestAddress("MC"));
       disputeResolution = ms.getLatestAddress("DR");
       
-      authorized = _multiSig;
       totalOptions = 3;
       predictionDecimalMultiplier = 10;
       defaultMaxRecords = 20;
@@ -1204,7 +1203,6 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     */    
     function setMarketStatus(uint256 _marketId, PredictionStatus _status) public {
       require(msg.sender == disputeResolution);
-      require(marketStatus(_marketId) == PredictionStatus.InDispute);
       marketDataExtended[_marketId].predictionStatus = _status;
     }
 

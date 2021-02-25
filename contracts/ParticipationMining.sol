@@ -37,7 +37,7 @@ contract ParticipationMining is Iupgradable, NativeMetaTransaction {
     /**
      * @dev Changes the master address and update it's instance
      */
-    function setMasterAddress(address _defaultAuthorizedAddress) public {
+    function setMasterAddress(address _authorizedMultiSig, address _defaultAuthorizedAddress) public {
         OwnedUpgradeabilityProxy proxy = OwnedUpgradeabilityProxy(
             address(uint160(address(this)))
         );

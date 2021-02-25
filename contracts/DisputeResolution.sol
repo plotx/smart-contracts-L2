@@ -54,17 +54,19 @@ contract DisputeResolution is IAuth, NativeMetaTransaction {
   /**
    * @dev Changes the master address and update it's instance
    */
-  function setMasterAddress(address _defaultAuthorizedAddress) public {
+  function setMasterAddress(address _authorizedMultiSig, address _defaultAuthorizedAddress) public {
     OwnedUpgradeabilityProxy proxy =  OwnedUpgradeabilityProxy(address(uint160(address(this))));
     require(msg.sender == proxy.proxyOwner());
     IMaster ms = IMaster(msg.sender);
     address _plotToken = ms.dAppToken();
+    authorized = _authorizedMultiSig;
     plotToken = _plotToken;
     allMarkets = IAllMarkets(ms.getLatestAddress("AM"));
     marketRewards = ms.getLatestAddress("MC");
     tokenStakeForDispute = 500 ether;
     drTokenLockPeriod = 10 days;
     voteThresholdMultiplier = 10;
+    drVotePeriod = 3 days;
   }
 
   /**
@@ -135,7 +137,7 @@ contract DisputeResolution is IAuth, NativeMetaTransaction {
     uint256 _tokensToTransfer = _marketDisputeData.stakeAmount;
     delete _marketDisputeData.stakeAmount;
     if(accepted) {
-      allMarkets.postMarketResult(finalResult, _marketId);
+      allMarkets.postMarketResult(_marketId, finalResult);
       _transferAsset(_marketDisputeData.raisedBy, _tokensToTransfer);
     } else {
       _transferAsset(marketRewards, _tokensToTransfer);

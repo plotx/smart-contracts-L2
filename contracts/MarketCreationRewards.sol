@@ -44,11 +44,12 @@ contract MarketCreationRewards is IAuth, NativeMetaTransaction {
     /**
      * @dev Changes the master address and update it's instance
      */
-    function setMasterAddress(address _defaultAuthorizedAddress) public {
+    function setMasterAddress(address _authorizedMultiSig, address _defaultAuthorizedAddress) public {
       OwnedUpgradeabilityProxy proxy =  OwnedUpgradeabilityProxy(address(uint160(address(this))));
       require(msg.sender == proxy.proxyOwner(),"not owner.");
       IMaster ms = IMaster(msg.sender);
       masterAddress = msg.sender;
+      authorized = _authorizedMultiSig;
       plotToken = ms.dAppToken();
       predictionToken = ms.dAppToken();
       allMarkets = IAllMarkets(ms.getLatestAddress("AM"));

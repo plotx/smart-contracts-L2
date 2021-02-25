@@ -39,13 +39,16 @@ contract Master is IAuth {
     function initiateMaster(
         address[] calldata _implementations,
         address _token,
-        address _defaultAddress
+        address _defaultAddress,
+        address _authMultiSig
     ) external {
         OwnedUpgradeabilityProxy proxy = OwnedUpgradeabilityProxy(
             address(uint160(address(this)))
         );
         require(!masterInitialised);
         require(msg.sender == proxy.proxyOwner(), "Sender is not proxy owner.");
+        require(_defaultAddress != address(0));
+        require(_authMultiSig != address(0));
         masterInitialised = true;
 
         //Initial contract names
@@ -65,6 +68,7 @@ contract Master is IAuth {
             _generateProxy(allContractNames[i], _implementations[i]);
         }
 
+        authorized = _authMultiSig;
         initialAuthorizedAddress = _defaultAddress;
         _setMasterAddress();
     }
@@ -85,7 +89,7 @@ contract Master is IAuth {
         allContractNames.push(_contractName);
         _generateProxy(_contractName, _contractAddress);
         Iupgradable up = Iupgradable(contractAddress[_contractName]);
-        up.setMasterAddress(initialAuthorizedAddress);
+        up.setMasterAddress(authorized, initialAuthorizedAddress);
     }
 
     /**
@@ -139,7 +143,7 @@ contract Master is IAuth {
     function _setMasterAddress() internal {
         for (uint256 i = 0; i < allContractNames.length; i++) {
             Iupgradable up = Iupgradable(contractAddress[allContractNames[i]]);
-            up.setMasterAddress(initialAuthorizedAddress);
+            up.setMasterAddress(authorized, initialAuthorizedAddress);
         }
     }
 
