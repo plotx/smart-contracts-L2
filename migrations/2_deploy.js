@@ -47,7 +47,7 @@ module.exports = function(deployer, network, accounts){
       
       allMarkets = await AllMarkets.at(allMarketsProxy.address);
       mcr = await MarketCreationRewards.at(mcrProxy.address);
-      await allMarkets.setAssetPlotConversionRate(plotusToken.address, 1);
+      // await allMarkets.setAssetPlotConversionRate(plotusToken.address, 1);
 
 
       assert.equal(await master.isInternal(allMarkets.address), true);
