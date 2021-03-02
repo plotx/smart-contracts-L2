@@ -1,11 +1,8 @@
 const Master = artifacts.require('Master');
-const MemberRoles = artifacts.require('MemberRoles');
-const Governance = artifacts.require('Governance');
-const ProposalCategory = artifacts.require('ProposalCategory');
-const TokenController = artifacts.require("MockTokenController");
 const AllMarkets = artifacts.require("AllMarkets");
-const MarketUtility = artifacts.require("MarketUtility");
 const MarketCreationRewards = artifacts.require("MarketCreationRewards");
+const DisputeResolution = artifacts.require("DisputeResolution");
+const ParticipationMining = artifacts.require("ParticipationMining");
 const PlotusToken = artifacts.require("MockPLOT");
 const OwnedUpgradeabilityProxy = artifacts.require('OwnedUpgradeabilityProxy');
 const NewProxyInternalContract = artifacts.require('NewProxyInternalContract');
@@ -44,141 +41,84 @@ contract('Master', function(accounts) {
     plotTok = await PlotusToken.deployed();
     ms = await OwnedUpgradeabilityProxy.deployed();
     ms = await Master.at(ms.address);
-    tc = await TokenController.at(await ms.getLatestAddress(toHex('TC')));
-    propCat = await ProposalCategory.at(await ms.getLatestAddress(toHex('PC')));
-    memberRoles = await MemberRoles.at(await ms.getLatestAddress(toHex('MR')));
-    gov = await Governance.at(await ms.getLatestAddress(toHex('GV')));
     allMarkets = await AllMarkets.at(await ms.getLatestAddress(toHex('AM')));
-
+    mcr = await MarketCreationRewards.at(await ms.getLatestAddress(toHex("MC")));
+    dr = await DisputeResolution.at(await ms.getLatestAddress(toHex("DR")));
+    pm = await ParticipationMining.at(await ms.getLatestAddress(toHex("PM")));
   });
 
     describe('Negative Test Cases', function() {
-    it('Upgrade contract should revert if called directly', async function() {
+    it('Upgrade contract should revert if called directly by unauthorized address', async function() {
       await assertRevert(
-        ms.upgradeMultipleImplementations([toHex('GV')], [gov.address])
+        ms.upgradeMultipleImplementations([toHex('AM')], [allMarkets.address], {from: accounts[1]})
       );
     });
     it('Upgrade contract should revert if array length is different for contract code and address', async function() {
       actionHash = encode1(
         ['bytes2[]', 'address[]'],
         [
-          [toHex('GV')],
-          [gov.address, allMarkets.address]
+          [toHex('MC')],
+          [mcr.address, allMarkets.address]
         ]
       );
 
-      await gvProp(
-        6,
-        actionHash,
-        await MemberRoles.at(await ms.getLatestAddress(toHex('MR'))),
-        await Governance.at(await ms.getLatestAddress(toHex('GV'))),
-        2,
-        0
-      );
+      await assertRevert(ms.upgradeMultipleImplementations([toHex('MC')],
+                [mcr.address, allMarkets.address]));
+      // await gvProp(
+      //   6,
+      //   actionHash,
+      //   await MemberRoles.at(await ms.getLatestAddress(toHex('MR'))),
+      //   await Governance.at(await ms.getLatestAddress(toHex('GV'))),
+      //   2,
+      //   0
+      // );
     });
     it('Add internal contract should revert if called directly', async function() {
+      let ps = await AllMarkets.new();
+      await assertRevert(
+        ms.addNewContract(toHex('PS'), ps.address, {from:accounts[1]})
+      );
+    });
+    it('Add internal contract should revert if contract address already exists', async function() {
       await assertRevert(
         ms.addNewContract(toHex('PS'), allMarkets.address)
       );
     });
     it('Add internal contract should revert if new contract code already exist', async function() {
-      actionHash = encode1(
-        ['bytes2', 'address'],
-        [
-          toHex('GV'),
-          gov.address
-        ]
-      );
-      await gvProp(
-        8,
-        actionHash,
-        await MemberRoles.at(await ms.getLatestAddress(toHex('MR'))),
-        await Governance.at(await ms.getLatestAddress(toHex('GV'))),
-        2,
-        0
+      await assertRevert(
+        ms.addNewContract(toHex('AM'), allMarkets.address)
       );
     });
     it('Add internal contract should revert if new contract address is null', async function() {
-      actionHash = encode1(
-        ['bytes2', 'address'],
-        [
-          toHex('PS'),
-          ZERO_ADDRESS
-        ]
-      );
-      await gvProp(
-        8,
-        actionHash,
-        await MemberRoles.at(await ms.getLatestAddress(toHex('MR'))),
-        await Governance.at(await ms.getLatestAddress(toHex('GV'))),
-        2,
-        0
+      await assertRevert(
+        ms.addNewContract(toHex('AZ'), ZERO_ADDRESS)
       );
     });
     it('Add internal contract should revert if new contract code is MS', async function() {
-      actionHash = encode1(
-        ['bytes2', 'address'],
-        [
-          toHex('MS'),
-          gov.address
-        ]
-      );
-      await gvProp(
-        8,
-        actionHash,
-        await MemberRoles.at(await ms.getLatestAddress(toHex('MR'))),
-        await Governance.at(await ms.getLatestAddress(toHex('GV'))),
-        2,
-        0
+      let ps = await AllMarkets.new();
+      await assertRevert(
+        ms.addNewContract(toHex('MS'), ps.address)
       );
     });
     it('Upgrade contract implementation should revert if new address is null', async function() {
-      oldGv = await Governance.at(await ms.getLatestAddress(toHex('GV')));
-      oldMR = await MemberRoles.at(await ms.getLatestAddress(toHex('MR')));
-      gvProxy = await OwnedUpgradeabilityProxy.at(
-        await ms.getLatestAddress(toHex('GV'))
-      );
-      let gvImplementationAdd = await gvProxy.implementation();
-      oldPC = await ProposalCategory.at(
-        await ms.getLatestAddress(toHex('PC'))
-      );
-
-      let catId = 6;
-
-      actionHash = encode1(
-        ['bytes2[]', 'address[]'],
-        [[toHex('GV')], [ZERO_ADDRESS]]
-      );
-
-      await gvProp(
-        catId,
-        actionHash,
-        await MemberRoles.at(await ms.getLatestAddress(toHex('MR'))),
-        await Governance.at(await ms.getLatestAddress(toHex('GV'))),
-        2,
-        0
-      );
-      assert.equal(
-        gvImplementationAdd,
-        await gvProxy.implementation()
-      );
+      await assertRevert(ms.upgradeMultipleImplementations([toHex("GV")],[ZERO_ADDRESS]));
     });
     it('Should revert if caller is not proxyOwner', async function() {
       mas = await Master.new();
       mas = await OwnedUpgradeabilityProxy.new(mas.address);
       mas = await Master.at(mas.address);
       await assertRevert(
-        mas.initiateMaster([mas.address, mas.address, mas.address], mas.address, mas.address, {from: newOwner})
+        mas.initiateMaster([mas.address, mas.address, mas.address, mas.address, mas.address], mas.address, mas.address, mas.address, {from: newOwner})
       );
     });
     it('Should revert if length of implementation array and contract array are not same', async function() {
       await assertRevert(
-        mas.initiateMaster([mas.address, mas.address, mas.address], mas.address, mas.address)
+        mas.initiateMaster([mas.address, mas.address, mas.address], mas.address, mas.address, mas.address)
       );
     });
     it('Should revert if master already initiated', async function() {
       await assertRevert(
-        ms.initiateMaster([mas.address, mas.address, mas.address], mas.address, mas.address)
+        ms.initiateMaster([mas.address, mas.address, mas.address, mas.address, mas.address], mas.address, mas.address, mas.address, {from: newOwner})
       );
     });
   });
@@ -187,15 +127,9 @@ contract('Master', function(accounts) {
     it('Update master address', async function() {
       let newMaster = await Master.new();
       let actionHash = encode1(['address'], [newMaster.address]);
-      await gvProp(
-        7,
-        actionHash,
-        await MemberRoles.at(await ms.getLatestAddress(toHex('MR'))),
-        gov,
-        2,
-        0
-      );
       let implInc = await OwnedUpgradeabilityProxy.at(ms.address);
+      await implInc.upgradeTo(newMaster.address);
+      // let implInc = await OwnedUpgradeabilityProxy.at(ms.address);
       assert.equal(await implInc.implementation(), newMaster.address);
     });
 
@@ -205,17 +139,10 @@ contract('Master', function(accounts) {
         toHex('REJCOUNT'),
         2
       );
-      await gvProp(
-        12,
-        actionHash,
-        await MemberRoles.at(await ms.getLatestAddress(toHex('MR'))),
-        gov,
-        2,
-        0
-      );
+      await allMarkets.updateUintParameters(toHex("MDPA"),65);
       assert.equal(
-        (await gov.getUintParameters(toHex('REJCOUNT')))[1].toNumber(),
-        2
+        (await allMarkets.getUintParameters(toHex('MDPA')))[1].toNumber(),
+        65
       );
     });
 
@@ -224,147 +151,90 @@ contract('Master', function(accounts) {
         await ms.getLatestAddress(toHex('MC'))
       );
       await plotTok.transfer(mcr.address, toWei(1));
-      await plotTok.transfer(tc.address, toWei(1));
+      await plotTok.transfer(allMarkets.address, toWei(1));
     });
 
 
     it('Upgrade multiple contract implemenations', async function() {
-      oldGv = await Governance.at(await ms.getLatestAddress(toHex('GV')));
-      oldMR = await MemberRoles.at(await ms.getLatestAddress(toHex('MR')));
-      oldTC = await TokenController.at(
-        await ms.getLatestAddress(toHex('TC'))
-      );
-      oldPC = await ProposalCategory.at(
-        await ms.getLatestAddress(toHex('PC'))
-      );
       oldAM = await AllMarkets.at(
         await ms.getLatestAddress(toHex('AM'))
       );
       oldMCR = await MarketCreationRewards.at(
         await ms.getLatestAddress(toHex('MC'))
       );
-      oldUtility = await MarketUtility.at(
-        await ms.getLatestAddress(toHex('MU'))
+      oldPM = await ParticipationMining.at(
+        await ms.getLatestAddress(toHex('PM'))
       );
-      let tcbalPlot = await plotTok.balanceOf(
-        await ms.getLatestAddress(toHex('TC'))
+      oldDR = await ParticipationMining.at(
+        await ms.getLatestAddress(toHex('DR'))
       );
       let plbalPlot = await plotTok.balanceOf(
         await ms.getLatestAddress(toHex('MC'))
       );
-      let proposalDetails = await oldGv.proposal(1);
-      let totalSupply = await oldTC.totalSupply();
-      let catDetails = await oldPC.category(5);
-      let members = await oldMR.members(2);
-      let relayerFeePercent = (await oldAM.getUintParameters(toHex("RELF")))[1];
-      let catId = 6;
+      let relayerFeePercent = (await oldAM.getUintParameters(toHex("DAOF")))[1];
       let newAllMarkets = await AllMarkets.new();
       await increaseTime(100);
-      let newGV = await Governance.new();
-      let newPC = await ProposalCategory.new();
-      let newMR = await MemberRoles.new();
-      let newTC = await TokenController.new();
-      let newMU = await MarketUtility.new();
       let newMC = await MarketCreationRewards.new();
+      let newDR = await DisputeResolution.new();
+      let newPM = await ParticipationMining.new();
       actionHash = encode1(
         ['bytes2[]', 'address[]'],
         [
-          [toHex('GV'), toHex('PC'), toHex('MR'), toHex('TC'), toHex('AM'), toHex("MU"), toHex("MC")],
-          [newGV.address, newPC.address, newMR.address, newTC.address, newAllMarkets.address, newMU.address, newMC.address]
+          [toHex('AM'), toHex("MC"), toHex("PM"), toHex("DR")],
+          [newAllMarkets.address, newMC.address, newPM.address, newDR.address]
         ]
       );
-
-      await gvProp(
-        catId,
-        actionHash,
-        await MemberRoles.at(await ms.getLatestAddress(toHex('MR'))),
-        await Governance.at(await ms.getLatestAddress(toHex('GV'))),
-        2,
-        0
+      await ms.upgradeMultipleImplementations(
+        [toHex('AM'), toHex("MC"), toHex("PM"), toHex("DR")],
+          [newAllMarkets.address, newMC.address, newPM.address, newDR.address]
       );
 
-      let oldGVImpl = await OwnedUpgradeabilityProxy.at(
-        await ms.getLatestAddress(toHex('GV'))
-      );
-      let oldPCImpl = await OwnedUpgradeabilityProxy.at(
-        await ms.getLatestAddress(toHex('PC'))
-      );
-      let oldMRImpl = await OwnedUpgradeabilityProxy.at(
-        await ms.getLatestAddress(toHex('MR'))
-      );
-      let oldTCImpl = await OwnedUpgradeabilityProxy.at(
-        await ms.getLatestAddress(toHex('TC'))
-      );
       let oldAMImpl = await OwnedUpgradeabilityProxy.at(
         await ms.getLatestAddress(toHex('AM'))
-      );
-      let oldMUImpl = await OwnedUpgradeabilityProxy.at(
-        await ms.getLatestAddress(toHex('MU'))
       );
       let oldMCImpl = await OwnedUpgradeabilityProxy.at(
         await ms.getLatestAddress(toHex('MC'))
       );
-
-      // Checking Upgraded Contract addresses
-      assert.equal(newGV.address, await oldGVImpl.implementation());
-      assert.equal(newPC.address, await oldPCImpl.implementation());
-      assert.equal(newMR.address, await oldMRImpl.implementation());
-      assert.equal(newTC.address, await oldTCImpl.implementation());
-      assert.equal(newMU.address, await oldMUImpl.implementation());
-      assert.equal(newMC.address, await oldMCImpl.implementation());
-      assert.equal(newAllMarkets.address, await oldAMImpl.implementation());
-      oldGv = await Governance.at(await ms.getLatestAddress(toHex('GV')));
-      oldMR = await MemberRoles.at(await ms.getLatestAddress(toHex('MR')));
-
-      // Checking Master address in upgraded Contracts
-      assert.equal(ms.address, await oldGv.ms());
-      assert.equal(ms.address, await oldMR.masterAddress());
-      assert.equal(ms.address, await oldTC.masterAddress());
-      assert.equal(ms.address, await oldPC.masterAddress());
-      assert.equal(ms.address, await oldAM.masterAddress());
-      assert.equal(ms.address, await oldMCR.masterAddress());
-      assert.equal(ms.address, await oldUtility.masterAddress());
-
-      // Checking Funds transfer in upgraded Contracts
-      assert.equal(
-        (await plotTok.balanceOf(await ms.getLatestAddress(toHex('TC')))) / 1,
-        tcbalPlot / 1
+      let oldPMImpl = await OwnedUpgradeabilityProxy.at(
+        await ms.getLatestAddress(toHex('PM'))
+      );
+      let oldDRImpl = await OwnedUpgradeabilityProxy.at(
+        await ms.getLatestAddress(toHex('DR'))
       );
 
+      // Checking Upgraded Contract addresses
+      assert.equal(newMC.address, await oldMCImpl.implementation());
+      assert.equal(newDR.address, await oldDRImpl.implementation());
+      assert.equal(newPM.address, await oldPMImpl.implementation());
+      assert.equal(newAllMarkets.address, await oldAMImpl.implementation());
+      
+      // Checking Master address in upgraded Contracts
+      // assert.equal(ms.address, await oldAM.masterAddress());
+      // assert.equal(ms.address, await oldMCR.masterAddress());
+      // assert.equal(ms.address, await oldDR.masterAddress());
+      // assert.equal(ms.address, await oldPM.masterAddress());
+      
+      // Checking Funds transfer in upgraded Contracts
       assert.equal(
         (await plotTok.balanceOf(await ms.getLatestAddress(toHex('MC')))) / 1,
         plbalPlot / 1
       );
 
       // Checking getters in upgraded Contracts
-      assert.equal(
-        (await oldGv.proposal(1)).toString(),
-        proposalDetails.toString()
-      );
-      assert.equal((await oldMR.members(2)).toString(), members.toString());
-      assert.equal((await oldTC.totalSupply()) / 1, totalSupply / 1);
-      assert.equal((await oldPC.category(5)).toString(), catDetails.toString());
-      assert.equal(((await oldAM.getUintParameters(toHex("RELF")))[1]).toString(), relayerFeePercent.toString());
+      assert.equal(((await oldAM.getUintParameters(toHex("DAOF")))[1]).toString(), relayerFeePercent.toString());
     });
     it('Add new Proxy Internal contract', async function() {
       let nic = await NewProxyInternalContract.new();
-      let CatId = await oldPC.totalCategories();
       // Creating proposal for adding new proxy internal contract
       actionHash = encode1(
         ['bytes2','address'],
         [toHex('NP'),
         nic.address]
       );
-
-      await gvProp(
-        8,
-        actionHash,
-        await MemberRoles.at(await ms.getLatestAddress(toHex('MR'))),
-        await Governance.at(await ms.getLatestAddress(toHex('GV'))),
-        2,
-        0
+      await ms.addNewContract(
+        toHex('NP'),
+        nic.address
       );
-      p1 = await oldGv.getProposalLength();
       let proxyINS = await OwnedUpgradeabilityProxy.at(
         await ms.getLatestAddress(toHex('NP'))
       );
@@ -375,25 +245,16 @@ contract('Master', function(accounts) {
       assert.equal(ms.address, await proxyINS.ms());
       assert.equal(await ms.isInternal(nic.address), false);
       assert.equal(await ms.isInternal(proxyINS.address), true);
-      assert.notEqual(await tc.bit(), 200);
-      await proxyINS.callDummyOnlyInternalFunction(200);
-      assert.equal(await tc.bit(), 200);
+      // assert.notEqual(await tc.bit(), 200);
+      // await proxyINS.callDummyOnlyInternalFunction(200);
+      // assert.equal(await tc.bit(), 200);
     });
-    it('Check if new master is updated properly', async function() {
-      let tcProxy = await TokenController.at(
-        await ms.getLatestAddress(toHex('TC'))
-      );
-      let mrProxy = await MemberRoles.at(
-        await ms.getLatestAddress(toHex('MR'))
-      );
-      let catProxy = await ProposalCategory.at(
-        await ms.getLatestAddress(toHex('PC'))
-      );
-      assert.equal(ms.address, await tcProxy.masterAddress());
-      assert.equal(ms.address, await gov.ms());
-      assert.equal(ms.address, await mrProxy.masterAddress());
-      assert.equal(ms.address, await catProxy.masterAddress());
-    });
+    // it('Check if new master is updated properly', async function() {
+    //   let amProxy = await AllMarkets.at(
+    //     await ms.getLatestAddress(toHex('AM'))
+    //   );
+    //   assert.equal(ms.address, await amProxy.masterAddress());
+    // });
   });
 
   after(async function () {
