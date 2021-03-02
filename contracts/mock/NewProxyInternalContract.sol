@@ -6,7 +6,7 @@ import "../interfaces/Iupgradable.sol";
 contract NewProxyInternalContract is Iupgradable {
 	Master public ms;
 
-    function setMasterAddress() public {
+    function setMasterAddress(address _auth, address _authMultisig) public {
     	ms = Master(msg.sender);
     }
 

@@ -36,6 +36,8 @@ contract DisputeResolution is IAuth, NativeMetaTransaction {
     uint256 allowVoteUntil;
     uint256 stakeAmount;
     uint256 totalVoteValue;
+    uint256 acceptedVoteValue;
+    uint256 rejectedVoteValue;
     uint256 tokensLockedUntill;
     mapping (address => uint256) userVoteValue;
   }
@@ -67,6 +69,7 @@ contract DisputeResolution is IAuth, NativeMetaTransaction {
     drTokenLockPeriod = 10 days;
     voteThresholdMultiplier = 10;
     drVotePeriod = 3 days;
+    _initializeEIP712("DR");
   }
 
   /**
@@ -107,6 +110,11 @@ contract DisputeResolution is IAuth, NativeMetaTransaction {
     _transferTokenFrom(_msgSenderAddress, address(this), _voteValue);
     _marketDisputeData.userVoteValue[_msgSenderAddress] = _voteValue;
     _marketDisputeData.totalVoteValue = _marketDisputeData.totalVoteValue.add(_voteValue);
+    if(_choice) {
+      _marketDisputeData.acceptedVoteValue = _marketDisputeData.acceptedVoteValue.add(_voteValue);
+    } else {
+      _marketDisputeData.rejectedVoteValue = _marketDisputeData.rejectedVoteValue.add(_voteValue);
+    }
     emit Vote(_marketId, _msgSenderAddress, _choice, _voteValue, now);
   }
 
@@ -119,8 +127,11 @@ contract DisputeResolution is IAuth, NativeMetaTransaction {
     require(now > _marketDisputeData.allowVoteUntil);
     require(allMarkets.marketStatus(_marketId) == IAllMarkets.PredictionStatus.InDispute);
     uint256 plotStakedOnMarket = allMarkets.getTotalStakedWorthInPLOT(_marketId);
-    if(_marketDisputeData.totalVoteValue >= voteThresholdMultiplier.mul(plotStakedOnMarket)) {
-      _resolveDispute(_marketId, true, _marketDisputeData.proposedValue);
+    if(
+      (_marketDisputeData.totalVoteValue >= voteThresholdMultiplier.mul(plotStakedOnMarket)) &&
+      (_marketDisputeData.acceptedVoteValue > _marketDisputeData.rejectedVoteValue)
+    ) {
+        _resolveDispute(_marketId, true, _marketDisputeData.proposedValue);
     } else {
       _resolveDispute(_marketId, false, 0);
     }
@@ -155,6 +166,7 @@ contract DisputeResolution is IAuth, NativeMetaTransaction {
     DisputeData storage _marketDisputeData = marketDisputeData[_marketId];
     require(now > _marketDisputeData.tokensLockedUntill);
     uint256 _tokensToTransfer = _marketDisputeData.userVoteValue[_msgSenderAddress];
+    require(_tokensToTransfer > 0);
     delete _marketDisputeData.userVoteValue[_msgSenderAddress];
     _transferAsset(_msgSenderAddress, _tokensToTransfer);
     emit WithdrawnTokens(_marketId, _msgSenderAddress, _tokensToTransfer);
