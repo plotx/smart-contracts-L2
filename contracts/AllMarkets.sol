@@ -348,16 +348,16 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       }
     }
 
-    /**
-    * @dev Function to update address parameters
-    */
-    function updateAddressParameters(bytes8 code, address _address) external onlyAuthorized {
-      if(code == "MULSIG") {
-        // authorizedMultiSig = _address;
-      } else {
-        revert("Invalid code");
-      }
-    }
+    // /**
+    // * @dev Function to update address parameters
+    // */
+    // function updateAddressParameters(bytes8 code, address _address) external onlyAuthorized {
+    //   if(code == "MULSIG") {
+    //     // authorizedMultiSig = _address;
+    //   } else {
+    //     revert("Invalid code");
+    //   }
+    // }
 
     /**
     * @dev function to get integer parameters
