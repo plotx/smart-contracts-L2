@@ -186,7 +186,6 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     }
 
     function setReferrer(address _referrer, address _referee) external onlyAuthorizedUsers {
-      require(authorizedAddresses[msg.sender]);
       UserData storage _userData = userData[_referee];
       require(_userData.totalStaked == 0);
       require(_userData.referrer == address(0));

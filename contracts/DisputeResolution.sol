@@ -51,7 +51,7 @@ contract DisputeResolution is IAuth, NativeMetaTransaction {
   uint256 internal drTokenLockPeriod;
   uint256 internal voteThresholdMultiplier;
 
-  mapping (uint256 => DisputeData) internal marketDisputeData;
+  mapping (uint256 => DisputeData) public marketDisputeData;
 
   /**
    * @dev Changes the master address and update it's instance
@@ -180,6 +180,7 @@ contract DisputeResolution is IAuth, NativeMetaTransaction {
   function burnLockedTokens(address _user, uint256 _marketId) external onlyAuthorized {
     DisputeData storage _marketDisputeData = marketDisputeData[_marketId];
     require(allMarkets.marketStatus(_marketId) == IAllMarkets.PredictionStatus.Settled);
+    require(now <= _marketDisputeData.tokensLockedUntill);
     uint256 _tokensToTransfer = _marketDisputeData.userVoteValue[_user];
     delete _marketDisputeData.userVoteValue[_user];
     _transferAsset(marketRewards, _tokensToTransfer);
@@ -213,5 +214,15 @@ contract DisputeResolution is IAuth, NativeMetaTransaction {
     if(_amount > 0) { 
         require(IToken(plotToken).transfer(_recipient, _amount));
     }
+  }
+
+  /**
+  * @dev Get user vote value of disputed market
+  * @param _user The address to user
+  * @param _marketId Index of market
+  * @return User vote value of `_marketId`
+  */
+  function getUserVoteValue(address _user, uint256 _marketId) external view returns(uint256) {
+    return marketDisputeData[_marketId].userVoteValue[_user];
   }
 }
