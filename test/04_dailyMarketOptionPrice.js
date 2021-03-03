@@ -1,7 +1,6 @@
 const { assert } = require("chai");
 const OwnedUpgradeabilityProxy = artifacts.require("OwnedUpgradeabilityProxy");
 const Master = artifacts.require("Master");
-const TokenController = artifacts.require("TokenController");
 const PlotusToken = artifacts.require("MockPLOT");
 const MockchainLinkBTC = artifacts.require("MockChainLinkAggregator");
 const BLOT = artifacts.require("BLOT");
