@@ -2,9 +2,11 @@ const Master = artifacts.require('Master');
 const AllMarkets = artifacts.require('AllMarkets');
 const PlotusToken = artifacts.require("MockPLOT");
 const MockchainLink = artifacts.require('MockChainLinkAggregator');
+const MultiSigWallet = artifacts.require('MultiSigWallet');
 const OwnedUpgradeabilityProxy = artifacts.require('OwnedUpgradeabilityProxy');
 const gvProposal = require('./utils/gvProposal.js').gvProposalWithIncentiveViaTokenHolder;
 const encode = require('./utils/encoder.js').encode;
+const encode3 = require('./utils/encoder.js').encode3;
 const assertRevert = require("./utils/assertRevert").assertRevert;
 const {toHex, toWei, toChecksumAddress} = require('./utils/ethTools');
 const { takeSnapshot, revertSnapshot } = require('./utils/snapshot');
@@ -20,7 +22,7 @@ let marketConfig;
 let plotTok;
 let feedInstance;
 let snapshotId;
-
+let multiSigtransactionId = 0;
 const maxAllowance = '115792089237316195423570985008687907853269984665640564039457584007913129639935';
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
@@ -35,8 +37,14 @@ contract('Configure Global Parameters', accounts => {
       ms = await Master.at(ms.address);
       allMarkets = await AllMarkets.at(await ms.getLatestAddress(toHex('AM')));
       plotTok = await PlotusToken.deployed();
-      feedInstance = await MockchainLink.deployed()
-
+      feedInstance = await MockchainLink.deployed();
+      multiSigWallet = await MultiSigWallet.new([accounts[0], accounts[1], accounts[2]],3);
+      await allMarkets.changeAuthorizedAddress(multiSigWallet.address);
+      let owners = await multiSigWallet.getOwners();
+      for(let i = 0;i<3;i++) {
+        owners[i] = accounts[i];
+      }
+      multiSigtransactionId = 0;
     });
 
     async function updateParameter(
@@ -65,7 +73,14 @@ contract('Configure Global Parameters', accounts => {
         getterFunction = '';
       }
 
-      await contractInst[functionToCall](code, proposedValue);
+      let data = encode3(action, code, proposedValue);
+      let retVal = await multiSigWallet.submitTransaction(contractInst.address, 0, data);
+      await multiSigWallet.confirmTransaction(multiSigtransactionId, {from:accounts[1]});
+      await multiSigWallet.confirmTransaction(multiSigtransactionId, {from:accounts[2]});
+      let confirmationCount = await multiSigWallet.getConfirmationCount(multiSigtransactionId);
+      assert.equal(confirmationCount, 3);
+      multiSigtransactionId++ ;
+      // await contractInst[functionToCall](code, proposedValue);
 
       // let actionHash = encode(action, code, proposedValue);
       // await gvProposal(cId, actionHash, mr, gv, mrSequence, 0);
@@ -107,7 +122,14 @@ contract('Configure Global Parameters', accounts => {
         action = 'updateUintParameters(bytes8,uint)';
         getterFunction = 'getUintParameters';
       }
-      await assertRevert(contractInst[functionToCall](code, proposedValue));
+      let data = encode3(action, code, proposedValue);
+      let retVal = await multiSigWallet.submitTransaction(contractInst.address, 0, data);
+      await multiSigWallet.confirmTransaction(multiSigtransactionId, {from:accounts[1]});
+      await multiSigWallet.confirmTransaction(multiSigtransactionId, {from:accounts[2]});
+      let status = await multiSigWallet.transactions(multiSigtransactionId);
+      assert.equal(status.executed, false);
+      multiSigtransactionId++ ;
+      // await assertRevert(contractInst[functionToCall](code, proposedValue));
       // let actionHash = encode(action, code, proposedValue);
       // await gvProposal(cId, actionHash, mr, gv, mrSequence, 0);
       if (code == toHex('MASTADD') && proposedValue != ZERO_ADDRESS) {
@@ -176,9 +198,15 @@ contract('Configure Global Parameters', accounts => {
     describe('Update AllMarkets Parameters', function() {
       it('Should update Cummulative fee percent', async function() {
         await updateParameter(19, 2, 'CMFP', allMarkets, 'uint', '5300');
+        let confirmedBy = await multiSigWallet.getConfirmations(multiSigtransactionId-1);
+        for(let i = 0; i<3;i++) {
+          confirmedBy[i] = accounts[i];
+        }
       });
       it('Should update DAO fee percent', async function() {
         await updateParameter(19, 2, 'DAOF', allMarkets, 'uint', '2500');
+        let transactions = await multiSigWallet.getTransactionIds(0,2, true, true);
+        assert.equal(transactions.length,2);
       });
       it('Should update Market creator fee percent', async function() {
         await updateParameter(19, 2, 'MCF', allMarkets, 'uint', '1000');
@@ -191,6 +219,8 @@ contract('Configure Global Parameters', accounts => {
       });
       it('Should update Market creator default prediction amount', async function() {
         await updateParameter(19, 2, 'MDPA', allMarkets, 'uint', '123');
+        let transactionCount = await multiSigWallet.getTransactionCount(false, true);
+        assert.equal(transactionCount,multiSigtransactionId);
       });
       // it('Should update Multisig address', async function() {
       //   await updateParameter(26, 2, 'MULSIG', allMarkets, 'address', allMarkets.address, "authorizedMultiSig()", true);
