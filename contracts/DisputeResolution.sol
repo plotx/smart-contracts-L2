@@ -21,7 +21,7 @@ import "./external/NativeMetaTransaction.sol";
 import "./interfaces/IMaster.sol";
 import "./interfaces/IAllMarkets.sol";
 import "./interfaces/IToken.sol";
-import "./IAuth.sol";
+import "./interfaces/IAuth.sol";
 
 contract DisputeResolution is IAuth, NativeMetaTransaction {
   

@@ -6,7 +6,7 @@ import "./external/openzeppelin-solidity/math/Math.sol";
 import "./interfaces/IToken.sol";
 import "./interfaces/IAllMarkets.sol";
 import "./interfaces/IMaster.sol";
-import "./IAuth.sol";
+import "./interfaces/IAuth.sol";
 import "./external/NativeMetaTransaction.sol";
 
 contract MarketCreationRewards is IAuth, NativeMetaTransaction {

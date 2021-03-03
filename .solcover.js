@@ -1,5 +1,5 @@
 module.exports = {
-  skipFiles: ['external', 'mock', 'interfaces', 'marketImplementations'],
+  skipFiles: ['external', 'mock', 'interfaces', 'oracles'],
   providerOptions: {
     default_balance_ether: 110, // Extra zero, coverage consumes more gas
     network_id: 5777,

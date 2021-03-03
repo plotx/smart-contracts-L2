@@ -18,7 +18,7 @@ pragma solidity 0.5.7;
 import "./external/proxy/OwnedUpgradeabilityProxy.sol";
 import "./interfaces/IbLOTToken.sol";
 import "./interfaces/Iupgradable.sol";
-import "./IAuth.sol";
+import "./interfaces/IAuth.sol";
 
 contract Master is IAuth {
     bytes2[] public allContractNames;

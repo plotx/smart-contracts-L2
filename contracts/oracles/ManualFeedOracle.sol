@@ -15,7 +15,7 @@
 
 pragma solidity 0.5.7;
 
-import "../IOracle.sol";
+import "../interfaces/IOracle.sol";
 
 contract ManualFeedOracle is IOracle {
 

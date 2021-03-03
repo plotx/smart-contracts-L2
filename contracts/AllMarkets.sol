@@ -21,8 +21,8 @@ import "./external/NativeMetaTransaction.sol";
 import "./interfaces/IToken.sol";
 import "./interfaces/IbLOTToken.sol";
 import "./interfaces/IMarketCreationRewards.sol";
-import "./IAuth.sol";
-import "./IOracle.sol";
+import "./interfaces/IAuth.sol";
+import "./interfaces/IOracle.sol";
 
 contract IMaster {
     function dAppToken() public view returns(address);
