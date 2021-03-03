@@ -26,21 +26,18 @@ contract("Market", async function([user1, user2, user3, user4]) {
 		allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
 
 		await allMarkets.setNextOptionPrice(0);
-		let expireT = await allMarkets.getMarketData(3);
 
-		await increaseTimeTo(expireT[5]);
+	  });
 
+	it("Add market currency with manual fee", async() => {
 		feedOracle = await ManualFeedOracle.new(user1);
-		let startTime = (await latestTime()) / 1 + 604800;
+		let startTime = (await latestTime()) / 1;
 
 		await allMarkets.addMarketCurrency(toHex("ETH/PLOT"), feedOracle.address, 8, 1, startTime);
 
-		await increaseTime(604810);
-
 		await feedOracle.postPrice(1195000000000);
 		// await marketConfig.setFeedPriceForMarketType(toHex("ETH/PLOT"),1195000000000);
-
-	  });
+	})
 
 	it("1.Scenario 1 - Stake < minstakes and time passed < min time passed", async () => {
 
@@ -89,13 +86,9 @@ contract("Market", async function([user1, user2, user3, user4]) {
 		
 
 		let expireT = await allMarkets.getMarketData(7);
-
-		await increaseTimeTo(expireT[5]/1);
-
+		await increaseTime(86400 + expireT[5]/1 - await latestTime());
 
 		await allMarkets.createMarket(2, 1, 0);
-
-
 
 		await plotusToken.transfer(user2, toWei(10000));
 	    await plotusToken.approve(allMarkets.address, toWei(100000), { from: user2 });
@@ -141,11 +134,9 @@ contract("Market", async function([user1, user2, user3, user4]) {
 	it("3.Scenario 3 - Stake > minstakes and time passed > min time passed", async () => {
 
 		let expireT = await allMarkets.getMarketData(8);
-
-		await increaseTimeTo(expireT[5]);
+		await increaseTime(86400 + expireT[5]/1 - await latestTime());
 
 		await allMarkets.createMarket(2, 1, 0);
-
 
 		await plotusToken.transfer(user2, toWei(10000));
 	    await plotusToken.approve(allMarkets.address, toWei(100000), { from: user2 });
@@ -191,8 +182,7 @@ contract("Market", async function([user1, user2, user3, user4]) {
 
 	it("4.Scenario 4 - Stake > minstakes and time passed > min time passed max distance = 2", async () => {
 		let expireT = await allMarkets.getMarketData(9);
-
-		await increaseTimeTo(expireT[5]);
+		await increaseTime(86400 + expireT[5]/1 - await latestTime());
 
 		await allMarkets.createMarket(2, 1, 0);
 

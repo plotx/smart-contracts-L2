@@ -111,6 +111,22 @@ contract('Master', function(accounts) {
         mas.initiateMaster([mas.address, mas.address, mas.address, mas.address, mas.address], mas.address, mas.address, mas.address, {from: newOwner})
       );
     });
+    it('Should revert if caller is default address passed is null address', async function() {
+      mas = await Master.new();
+      mas = await OwnedUpgradeabilityProxy.new(mas.address);
+      mas = await Master.at(mas.address);
+      await assertRevert(
+        mas.initiateMaster([mas.address, mas.address, mas.address, mas.address, mas.address], mas.address, ZERO_ADDRESS, mas.address)
+      );
+    });
+    it('Should revert if caller is multisig auth address passed is null address', async function() {
+      mas = await Master.new();
+      mas = await OwnedUpgradeabilityProxy.new(mas.address);
+      mas = await Master.at(mas.address);
+      await assertRevert(
+        mas.initiateMaster([mas.address, mas.address, mas.address, mas.address, mas.address], mas.address, mas.address, ZERO_ADDRESS)
+      );
+    });
     it('Should revert if length of implementation array and contract array are not same', async function() {
       await assertRevert(
         mas.initiateMaster([mas.address, mas.address, mas.address], mas.address, mas.address, mas.address)

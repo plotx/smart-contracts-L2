@@ -27,25 +27,22 @@ contract("Market", async function([user1, user2, user3, user4]) {
 		BLOTInstance = await BLOT.deployed();
 		allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
 		let address = await masterInstance.getLatestAddress(toHex("GV"));
-		
+
 		await allMarkets.setNextOptionPrice(0);
+	  });
 
-		let expireT = await allMarkets.getMarketData(1);
-
+	it("Add market currency with manual feed", async() => {
 		feedOracle = await ManualFeedOracle.new(user1);
-		let startTime = (await latestTime()) / 1 + 604800;
+		let startTime = (await latestTime()) / 1;
 
 		await allMarkets.addMarketCurrency(toHex("ETH/PLOT"), feedOracle.address, 8, 1, startTime);
-
-		await increaseTime(604810);
+		// await increaseTime(604810);
 
 		await feedOracle.postPrice(1195000000000);
 		// await marketConfig.setFeedPriceForMarketType(toHex("ETH/PLOT"),1195000000000);
-	  });
+	})
 
 	it("1.Scenario 1 - Stake < minstakes and time passed < min time passed", async () => {
-
-		
 
 		await allMarkets.createMarket(2, 0, 0);
 		await increaseTime(360);
@@ -91,10 +88,9 @@ contract("Market", async function([user1, user2, user3, user4]) {
 		
 
 		let expireT = await allMarkets.getMarketData(7);
-
-		await increaseTimeTo(expireT[5]);
-
-		await allMarkets.createMarket(2, 0, 0);
+		await increaseTime(14400 + expireT[5]/1 - await latestTime());
+		// await increaseTime(604800);
+		await allMarkets.createMarket(2, 0, 1);
 
 
 
@@ -143,7 +139,7 @@ contract("Market", async function([user1, user2, user3, user4]) {
 
 		let expireT = await allMarkets.getMarketData(8);
 
-		await increaseTimeTo(expireT[5]);
+		await increaseTime(14400 + expireT[5]/1 - await latestTime());
 
 		await assertRevert(allMarkets.postMarketResult(7, 10000000000, {from:user4}));
 		// await allMarkets.postResultMock(7, 10000000000);
@@ -194,7 +190,7 @@ contract("Market", async function([user1, user2, user3, user4]) {
 	it("4.Scenario 4 - Stake > minstakes and time passed > min time passed max distance = 2", async () => {
 		let expireT = await allMarkets.getMarketData(9);
 
-		await increaseTimeTo(expireT[5]);
+		await increaseTime(14400 + expireT[5]/1 - await latestTime());
 
 		await allMarkets.createMarket(2, 0, 0);
 

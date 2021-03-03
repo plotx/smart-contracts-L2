@@ -168,13 +168,14 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
             );
 
             await allMarkets.setMultiplierLevels(userLevels, multipliers);
-
             await assertRevert(allMarkets.setMultiplierLevels(userLevels, multipliers, { from: user2 }));
+            await assertRevert(allMarkets.setMultiplierLevels([1,2,3], [1,2]));
             
             await allMarkets.createMarket(0, 0, 0, { from: userMarketCreator })
             marketId++;
             
-            await allMarkets.setUserLevel(user1, 1);
+            await allMarkets.addAuthorizedAddress(user1);
+            await allMarkets.setUserLevel(user1, 1, {from:user1});
             await allMarkets.setUserLevel(user2, 2);
             await allMarkets.setUserLevel(user3, 5);
             await allMarkets.setUserLevel(user4, 10);

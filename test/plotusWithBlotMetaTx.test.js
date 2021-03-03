@@ -74,8 +74,8 @@ describe("newPlotusWithBlot", () => {
 
             } else {
               depositAmt=0;
-              await plotusToken.approve(BLOTInstance.address, toWei(predictionVal[i]));
-              await BLOTInstance.mint(users[i], toWei(predictionVal[i]));
+              await plotusToken.approve(BLOTInstance.address, toWei(predictionVal[i]*2));
+              await BLOTInstance.mint(users[i], toWei(predictionVal[i]*2));
               predictionToken = BLOTInstance.address;
             }
             let functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)",depositAmt , 7, predictionToken, to8Power(predictionVal[i]), options[i]);
@@ -87,6 +87,16 @@ describe("newPlotusWithBlot", () => {
                 allMarkets,
                 "AM"
                 );
+            if(!withPlot[i]) {
+                //SHould not allow to predict with bPLOT twice
+                await assertRevert(signAndExecuteMetaTx(
+                                pkList[i],
+                                users[i],
+                                functionSignature,
+                                allMarkets,
+                                "AM"
+                                ));
+            }
           }
         });
         it("1.2 Relayer should get apt reward", async () => {

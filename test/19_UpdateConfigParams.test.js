@@ -74,12 +74,15 @@ contract('Configure Global Parameters', accounts => {
       }
 
       let data = encode3(action, code, proposedValue);
+      let transactionCount = await multiSigWallet.getTransactionCount(true, true);
       let retVal = await multiSigWallet.submitTransaction(contractInst.address, 0, data);
-      await multiSigWallet.confirmTransaction(multiSigtransactionId, {from:accounts[1]});
-      await multiSigWallet.confirmTransaction(multiSigtransactionId, {from:accounts[2]});
-      let confirmationCount = await multiSigWallet.getConfirmationCount(multiSigtransactionId);
+      await multiSigWallet.confirmTransaction(transactionCount, {from:accounts[1]});
+      let confirmationCount = await multiSigWallet.getConfirmationCount(transactionCount);
+      assert.equal(confirmationCount, 2);
+      await multiSigWallet.confirmTransaction(transactionCount, {from:accounts[2]});
+      confirmationCount = await multiSigWallet.getConfirmationCount(transactionCount);
       assert.equal(confirmationCount, 3);
-      multiSigtransactionId++ ;
+      multiSigtransactionId = transactionCount + 1;
       // await contractInst[functionToCall](code, proposedValue);
 
       // let actionHash = encode(action, code, proposedValue);
@@ -123,12 +126,13 @@ contract('Configure Global Parameters', accounts => {
         getterFunction = 'getUintParameters';
       }
       let data = encode3(action, code, proposedValue);
+      let transactionCount = await multiSigWallet.getTransactionCount(true, true);
       let retVal = await multiSigWallet.submitTransaction(contractInst.address, 0, data);
-      await multiSigWallet.confirmTransaction(multiSigtransactionId, {from:accounts[1]});
-      await multiSigWallet.confirmTransaction(multiSigtransactionId, {from:accounts[2]});
-      let status = await multiSigWallet.transactions(multiSigtransactionId);
+      await multiSigWallet.confirmTransaction(transactionCount, {from:accounts[1]});
+      await multiSigWallet.confirmTransaction(transactionCount, {from:accounts[2]});
+      let status = await multiSigWallet.transactions(transactionCount);
       assert.equal(status.executed, false);
-      multiSigtransactionId++ ;
+      multiSigtransactionId = transactionCount + 1;
       // await assertRevert(contractInst[functionToCall](code, proposedValue));
       // let actionHash = encode(action, code, proposedValue);
       // await gvProposal(cId, actionHash, mr, gv, mrSequence, 0);
@@ -195,12 +199,13 @@ contract('Configure Global Parameters', accounts => {
 
     // });
 
-    describe('Update AllMarkets Parameters', function() {
+
+    describe('Update AllMarkets Parameters', async function() {
       it('Should update Cummulative fee percent', async function() {
         await updateParameter(19, 2, 'CMFP', allMarkets, 'uint', '5300');
-        let confirmedBy = await multiSigWallet.getConfirmations(multiSigtransactionId-1);
+        let confirmedBy = await multiSigWallet.getConfirmations(0);
         for(let i = 0; i<3;i++) {
-          confirmedBy[i] = accounts[i];
+          assert.equal(confirmedBy[i],accounts[i]);
         }
       });
       it('Should update DAO fee percent', async function() {
@@ -219,8 +224,6 @@ contract('Configure Global Parameters', accounts => {
       });
       it('Should update Market creator default prediction amount', async function() {
         await updateParameter(19, 2, 'MDPA', allMarkets, 'uint', '123');
-        let transactionCount = await multiSigWallet.getTransactionCount(false, true);
-        assert.equal(transactionCount,multiSigtransactionId);
       });
       // it('Should update Multisig address', async function() {
       //   await updateParameter(26, 2, 'MULSIG', allMarkets, 'address', allMarkets.address, "authorizedMultiSig()", true);
@@ -241,6 +244,142 @@ contract('Configure Global Parameters', accounts => {
         await updateInvalidParameter(19, 2, 'EPTIM', allMarkets, 'uint', '2');
       });
     }); 
+
+    describe("MultisigWallet", async function() {
+      it('Should not add owner if zero address passed', async function() {
+        let data = await encode3("addOwner(address)",ZERO_ADDRESS);
+        let transactionCount = await multiSigWallet.getTransactionCount(true, true);
+        await multiSigWallet.submitTransaction(multiSigWallet.address, 0, data);
+        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[1]});
+        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[2]});
+        let status = await multiSigWallet.transactions(transactionCount);
+        assert.equal(status.executed, false);
+        assert.equal(await multiSigWallet.isOwner(ZERO_ADDRESS), false);
+      });
+      it('Should add owner', async function() {
+        let data = await encode3("addOwner(address)",accounts[3]);
+        await assertRevert(multiSigWallet.addOwner(accounts[3]));
+        let transactionCount = await multiSigWallet.getTransactionCount(true, true);
+        await multiSigWallet.submitTransaction(multiSigWallet.address, 0, data);
+        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[1]});
+        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[2]});
+        let status = await multiSigWallet.transactions(transactionCount);
+        assert.equal(status.executed, true);
+        assert.equal(await multiSigWallet.isOwner(accounts[3]), true);
+      });
+      it('Should add owner', async function() {
+        let data = await encode3("addOwner(address)",accounts[10]);
+        await assertRevert(multiSigWallet.addOwner(accounts[3]));
+        let transactionCount = await multiSigWallet.getTransactionCount(true, true);
+        await multiSigWallet.submitTransaction(multiSigWallet.address, 0, data);
+        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[1]});
+        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[2]});
+        let status = await multiSigWallet.transactions(transactionCount);
+        assert.equal(status.executed, true);
+        assert.equal(await multiSigWallet.isOwner(accounts[10]), true);
+      });
+      it('Should not add owner twice', async function() {
+        let data = await encode3("addOwner(address)",accounts[3]);
+        let transactionCount = await multiSigWallet.getTransactionCount(true, true);
+        await multiSigWallet.submitTransaction(multiSigWallet.address, 0, data);
+        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[1]});
+        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[2]});
+        let status = await multiSigWallet.transactions(transactionCount);
+        assert.equal(status.executed, false);
+      });
+      it('Cannot replace owner with another existing owner', async function() {
+        let data = await encode3("replaceOwner(address,address)",accounts[3], accounts[3]);
+        await multiSigWallet.submitTransaction(multiSigWallet.address, 0, data);
+        let transactionCount = await multiSigWallet.getTransactionCount(true, true);
+        await multiSigWallet.confirmTransaction(transactionCount/1 - 1, {from:accounts[1]});
+        await multiSigWallet.confirmTransaction(transactionCount/1 - 1, {from:accounts[2]});
+        let status = await multiSigWallet.transactions(transactionCount - 1);
+        assert.equal(status.executed, false);
+      });
+      it('Cannot replace if the provided owner doesnt exist', async function() {
+        let data = await encode3("replaceOwner(address,address)",accounts[6], accounts[4]);
+        let transactionCount = await multiSigWallet.getTransactionCount(true, true);
+        await multiSigWallet.submitTransaction(multiSigWallet.address, 0, data);
+        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[1]});
+        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[2]});
+        let status = await multiSigWallet.transactions(transactionCount);
+        assert.equal(status.executed, false);
+        assert.equal(await multiSigWallet.isOwner(accounts[4]), false);
+        assert.equal(await multiSigWallet.isOwner(accounts[6]), false);
+      });
+      it('Should replace owner', async function() {
+        let data = await encode3("replaceOwner(address,address)",accounts[3], accounts[4]);
+        let transactionCount = await multiSigWallet.getTransactionCount(true, true);
+        await multiSigWallet.submitTransaction(multiSigWallet.address, 0, data);
+        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[1]});
+        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[2]});
+        let status = await multiSigWallet.transactions(transactionCount);
+        assert.equal(status.executed, true);
+        assert.equal(await multiSigWallet.isOwner(accounts[4]), true);
+      });
+      it('Should be able to change requirement for confirmation', async function() {
+        let data = await encode3("changeRequirement(uint256)",4);
+        let transactionCount = await multiSigWallet.getTransactionCount(true, true);
+        await multiSigWallet.submitTransaction(multiSigWallet.address, 0, data);
+        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[1]});
+        await assertRevert(multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[1]}));
+        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[2]});
+        await assertRevert(multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[2]}));
+        let status = await multiSigWallet.transactions(transactionCount);
+        assert.equal(status.executed, true);
+        assert.equal(await multiSigWallet.required(), 4);
+      });
+      it('Should remove owner', async function() {
+        let data = await encode3("removeOwner(address)",accounts[2]);
+        let transactionCount = await multiSigWallet.getTransactionCount(true, true);
+        await multiSigWallet.submitTransaction(multiSigWallet.address, 0, data);
+        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[1]});
+        await assertRevert(multiSigWallet.revokeConfirmation(transactionCount/1, {from:accounts[10]}));
+        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[10]});
+        await multiSigWallet.revokeConfirmation(transactionCount/1, {from:accounts[10]});
+        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[2]});
+        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[4]});
+        await assertRevert(multiSigWallet.revokeConfirmation(transactionCount/1, {from:accounts[4]}));
+        let status = await multiSigWallet.transactions(transactionCount);
+        assert.equal(status.executed, true);
+        assert.equal(await multiSigWallet.isOwner(accounts[2]), false);
+      });
+      it('Should remove owner', async function() {
+        let data = await encode3("removeOwner(address)",accounts[4]);
+        let transactionCount = await multiSigWallet.getTransactionCount(true, true);
+        await multiSigWallet.submitTransaction(multiSigWallet.address, 0, data);
+        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[1]});
+        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[10]});
+        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[4]});
+        await assertRevert(multiSigWallet.revokeConfirmation(transactionCount/1, {from:accounts[4]}));
+        let status = await multiSigWallet.transactions(transactionCount);
+        assert.equal(status.executed, true);
+        assert.equal(await multiSigWallet.isOwner(accounts[4]), false);
+      });
+      it('Should not execute if tried to remove address which is not owner', async function() {
+        assert.equal(await multiSigWallet.isOwner(accounts[3]), false);
+        let data = await encode3("removeOwner(address)",accounts[3]);
+        let transactionCount = await multiSigWallet.getTransactionCount(true, true);
+        await multiSigWallet.submitTransaction(multiSigWallet.address, 0, data);
+        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[1]});
+        let transactions = await multiSigWallet.getTransactionIds(0,transactionCount , true, true);
+        assert.equal(transactions.length,transactionCount);
+        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[10]});
+        let status = await multiSigWallet.transactions(transactionCount);
+        assert.equal(status.executed, false);
+      });
+      it('Should not be able to change requirement if requirement > current owners length', async function() {
+        let data = await encode3("changeRequirement(uint256)",10);
+        let transactionCount = await multiSigWallet.getTransactionCount(true, true);
+        await multiSigWallet.submitTransaction(multiSigWallet.address, 0, data);
+        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[1]});
+        await assertRevert(multiSigWallet.confirmTransaction(60, {from:accounts[10]}));
+        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[10]});
+        let status = await multiSigWallet.transactions(transactionCount);
+        assert.equal(status.executed, false);
+        assert.equal(await multiSigWallet.required(),3);
+      });
+    });
 
     after(async function () {
       await revertSnapshot(snapshotId);

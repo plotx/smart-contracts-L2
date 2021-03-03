@@ -17,7 +17,7 @@ contract('bLOTToken', function([user1,user2,user3,user4]){
         BLOTInstance = await BLOT.at(await masterInstance.getLatestAddress(web3.utils.fromAscii("BL")));
         await PLOTInstance.approve(BLOTInstance.address, "10000000000000000000000");
         let canMint = await BLOTInstance.mint(user1,"1000000000000000000000");
-        await assertRevert(BLOTInstance.setMasterAddress());
+        await assertRevert(BLOTInstance.setMasterAddress(user1, user1));
         assert.ok(canMint)
         })
 
@@ -79,11 +79,8 @@ contract('bLOTToken', function([user1,user2,user3,user4]){
     it('7. Should not allow to mint to zero address',async function(){
         await PLOTInstance.approve(BLOTInstance.address, "10000000000000000000000");
         await assertRevert(BLOTInstance.mint(ZERO_ADDRESS,"1000000000000000000000"));
-        })
+    })
 
-    it('8. Should not allow to re-initiate bLOT instance', async function() {
-        await assertRevert(BLOTInstance.initiatebLOT(user1));
-    });
 
     it('9. Should authorise the txn when called from authController', async function() {
         await (BLOTInstance.whitelistMigration(hash,user1,user2,timestamp,"1000000000000000000000",{from:user3}));

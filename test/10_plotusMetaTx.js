@@ -66,6 +66,9 @@ contract("Rewards-Market", async function(users) {
 			await allMarkets.setNextOptionPrice(18);
 			await allMarkets.claimRelayerRewards();
             await allMarkets.createMarket(0, 0, 0,{from:users[11],gasPrice:500000});
+            await assertRevert(marketIncentives.setMasterAddress(users[0], users[0]));
+            await assertRevert(allMarkets.setMasterAddress(users[0], users[0]));
+            await assertRevert(allMarkets.setMarketStatus(6, 1));
             // await marketIncentives.claimCreationReward(100,{from:users[11]});
 		});
 
