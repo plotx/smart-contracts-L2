@@ -138,7 +138,6 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     }
 
     MarketFeeParams internal marketFeeParams;
-    uint64 internal mcDefaultPredictionAmount;
     mapping (address => uint256) public relayerFeeEarned;
     mapping(uint256 => PricingData) internal marketPricingData;
     // mapping(address => uint256) public conversionRate;
@@ -155,12 +154,12 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     uint internal totalOptions;
     uint internal predictionDecimalMultiplier;
     uint internal defaultMaxRecords;
-    uint internal minPredictionAmount;
-    uint internal maxPredictionAmount;
-    uint internal stakingFactorMinStake;
-    uint32 internal stakingFactorWeightage;
-    uint32 internal currentPriceWeightage;
-
+    uint internal minPredictionAmount ;
+    uint internal maxPredictionAmount ;
+    uint internal stakingFactorMinStake ;
+    uint32 internal stakingFactorWeightage ;
+    uint32 internal currentPriceWeightage ;
+    uint64 internal mcDefaultPredictionAmount;
 
     bool public marketCreationPaused;
     MarketCurrency[] internal marketCurrencies;
@@ -353,10 +352,20 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     * @param value Value to which the parameter should be updated
     */
     function updateUintParameters(bytes8 code, uint256 value) external onlyAuthorized {
-      MarketFeeParams storage _marketFeeParams = marketFeeParams;
-      if(code == "MDPA") { // Market creators default prediction amount
+      if(code == "MINP") { // Minimum prediction amount
+        minPredictionAmount = value;
+      } else if(code == "MAXP") { // Maximum prediction amount
+        maxPredictionAmount = value;
+      } else if(code == "CPW") { // Current price weighage
+        currentPriceWeightage = uint32(value);
+        //Staking factor weightage% = 100% - currentPriceWeightage%
+        stakingFactorWeightage = 100 - currentPriceWeightage;
+      } else if(code == "SFMS") { // Minimum amount for staking factor to apply
+        stakingFactorMinStake = value;
+      } else if(code == "MDPA") { // Market creators default prediction amount
         mcDefaultPredictionAmount = uint64(value);
       } else {
+        MarketFeeParams storage _marketFeeParams = marketFeeParams;
         require(value < 10000);
         if(code == "CMFP") { // Cummulative fee percent
           _marketFeeParams.cummulativeFeePercent = uint32(value);
@@ -401,7 +410,15 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     */
     function getUintParameters(bytes8 code) external view returns(bytes8 codeVal, uint256 value) {
       codeVal = code;
-      if(code == "CMFP") { // Cummulative fee percent
+      if(code == "MINP") { // Minimum prediction amount
+        value = minPredictionAmount;
+      } else if(code == "MAXP") { // Maximum prediction amount
+        value = maxPredictionAmount;
+      } else if(code == "CPW") { // Current price weighage
+        value = currentPriceWeightage;
+      } else if(code == "SFMS") { // Minimum amount for staking factor to apply
+        value = stakingFactorMinStake;
+      } else if(code == "CMFP") { // Cummulative fee percent
         value = marketFeeParams.cummulativeFeePercent;
       } else if(code == "DAOF") { // DAO Fee percent in Cummulative fee
         value = marketFeeParams.daoCommissionPercent;
