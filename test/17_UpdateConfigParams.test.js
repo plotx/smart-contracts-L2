@@ -225,6 +225,18 @@ contract('Configure Global Parameters', accounts => {
       it('Should update Market creator default prediction amount', async function() {
         await updateParameter(19, 2, 'MDPA', allMarkets, 'uint', '123');
       });
+      it('Should update minimum creator default prediction amount', async function() {
+        await updateParameter(19, 2, 'MINP', allMarkets, 'uint', '123');
+      });
+      it('Should update maximum prediction amount', async function() {
+        await updateParameter(19, 2, 'MAXP', allMarkets, 'uint', '123');
+      });
+      it('Should update Current price weightage', async function() {
+        await updateParameter(19, 2, 'CPW', allMarkets, 'uint', '123');
+      });
+      it('Should update Staking factor min stake', async function() {
+        await updateParameter(19, 2, 'SFMS', allMarkets, 'uint', '123');
+      });
       // it('Should update Multisig address', async function() {
       //   await updateParameter(26, 2, 'MULSIG', allMarkets, 'address', allMarkets.address, "authorizedMultiSig()", true);
       // });
