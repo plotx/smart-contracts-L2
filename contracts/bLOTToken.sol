@@ -82,6 +82,8 @@ contract BLOT is Iupgradable {
 
     /**
      * @dev Changes the master address and update it's instance
+     * @param _authorizedMultiSig Authorized address to execute critical functions in the protocol.
+     * @param _defaultMinter Authorized address to trigger initial functions by passing required external values.
      */
     function setMasterAddress(address _authorizedMultiSig, address _defaultMinter) public {
         OwnedUpgradeabilityProxy proxy = OwnedUpgradeabilityProxy(

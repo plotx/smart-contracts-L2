@@ -185,6 +185,11 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
         _;
     }
 
+    /**
+    * @dev Set referrer address of a user, can be set only by the authorized users
+    * @param _referrer User who is referring new user
+    * @return _referee User who is getting referred
+    */
     function setReferrer(address _referrer, address _referee) external onlyAuthorizedUsers {
       UserData storage _userData = userData[_referee];
       require(_userData.totalStaked == 0);
@@ -204,6 +209,10 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       return (_userData.referrerFee, _userData.refereeFee);
     }
 
+    /**
+    * @dev Claim the fee earned by referrals
+    * @param _user Address to claim the fee for
+     */
     function claimReferralFee(address _user) external {
       UserData storage _userData = userData[_user];
       uint256 _referrerFee = _userData.referrerFee;
@@ -266,6 +275,14 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       _addMarketCurrency(_currencyName, _marketFeed, decimals, roundOfToNearest, _marketStartTime);
     }
 
+    /**
+    * @dev Internal Function to add market currency
+    * @param _currencyName name of the currency
+    * @param _marketFeed Price Feed address of the currency
+    * @param decimals Decimals of the price provided by feed address
+    * @param roundOfToNearest Round of the price to nearest number
+    * @param _marketStartTime Start time of initial markets
+    */
     function _addMarketCurrency(bytes32 _currencyName, address _marketFeed, uint8 decimals, uint8 roundOfToNearest, uint32 _marketStartTime) internal {
       uint32 index = uint32(marketCurrencies.length);
       marketCurrency[_currencyName] = index;
@@ -277,10 +294,12 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     }
 
     /**
-    * @dev Add new market type.
+    * @dev Add market type.
     * @param _predictionTime The time duration of market.
     * @param _optionRangePerc Option range percent of neutral min, max options (raised by 2 decimals)
+    * @param _marketStartTime Start time of first market to be created in this type
     * @param _marketCooldownTime Cool down time of the market after market is settled
+    * @param _minTimePassed Minimum amount of time to be passed for the time factor to be kicked in while calculating option price
     */
     function addMarketType(uint32 _predictionTime, uint32 _optionRangePerc, uint32 _marketStartTime, uint32 _marketCooldownTime, uint32 _minTimePassed) external onlyAuthorized {
       require(marketTypeArray[marketType[_predictionTime]].predictionTime != _predictionTime);
@@ -294,6 +313,14 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       }
     }
 
+    /**
+    * @dev Internal function add market type.
+    * @param _predictionTime The time duration of market.
+    * @param _optionRangePerc Option range percent of neutral min, max options (raised by 2 decimals)
+    * @param _marketStartTime Start time of first market to be created in this type
+    * @param _marketCooldownTime Cool down time of the market after market is settled
+    * @param _minTimePassed Minimum amount of time to be passed for the time factor to be kicked in while calculating option price
+    */
     function _addMarketType(uint32 _predictionTime, uint32 _optionRangePerc, uint32 _marketCooldownTime, uint32 _minTimePassed) internal returns(uint32) {
       uint32 index = uint32(marketTypeArray.length);
       marketType[_predictionTime] = index;
@@ -302,6 +329,13 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       return index;
     }
 
+    /**
+    * @dev Update market type.
+    * @param _marketType Index of the updating market type.
+    * @param _optionRangePerc Option range percent of neutral min, max options (raised by 2 decimals)
+    * @param _marketCooldownTime Cool down time of the market after market is settled
+    * @param _minTimePassed Minimum amount of time to be passed for the time factor to be kicked in while calculating option price
+    */
     function updateMarketType(uint32 _marketType, uint32 _optionRangePerc, uint32 _marketCooldownTime, uint32 _minTimePassed) external onlyAuthorized {
       require(_optionRangePerc > 0);
       require(_marketCooldownTime > 0);
@@ -316,6 +350,8 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
 
     /**
     * @dev function to update integer parameters
+    * @param code Code of the updating parameter.
+    * @param value Value to which the parameter should be updated
     */
     function updateUintParameters(bytes8 code, uint256 value) external onlyAuthorized {
       MarketFeeParams storage _marketFeeParams = marketFeeParams;
@@ -360,6 +396,9 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
 
     /**
     * @dev function to get integer parameters
+    * @param code Code of the parameter.
+    * @return codeVal Code of the parameter.
+    * @return value Value of the queried parameter.
     */
     function getUintParameters(bytes8 code) external view returns(bytes8 codeVal, uint256 value) {
       codeVal = code;
@@ -380,6 +419,8 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
 
     /**
      * @dev Changes the master address and update it's instance
+     * @param _authorizedMultiSig Authorized address to execute critical functions in the protocol.
+     * @param _defaultAuthorizedAddress Authorized address to trigger initial functions by passing required external values.
      */
     function setMasterAddress(address _authorizedMultiSig, address _defaultAuthorizedAddress) public {
       OwnedUpgradeabilityProxy proxy =  OwnedUpgradeabilityProxy(address(uint160(address(this))));
@@ -396,6 +437,9 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
 
     /**
     * @dev Start the initial market and set initial variables.
+    * @param _marketStartTime Starttime of the initial market of protocol
+    * @param _ethFeed Feed Address of initial eth/usd market
+    * @param _btcFeed Feed Address of btc/usd market
     */
     function addInitialMarketTypesAndStart(uint32 _marketStartTime, address _ethFeed, address _btcFeed) external onlyAuthorizedUsers {
       require(marketTypeArray.length == 0);
@@ -463,6 +507,13 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       _placeInitialPrediction(_marketIndex, _msgSenderAddress);
     }
 
+    /**
+     * @dev Internal function to calculate option ranges for the market
+     * @param _optionRangePerc Defined Option percent
+     * @param _decimals Decimals of the given feed address
+     * @param _roundOfToNearest Round of the option range to the nearest multiple
+     * @param _marketFeed Market Feed address
+     */
     function _calculateOptionRange(uint _optionRangePerc, uint64 _decimals, uint8 _roundOfToNearest, address _marketFeed) internal view returns(uint64 _minValue, uint64 _maxValue) {
       uint currentPrice = IOracle(_marketFeed).getLatestPrice();
       uint optionRangePerc = currentPrice.mul(_optionRangePerc.div(2)).div(10000);
@@ -470,6 +521,11 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       _maxValue = uint64((ceil(currentPrice.add(optionRangePerc).div(_roundOfToNearest), 10**_decimals)).mul(_roundOfToNearest));
     }
 
+    /**
+     * @dev Internal function to place initial prediction of the market creator
+     * @param _marketId Index of the market to place prediction
+     * @param _msgSenderAddress Address of the user who is placing the prediction
+     */
     function _placeInitialPrediction(uint64 _marketId, address _msgSenderAddress) internal {
       uint64 _mcDefaultPredictionAmount = mcDefaultPredictionAmount;
       uint256 _defaultAmount = (10**predictionDecimalMultiplier).mul(_mcDefaultPredictionAmount);
@@ -485,6 +541,8 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
 
     /**
     * @dev Calculate start time for next market of provided currency and market type indexes
+    * @param _marketCurrencyIndex Index of the market currency
+    * @param _marketType Index of the market type
     */
     function calculateStartTimeForMarket(uint32 _marketCurrencyIndex, uint32 _marketType) public view returns(uint32 _marketStartTime) {
       _marketStartTime = marketCreationData[_marketType][_marketCurrencyIndex].initialStartTime;
@@ -508,6 +566,9 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
 
     /**
     * @dev Internal function to settle the previous market 
+    * @param _marketTypeIndex Index of the market type
+    * @param _marketCurrencyIndex Index of the market currency
+    * @param _roundId RoundId of the feed for the settlement price
     */
     function _closePreviousMarketWithRoundId(uint64 _marketTypeIndex, uint64 _marketCurrencyIndex, uint80 _roundId) internal {
       MarketCreationData storage _marketCreationData = marketCreationData[_marketTypeIndex][_marketCurrencyIndex];
@@ -523,6 +584,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
 
     /**
     * @dev Get market settle time
+    * @param _marketId Index of the market
     * @return the time at which the market result will be declared
     */
     function marketSettleTime(uint256 _marketId) public view returns(uint32) {
@@ -536,6 +598,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
 
     /**
     * @dev Gets the status of market.
+    * @param _marketId Index of the market
     * @return PredictionStatus representing the status of market.
     */
     function marketStatus(uint256 _marketId) public view returns(PredictionStatus){
@@ -550,6 +613,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
 
     /**
     * @dev Get market cooldown time
+    * @param _marketId Index of the market
     * @return the time upto which user can raise the dispute after the market is settled
     */
     function marketCoolDownTime(uint256 _marketId) public view returns(uint256) {
@@ -651,7 +715,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     * @param _asset The asset used by user during prediction whether it is prediction token address or in Bonus token.
     * @param _predictionStake The amount staked by user at the time of prediction.
     * @param _prediction The option on which user placed prediction.
-    * _predictioStake should be passed with 8 decimals, reduced it to 8 decimals to reduce the storage space of prediction data
+    * _predictionStake should be passed with 8 decimals, reduced it to 8 decimals to reduce the storage space of prediction data
     */
     function _placePrediction(uint _marketId, address _asset, uint64 _predictionStake, uint256 _prediction) internal {
       address payable _msgSenderAddress = _msgSender();
@@ -687,6 +751,12 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       emit PlacePrediction(_msgSenderAddress, _predictionStake, predictionPoints, _asset, _prediction, _marketId);
     }
 
+    /**
+     * @dev Internal function to deduct fee from the prediction amount
+     * @param _marketId Index of the market
+     * @param _amount Total preidction amount of the user
+     * @param _msgSenderAddress User address
+     */
     function _deductFee(uint _marketId, uint64 _amount, address _msgSenderAddress) internal returns(uint64 _amountPostFee){
       uint64 _fee;
       address _relayer;
@@ -708,6 +778,13 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       // _transferAsset(predictionToken, address(marketCreationRewards), (10**predictionDecimalMultiplier).mul(_daoFee));
     }
 
+    /**
+     * @dev Internal function to check and calcualte the referral fee from the cummulative fee
+     * @param _msgSenderAddress User address
+     * @param _cummulativeFee Total fee deducted from the user's prediction amount 
+     * @param _refereeFeePerc Referee fee percent to be deducted from the cummulative fee
+     * @param _referrerFeePerc Referrer fee percent to be deducted from the cummulative fee
+     */
     function _calculateReferalFee(address _msgSenderAddress, uint64 _cummulativeFee, uint32 _refereeFeePerc, uint32 _referrerFeePerc) internal returns(uint64 _referrerFee, uint64 _refereeFee) {
       UserData storage _userData = userData[_msgSenderAddress];
       address _referrer = _userData.referrer;
@@ -723,6 +800,10 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
 
     /**
     * @dev Internal function to calculate prediction points  and multiplier
+    * @param _user User Address
+    * @param _marketId Index of the market
+    * @param _prediction Option predicted by the user
+    * @param _stake Amount staked by the user
     */
     function _calculatePredictionPointsAndMultiplier(address _user, uint256 _marketId, uint256 _prediction, uint64 _stake) internal returns(uint64 predictionPoints){
       bool isMultiplierApplied;
@@ -733,6 +814,14 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       }
     }
 
+    /**
+    * @dev Internal function to calculate prediction points
+    * @param _marketId Index of the market
+    * @param _prediction Option predicted by the user
+    * @param _user User Address
+    * @param multiplierApplied Flag defining if user had already availed multiplier
+    * @param _predictionStake Amount staked by the user
+    */
     function calculatePredictionPoints(uint _marketId, uint256 _prediction, address _user, bool multiplierApplied, uint _predictionStake) internal view returns(uint64 predictionPoints, bool isMultiplierApplied) {
       uint _stakeValue = _predictionStake.mul(1e10);
       if(_stakeValue < minPredictionAmount || _stakeValue > maxPredictionAmount) {
@@ -869,6 +958,8 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
 
     /**
     * @dev Settle the market, setting the winning option
+    * @param _marketId Index of market
+    * @param _roundId RoundId of the feed for the settlement price
     */
     function settleMarket(uint256 _marketId, uint80 _roundId) external {
       _settleMarket(_marketId, _roundId);
@@ -886,7 +977,9 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     }
 
     /**
-    * @dev Settle the market, setting the winning option
+    * @dev Internal function to settle market
+    * @param _marketId Index of market
+    * @param _roundId RoundId of the feed for the settlement price
     */
     function _settleMarket(uint256 _marketId, uint80 _roundId) internal {
       address _feedAdd = marketBasicData[_marketId].feedAddress;
@@ -1163,6 +1256,13 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       }
     }
 
+    /**
+    * @dev Internal function to call transferFrom function of a given token
+    * @param _token Address of the ERC20 token
+    * @param _from Address from which the tokens are to be received
+    * @param _to Address to which the tokens are to be transferred
+    * @param _amount Amount of tokens to transfer. In Wei
+    */
     function _transferTokenFrom(address _token, address _from, address _to, uint256 _amount) internal {
       IToken(_token).transferFrom(_from, _to, _amount);
     }
