@@ -186,6 +186,13 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     }
 
     /**
+    * @dev Function to set authorized address
+    **/
+    function addAuthorizedAddress(address _address) external onlyAuthorizedUsers {
+        authorizedAddresses[_address] = true;
+    }
+
+    /**
     * @dev Set referrer address of a user, can be set only by the authorized users
     * @param _referrer User who is referring new user
     * @return _referee User who is getting referred
@@ -220,13 +227,6 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       uint256 _refereeFee = _userData.refereeFee;
       delete _userData.refereeFee;
       _transferAsset(predictionToken, _user, (_refereeFee.add(_referrerFee)).mul(10**predictionDecimalMultiplier));
-    }
-
-    /**
-    * @dev Function to set authorized address
-    **/
-    function addAuthorizedAddress(address _address) external onlyAuthorizedUsers {
-        authorizedAddresses[_address] = true;
     }
 
     /**
