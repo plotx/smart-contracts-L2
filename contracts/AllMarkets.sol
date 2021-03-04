@@ -317,7 +317,6 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     * @dev Internal function add market type.
     * @param _predictionTime The time duration of market.
     * @param _optionRangePerc Option range percent of neutral min, max options (raised by 2 decimals)
-    * @param _marketStartTime Start time of first market to be created in this type
     * @param _marketCooldownTime Cool down time of the market after market is settled
     * @param _minTimePassed Minimum amount of time to be passed for the time factor to be kicked in while calculating option price
     */
