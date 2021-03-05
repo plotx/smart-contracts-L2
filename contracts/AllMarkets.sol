@@ -1315,12 +1315,15 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     * @dev Internal function set market status
     * @param _marketId Index of market
     * @param _status Status of market to set
-    */    
+    */
     function setMarketStatus(uint256 _marketId, PredictionStatus _status) public {
       require(msg.sender == disputeResolution);
       marketDataExtended[_marketId].predictionStatus = _status;
     }
 
+    /**
+    * @dev Internal function to perfrom ceil operation of given params
+    */
     function ceil(uint256 a, uint256 m) internal pure returns (uint256) {
         return ((a + m - 1) / m) * m;
     }
