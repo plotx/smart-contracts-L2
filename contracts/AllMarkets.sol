@@ -843,7 +843,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       if(_stakeValue < minPredictionAmount || _stakeValue > maxPredictionAmount) {
         return (0, isMultiplierApplied);
       }
-      uint64 _optionPrice = getOptionPrice(_marketId, _prediction);
+      uint64 _optionPrice = IMarket(msg.sender).getOptionPrice(_marketId, _prediction);
       predictionPoints = uint64(_predictionStake).div(_optionPrice);
       if(!multiplierApplied) {
         uint256 _predictionPoints;
@@ -868,61 +868,6 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
         multiplierApplied = true;
       }
       return (_predictionPoints.mul(_muliplier).div(100),multiplierApplied);
-    }
-
-    /**
-     * @dev Gets price for given market and option
-     * @param _marketId  Market ID
-     * @param _prediction  prediction option
-     * @return  option price
-     **/
-    function getOptionPrice(uint _marketId, uint256 _prediction) public view returns(uint64) {
-      MarketBasicData storage _marketBasicData = marketBasicData[_marketId];
-      PricingData storage _marketPricingData = marketPricingData[_marketId];
-      uint stakingFactorConst;
-      uint optionPrice; 
-      uint256 totalStaked = marketDataExtended[_marketId].totalStaked;
-      // Checking if current stake in market reached minimum stake required for considering staking factor.
-      if(totalStaked > _marketPricingData.stakingFactorMinStake)
-      {
-        // 10000 / staking weightage
-        stakingFactorConst = uint(10000).div(_marketPricingData.stakingFactorWeightage); 
-        // (stakingFactorConst x Amount staked in option x 10^18) / Total staked in market --- (1)
-        optionPrice = (stakingFactorConst.mul(marketOptionsAvailable[_marketId][_prediction].amountStaked).mul(10**18).div(totalStaked)); 
-      }
-      uint timeElapsed = uint(now).sub(_marketBasicData.startTime);
-      // max(timeElapsed, minTimePassed)
-      if(timeElapsed < _marketPricingData.minTimePassed) {
-        timeElapsed = _marketPricingData.minTimePassed;
-      }
-      uint[] memory _distanceData = getOptionDistanceData(_marketId,_prediction);
-
-      // (Time Elapsed x 10000) / ((Max Distance + 1) x currentPriceWeightage)
-      uint timeFactor = timeElapsed.mul(10000).div((_distanceData[0].add(1)).mul(_marketPricingData.currentPriceWeightage));
-
-      uint totalTime = _marketBasicData.predictionTime;
-
-      // (1) + ((Option Distance from max distance + 1) x timeFactor x 10^18 / Total Prediction Time)  -- (2)
-      optionPrice = optionPrice.add((_distanceData[1].add(1)).mul(timeFactor).mul(10**18).div(totalTime));  
-      // (2) / ((stakingFactorConst x 10^13) + timeFactor x 10^13 x (cummulative option distaance + 3) / Total Prediction Time)
-      optionPrice = optionPrice.div(stakingFactorConst.mul(10**13).add(timeFactor.mul(10**13).mul(_distanceData[2].add(3)).div(totalTime)));
-
-      // option price for `_prediction` in 10^5 format
-      return uint64(optionPrice);
-
-    }
-
-    /**
-     * @dev Gets price for all the options in a market
-     * @param _marketId  Market ID
-     * @return _optionPrices array consisting of prices for all available options
-     **/
-    function getAllOptionPrices(uint _marketId) external view returns(uint64[] memory _optionPrices) {
-      _optionPrices = new uint64[](3);
-      for(uint i=0;i<3;i++) {
-        _optionPrices[i] = getOptionPrice(_marketId,i+1);
-      }
-
     }
 
     /**
