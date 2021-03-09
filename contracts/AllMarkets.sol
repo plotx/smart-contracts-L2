@@ -128,6 +128,8 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     uint internal totalOptions;
     uint internal predictionDecimalMultiplier;
     uint internal defaultMaxRecords;
+    uint internal minPredictionAmount;
+    uint internal maxPredictionAmount;
     uint64 internal mcDefaultPredictionAmount;
 
     bool public marketCreationPaused;
@@ -311,6 +313,8 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       _initializeEIP712("AM");
       predictionDecimalMultiplier = 10;
       defaultMaxRecords = 20;
+      minPredictionAmount = 10 ether; // Need to be updated
+      maxPredictionAmount = 100000 ether; // Need to be updated
       mcDefaultPredictionAmount = 100 * 10**8;
     }
 
@@ -495,7 +499,187 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     * _predictionStake should be passed with 8 decimals, reduced it to 8 decimals to reduce the storage space of prediction data
     */
     function _placePrediction(uint _marketId, address _asset, uint64 _predictionStake, uint256 _prediction) internal {
-   
+      address payable _msgSenderAddress = _msgSender();
+      require(!marketCreationPaused && _prediction <= totalOptions && _prediction >0);
+      require(now >= marketBasicData[_marketId].startTime && now <= marketExpireTime(_marketId));
+      uint64 _predictionStakePostDeduction = _predictionStake;
+      uint decimalMultiplier = 10**predictionDecimalMultiplier;
+      UserData storage _userData = userData[_msgSenderAddress];
+      if(_asset == predictionToken) {
+        uint256 unusedBalance = _userData.unusedBalance;
+        unusedBalance = unusedBalance.div(decimalMultiplier);
+        if(_predictionStake > unusedBalance)
+        {
+          _withdrawReward(defaultMaxRecords);
+          unusedBalance = _userData.unusedBalance;
+          unusedBalance = unusedBalance.div(decimalMultiplier);
+        }
+        require(_predictionStake <= unusedBalance);
+        _userData.unusedBalance = (unusedBalance.sub(_predictionStake)).mul(decimalMultiplier);
+      } else {
+        require(_asset == address(bPLOTInstance));
+        require(!_userData.userMarketData[_marketId].predictedWithBlot);
+        _userData.userMarketData[_marketId].predictedWithBlot = true;
+        bPLOTInstance.convertToPLOT(_msgSenderAddress, address(this), (decimalMultiplier).mul(_predictionStake));
+        _asset = plotToken;
+      }
+      _predictionStakePostDeduction = _deductFee(_marketId, _predictionStake, _msgSenderAddress);
+      
+      uint64 predictionPoints = _calculatePredictionPointsAndMultiplier(_msgSenderAddress, _marketId, _prediction, _predictionStakePostDeduction);
+      require(predictionPoints > 0);
+
+      _storePredictionData(_marketId, _prediction, _predictionStakePostDeduction, predictionPoints);
+      emit PlacePrediction(_msgSenderAddress, _predictionStake, predictionPoints, _asset, _prediction, _marketId);
+    }
+
+    /**
+     * @dev Internal function to deduct fee from the prediction amount
+     * @param _marketId Index of the market
+     * @param _amount Total preidction amount of the user
+     * @param _msgSenderAddress User address
+     */
+    function _deductFee(uint _marketId, uint64 _amount, address _msgSenderAddress) internal returns(uint64 _amountPostFee){
+      uint64 _fee;
+      address _relayer;
+      if(_msgSenderAddress != tx.origin) {
+        _relayer = tx.origin;
+      } else {
+        _relayer = _msgSenderAddress;
+      }
+      MarketFeeParams storage _marketFeeParams = marketFeeParams;
+      _fee = _calculateAmulBdivC(_marketFeeParams.cummulativeFeePercent, _amount, 10000);
+      _amountPostFee = _amount.sub(_fee);
+      (uint64 _referrerFee, uint64 _refereeFee) = _calculateReferalFee(_msgSenderAddress, _fee, _marketFeeParams.refereeFeePercent, _marketFeeParams.referrerFeePercent);
+      uint64 _daoFee = _calculateAmulBdivC(_marketFeeParams.daoCommissionPercent, _fee, 10000);
+      uint64 _marketCreatorFee = _calculateAmulBdivC(_marketFeeParams.marketCreatorFeePercent, _fee, 10000);
+      _marketFeeParams.daoFee[_marketId] = _marketFeeParams.daoFee[_marketId].add(_daoFee);
+      _marketFeeParams.marketCreatorFee[_marketId] = _marketFeeParams.marketCreatorFee[_marketId].add(_marketCreatorFee);
+      _fee = _fee.sub(_daoFee).sub(_referrerFee).sub(_refereeFee).sub(_marketCreatorFee);
+      relayerFeeEarned[_relayer] = relayerFeeEarned[_relayer].add(_fee);
+      // _transferAsset(predictionToken, address(marketCreationRewards), (10**predictionDecimalMultiplier).mul(_daoFee));
+    }
+
+    /**
+     * @dev Internal function to check and calcualte the referral fee from the cummulative fee
+     * @param _msgSenderAddress User address
+     * @param _cummulativeFee Total fee deducted from the user's prediction amount 
+     * @param _refereeFeePerc Referee fee percent to be deducted from the cummulative fee
+     * @param _referrerFeePerc Referrer fee percent to be deducted from the cummulative fee
+     */
+    function _calculateReferalFee(address _msgSenderAddress, uint64 _cummulativeFee, uint32 _refereeFeePerc, uint32 _referrerFeePerc) internal returns(uint64 _referrerFee, uint64 _refereeFee) {
+      UserData storage _userData = userData[_msgSenderAddress];
+      address _referrer = _userData.referrer;
+      if(_referrer != address(0)) {
+        //Commission for referee
+        _refereeFee = _calculateAmulBdivC(_refereeFeePerc, _cummulativeFee, 10000);
+        _userData.refereeFee = _userData.refereeFee.add(_refereeFee);
+        //Commission for referrer
+        _referrerFee = _calculateAmulBdivC(_referrerFeePerc, _cummulativeFee, 10000);
+        userData[_referrer].referrerFee = userData[_referrer].referrerFee.add(_referrerFee);
+      }
+    }
+
+    /**
+    * @dev Internal function to calculate prediction points  and multiplier
+    * @param _user User Address
+    * @param _marketId Index of the market
+    * @param _prediction Option predicted by the user
+    * @param _stake Amount staked by the user
+    */
+    function _calculatePredictionPointsAndMultiplier(address _user, uint256 _marketId, uint256 _prediction, uint64 _stake) internal returns(uint64 predictionPoints){
+      bool isMultiplierApplied;
+      UserData storage _userData = userData[_user];
+      (predictionPoints, isMultiplierApplied) = calculatePredictionPoints(_marketId, _prediction, _user, _userData.userMarketData[_marketId].multiplierApplied, _stake);
+      if(isMultiplierApplied) {
+        _userData.userMarketData[_marketId].multiplierApplied = true; 
+      }
+    }
+
+    /**
+    * @dev Internal function to calculate prediction points
+    * @param _marketId Index of the market
+    * @param _prediction Option predicted by the user
+    * @param _user User Address
+    * @param multiplierApplied Flag defining if user had already availed multiplier
+    * @param _predictionStake Amount staked by the user
+    */
+    function calculatePredictionPoints(uint _marketId, uint256 _prediction, address _user, bool multiplierApplied, uint _predictionStake) internal view returns(uint64 predictionPoints, bool isMultiplierApplied) {
+      uint _stakeValue = _predictionStake.mul(1e10);
+      if(_stakeValue < minPredictionAmount || _stakeValue > maxPredictionAmount) {
+        return (0, isMultiplierApplied);
+      }
+      uint64 _optionPrice = IMarket(msg.sender).getOptionPrice(_marketId, _prediction);
+      predictionPoints = uint64(_predictionStake).div(_optionPrice);
+      if(!multiplierApplied) {
+        uint256 _predictionPoints;
+        (_predictionPoints, isMultiplierApplied) = checkMultiplier(_user,  predictionPoints);
+        predictionPoints = uint64(_predictionPoints);
+      }
+    }
+
+    /**
+    * @dev Check if user gets any multiplier on his positions
+    * @param _user User address
+    * @param _predictionPoints The actual positions user got during prediction.
+    * @return uint256 representing multiplied positions
+    * @return bool returns true if multplier applied
+    */
+    function checkMultiplier(address _user, uint _predictionPoints) internal view returns(uint, bool) {
+      bool multiplierApplied;
+      uint _muliplier = 100;
+      uint256 _userLevel = userLevel[_user];
+      if(_userLevel > 0) {
+        _muliplier = _muliplier + levelMultiplier[_userLevel];
+        multiplierApplied = true;
+      }
+      return (_predictionPoints.mul(_muliplier).div(100),multiplierApplied);
+    }
+
+    /**
+     * @dev Gets price for given market and option
+     * @param _marketId  Market ID
+     * @param _prediction  prediction option
+     * @return  Array consist of Max Distance between current option and any option, predicting Option distance from max distance, cummulative option distance
+     **/
+    function getOptionDistanceData(uint _marketId,uint _prediction) internal view returns(uint[] memory) {
+      MarketBasicData storage _marketBasicData = marketBasicData[_marketId];
+      // [0]--> Max Distance between current option and any option, (For 3 options, if current option is 2 it will be `1`. else, it will be `2`) 
+      // [1]--> Predicting option distance from Max distance, (MaxDistance - | currentOption - predicting option |)
+      // [2]--> sum of all possible option distances,  
+      uint[] memory _distanceData = new uint256[](3); 
+
+      // Fetching current price
+      uint currentPrice = IOracle(_marketBasicData.feedAddress).getLatestPrice();
+      _distanceData[0] = 2;
+      // current option based on current price
+      uint currentOption;
+      _distanceData[2] = 3;
+      if(currentPrice < _marketBasicData.neutralMinValue)
+      {
+        currentOption = 1;
+      } else if(currentPrice > _marketBasicData.neutralMaxValue) {
+        currentOption = 3;
+      } else {
+        currentOption = 2;
+        _distanceData[0] = 1;
+        _distanceData[2] = 1;
+      }
+
+      // MaxDistance - | currentOption - predicting option |
+      _distanceData[1] = _distanceData[0].sub(modDiff(currentOption,_prediction)); 
+      return _distanceData;
+    }
+
+    /**
+     * @dev  Calculates difference between `a` and `b`.
+     **/
+    function modDiff(uint a, uint b) internal pure returns(uint) {
+      if(a>b)
+      {
+        return a.sub(b);
+      } else {
+        return b.sub(a);
+      }
     }
 
     /**
