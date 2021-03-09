@@ -46,7 +46,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
 
     event Deposited(address indexed user, uint256 amount, uint256 timeStamp);
     event Withdrawn(address indexed user, uint256 amount, uint256 timeStamp);
-    event MarketQuestion(uint256 indexed marketIndex, uint256 startTime, uint256 predictionTime, uint256 coolDownTime, uint256 setlementTime, uint64[] optionRanges);
+    event MarketQuestion(uint256 indexed marketIndex, uint256 startTime, uint256 predictionTime, uint256 coolDownTime, uint256 setlementTime, uint64[] optionRanges, address marketCreatorContract);
     event OptionPricingParams(uint256 indexed marketIndex, uint256 _stakingFactorMinStake,uint32 _stakingFactorWeightage,uint256 _currentPriceWeightage,uint32 _minTimePassed);
     event MarketResult(uint256 indexed marketIndex, uint256 totalReward, uint256 winningOption, uint256 closeValue, uint256 daoFee, uint256 marketCreatorFee);
     // event MarketResult(uint256 indexed marketIndex, uint256 totalReward, uint256 winningOption, uint256 closeValue, uint256 roundId, uint256 daoFee, uint256 marketCreatorFee);
@@ -329,17 +329,17 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     /**
     * @dev Create the market.
     */
-    function createMarket(uint32 _startTime, uint32 _predictionTime, uint32 _settlementTime, uint32 _cooldownTime, uint64[] memory _optionRanges) public {
+    function createMarket(uint32[] memory _marketTimes, uint64[] memory _optionRanges, address _createdBy) public {
+      // _marketTimes => [0] _startTime, [1] _predictionTIme, [2] _settlementTime, [3] _cooldownTime
       require(authorizedMarketCreator[msg.sender]);
       require(!marketCreationPaused);
       uint64 _marketIndex = uint64(marketBasicData.length);
-      marketBasicData.push(MarketBasicData(_startTime, _predictionTime, _cooldownTime, _settlementTime));
+      marketBasicData.push(MarketBasicData(_marketTimes[0], _marketTimes[1], _marketTimes[3], _marketTimes[2]));
       marketDataExtended[_marketIndex].optionRanges = _optionRanges;
       marketDataExtended[_marketIndex].createdBy = msg.sender;
-      emit MarketQuestion(_marketIndex, _startTime, _predictionTime, _cooldownTime, _settlementTime, _optionRanges);
-      address _msgSenderAddress = _msgSender();
-      marketCreationRewards.updateMarketCreationData(_msgSenderAddress, _marketIndex);
-      _placeInitialPrediction(_marketIndex, _msgSenderAddress, _optionRanges.length);
+      emit MarketQuestion(_marketIndex, _marketTimes[0], _marketTimes[1], _marketTimes[3], _marketTimes[2], _optionRanges, msg.sender);
+      marketCreationRewards.updateMarketCreationData(_createdBy, _marketIndex);
+      _placeInitialPrediction(_marketIndex, _createdBy, uint64(_optionRanges.length));
     }
     
     /**
@@ -347,7 +347,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
      * @param _marketId Index of the market to place prediction
      * @param _msgSenderAddress Address of the user who is placing the prediction
      */
-    function _placeInitialPrediction(uint64 _marketId, address _msgSenderAddress, uint _totalOptions) internal {
+    function _placeInitialPrediction(uint64 _marketId, address _msgSenderAddress, uint64 _totalOptions) internal {
       uint64 _mcDefaultPredictionAmount = mcDefaultPredictionAmount;
       uint256 _defaultAmount = (10**predictionDecimalMultiplier).mul(_mcDefaultPredictionAmount);
       (uint _tokenLeft, uint _tokenReward) = getUserUnusedBalance(_msgSenderAddress);
@@ -355,10 +355,10 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
         _deposit(_defaultAmount);
       }
       address _predictionToken = predictionToken;
-    //   for(uint i = 1;i < _totalOptions; i++) {
-    //     _placePrediction(_marketId, _predictionToken, _mcDefaultPredictionAmount/_totalOptions, i);
-    //   }
-    //   _placePrediction(_marketId, _predictionToken, _mcDefaultPredictionAmount - (_totalOptions-1)*(_mcDefaultPredictionAmount/_totalOptions), _totalOptions);
+      for(uint i = 1;i < _totalOptions; i++) {
+        _placePrediction(_marketId, _predictionToken, _mcDefaultPredictionAmount/_totalOptions, i);
+      }
+      _placePrediction(_marketId, _predictionToken, _mcDefaultPredictionAmount - (_totalOptions-1)*(_mcDefaultPredictionAmount/_totalOptions), _totalOptions);
     }
 
     /**
