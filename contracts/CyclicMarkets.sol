@@ -5,8 +5,8 @@ import "./external/proxy/OwnedUpgradeabilityProxy.sol";
 import "./external/NativeMetaTransaction.sol";
 import "./interfaces/IToken.sol";
 import "./interfaces/IbLOTToken.sol";
-import "./interfaces/IMarketCreationRewards.sol";
 import "./interfaces/IAuth.sol";
+import "./interfaces/IAllMarkets.sol";
 import "./interfaces/IOracle.sol";
 
 contract IMaster {
@@ -75,12 +75,11 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
 
     address internal masterAddress;
     address internal plotToken;
-    address internal disputeResolution;
+    IAllMarkets internal allMarkets;
     address internal predictionToken;
 
     IbLOTToken internal bPLOTInstance;
-    IMarketCreationRewards internal marketCreationRewards;
-
+    
     MarketCurrency[] internal marketCurrencies;
     MarketTypeData[] internal marketTypeArray;
     mapping(bytes32 => uint) internal marketCurrency;
@@ -92,8 +91,6 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
     mapping(address => bool) public authorizedAddresses;
 
     uint internal totalOptions;
-    uint internal minPredictionAmount ;
-    uint internal maxPredictionAmount ;
     uint internal stakingFactorMinStake ;
     uint32 internal stakingFactorWeightage ;
     uint32 internal currentPriceWeightage ;
@@ -210,15 +207,12 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       require(_btcFeed != address(0));
       
       IMaster ms = IMaster(masterAddress);
-      marketCreationRewards = IMarketCreationRewards(ms.getLatestAddress("MC"));
-      disputeResolution = ms.getLatestAddress("DR");
+      allMarkets = IAllMarkets(ms.getLatestAddress("AM"));
       
       totalOptions = 3;
       stakingFactorMinStake = uint(20000).mul(10**8);
       stakingFactorWeightage = 40;
       currentPriceWeightage = 60;
-      minPredictionAmount = 10 ether; // Need to be updated
-      maxPredictionAmount = 100000 ether; // Need to be updated
       MarketFeeParams storage _marketFeeParams = marketFeeParams;
       _marketFeeParams.cummulativeFeePercent = 200;
       _marketFeeParams.daoCommissionPercent = 1000;
@@ -252,8 +246,13 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       require(!_marketType.paused);
       _closePreviousMarketWithRoundId( _marketTypeIndex, _marketCurrencyIndex, _roundId);
       uint32 _startTime = calculateStartTimeForMarket(_marketCurrencyIndex, _marketTypeIndex);
+      uint32[] memory _marketTimes = new uint32[](4);
+      _marketTimes[0] = _startTime; 
+      _marketTimes[1] = _marketType.predictionTime;
+      _marketTimes[2] = _marketType.predictionTime*2;
+      _marketTimes[3] = _marketType.cooldownTime;
       // uint64 _marketIndex = allMarkets.createMarket();
-      uint64 _marketIndex;
+      // uint64 _marketIndex;
       MarketCreationData storage _marketCreationData = marketCreationData[_marketTypeIndex][_marketCurrencyIndex];
       (_marketCreationData.penultimateMarket, _marketCreationData.latestMarket) =
        (_marketCreationData.latestMarket, _marketIndex);
