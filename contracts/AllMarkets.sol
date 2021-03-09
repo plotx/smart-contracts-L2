@@ -29,6 +29,10 @@ contract IMaster {
     function getLatestAddress(bytes2 _module) public view returns(address);
 }
 
+contract IMarket {
+  function getOptionPrice(uint _marketId, uint256 _prediction) public view returns(uint64);
+}
+
 
 contract AllMarkets is IAuth, NativeMetaTransaction {
     using SafeMath32 for uint32;
@@ -633,53 +637,6 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
         multiplierApplied = true;
       }
       return (_predictionPoints.mul(_muliplier).div(100),multiplierApplied);
-    }
-
-    /**
-     * @dev Gets price for given market and option
-     * @param _marketId  Market ID
-     * @param _prediction  prediction option
-     * @return  Array consist of Max Distance between current option and any option, predicting Option distance from max distance, cummulative option distance
-     **/
-    function getOptionDistanceData(uint _marketId,uint _prediction) internal view returns(uint[] memory) {
-      MarketBasicData storage _marketBasicData = marketBasicData[_marketId];
-      // [0]--> Max Distance between current option and any option, (For 3 options, if current option is 2 it will be `1`. else, it will be `2`) 
-      // [1]--> Predicting option distance from Max distance, (MaxDistance - | currentOption - predicting option |)
-      // [2]--> sum of all possible option distances,  
-      uint[] memory _distanceData = new uint256[](3); 
-
-      // Fetching current price
-      uint currentPrice = IOracle(_marketBasicData.feedAddress).getLatestPrice();
-      _distanceData[0] = 2;
-      // current option based on current price
-      uint currentOption;
-      _distanceData[2] = 3;
-      if(currentPrice < _marketBasicData.neutralMinValue)
-      {
-        currentOption = 1;
-      } else if(currentPrice > _marketBasicData.neutralMaxValue) {
-        currentOption = 3;
-      } else {
-        currentOption = 2;
-        _distanceData[0] = 1;
-        _distanceData[2] = 1;
-      }
-
-      // MaxDistance - | currentOption - predicting option |
-      _distanceData[1] = _distanceData[0].sub(modDiff(currentOption,_prediction)); 
-      return _distanceData;
-    }
-
-    /**
-     * @dev  Calculates difference between `a` and `b`.
-     **/
-    function modDiff(uint a, uint b) internal pure returns(uint) {
-      if(a>b)
-      {
-        return a.sub(b);
-      } else {
-        return b.sub(a);
-      }
     }
 
     /**
