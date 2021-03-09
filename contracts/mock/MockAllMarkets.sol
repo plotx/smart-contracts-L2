@@ -7,7 +7,7 @@ contract MockAllMarkets is AllMarkets {
     uint64 public nextOptionPrice;
 
     function postResultMock(uint _val, uint _marketId) external {
-        _postResult(_val, 0 , _marketId);
+        _postResult(_val, _marketId);
     } 
 
     function setNextOptionPrice(uint64 _price) public {
@@ -19,7 +19,7 @@ contract MockAllMarkets is AllMarkets {
             return nextOptionPrice;
         }
         else  {
-            return super.getOptionPrice(_marketId, _prediction);
+            // return super.getOptionPrice(_marketId, _prediction);
         }
     }
 

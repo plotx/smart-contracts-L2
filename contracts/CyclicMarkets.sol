@@ -1,7 +1,34 @@
 pragma solidity 0.5.7;
 
-contract CyclicMarkets {
+import "./external/openzeppelin-solidity/math/SafeMath.sol";
+import "./external/proxy/OwnedUpgradeabilityProxy.sol";
+import "./external/NativeMetaTransaction.sol";
+import "./interfaces/IToken.sol";
+import "./interfaces/IbLOTToken.sol";
+import "./interfaces/IMarketCreationRewards.sol";
+import "./interfaces/IAuth.sol";
+import "./interfaces/IOracle.sol";
 
+contract IMaster {
+    function dAppToken() public view returns(address);
+    function getLatestAddress(bytes2 _module) public view returns(address);
+}
+
+contract CyclicMarkets is IAuth, NativeMetaTransaction {
+    using SafeMath32 for uint32;
+    using SafeMath64 for uint64;
+    using SafeMath128 for uint128;
+    using SafeMath for uint;
+
+    enum PredictionStatus {
+      Live,
+      InSettlement,
+      Cooling,
+      InDispute,
+      Settled
+    }
+
+    event OptionPricingParams(uint256 indexed marketIndex, uint256 _stakingFactorMinStake,uint32 _stakingFactorWeightage,uint256 _currentPriceWeightage,uint32 _minTimePassed);
     event MarketTypes(uint256 indexed index, uint32 predictionTime, uint32 cooldownTime, uint32 optionRangePerc, bool status, uint32 minTimePassed);
     event MarketCurrencies(uint256 indexed index, address feedAddress, bytes32 currencyName, bool status);
 
@@ -27,6 +54,33 @@ contract CyclicMarkets {
       bool paused;
     }
 
+    struct PricingData {
+      uint256 stakingFactorMinStake;
+      uint32 stakingFactorWeightage;
+      uint32 currentPriceWeightage;
+      uint32 minTimePassed;
+    }
+
+    struct MarketFeeParams {
+      uint32 cummulativeFeePercent;
+      uint32 daoCommissionPercent;
+      uint32 referrerFeePercent;
+      uint32 refereeFeePercent;
+      uint32 marketCreatorFeePercent;
+      mapping (uint256 => uint64) daoFee;
+      mapping (uint256 => uint64) marketCreatorFee;
+    }
+
+    MarketFeeParams internal marketFeeParams;
+
+    address internal masterAddress;
+    address internal plotToken;
+    address internal disputeResolution;
+    address internal predictionToken;
+
+    IbLOTToken internal bPLOTInstance;
+    IMarketCreationRewards internal marketCreationRewards;
+
     MarketCurrency[] internal marketCurrencies;
     MarketTypeData[] internal marketTypeArray;
     mapping(bytes32 => uint) internal marketCurrency;
@@ -34,6 +88,27 @@ contract CyclicMarkets {
     mapping(uint64 => uint32) internal marketType;
     mapping(uint256 => mapping(uint256 => MarketCreationData)) internal marketCreationData;
 
+    mapping(uint256 => PricingData) internal marketPricingData;
+    mapping(address => bool) public authorizedAddresses;
+
+    uint internal totalOptions;
+    uint internal minPredictionAmount ;
+    uint internal maxPredictionAmount ;
+    uint internal stakingFactorMinStake ;
+    uint32 internal stakingFactorWeightage ;
+    uint32 internal currentPriceWeightage ;
+
+    modifier onlyAuthorizedUsers() {
+        require(authorizedAddresses[msg.sender]);
+        _;
+    }
+
+    /**
+    * @dev Function to set authorized address
+    **/
+    function addAuthorizedAddress(address _address) external onlyAuthorizedUsers {
+        authorizedAddresses[_address] = true;
+    }
     
     /**
     * @dev Add new market currency.
@@ -124,6 +199,48 @@ contract CyclicMarkets {
     }
 
     /**
+    * @dev Start the initial market and set initial variables.
+    * @param _marketStartTime Starttime of the initial market of protocol
+    * @param _ethFeed Feed Address of initial eth/usd market
+    * @param _btcFeed Feed Address of btc/usd market
+    */
+    function addInitialMarketTypesAndStart(uint32 _marketStartTime, address _ethFeed, address _btcFeed) external onlyAuthorizedUsers {
+      require(marketTypeArray.length == 0);
+      require(_ethFeed != address(0));
+      require(_btcFeed != address(0));
+      
+      IMaster ms = IMaster(masterAddress);
+      marketCreationRewards = IMarketCreationRewards(ms.getLatestAddress("MC"));
+      disputeResolution = ms.getLatestAddress("DR");
+      
+      totalOptions = 3;
+      stakingFactorMinStake = uint(20000).mul(10**8);
+      stakingFactorWeightage = 40;
+      currentPriceWeightage = 60;
+      minPredictionAmount = 10 ether; // Need to be updated
+      maxPredictionAmount = 100000 ether; // Need to be updated
+      MarketFeeParams storage _marketFeeParams = marketFeeParams;
+      _marketFeeParams.cummulativeFeePercent = 200;
+      _marketFeeParams.daoCommissionPercent = 1000;
+      _marketFeeParams.refereeFeePercent = 1000;
+      _marketFeeParams.referrerFeePercent = 2000;
+      _marketFeeParams.marketCreatorFeePercent = 4000;
+      
+      _addMarketType(4 hours, 100, 1 hours, 40 minutes);
+      _addMarketType(24 hours, 200, 6 hours, 4 hours);
+      _addMarketType(168 hours, 500, 8 hours, 28 hours);
+
+      _addMarketCurrency("ETH/USD", _ethFeed, 8, 1, _marketStartTime);
+      _addMarketCurrency("BTC/USD", _btcFeed, 8, 25, _marketStartTime);
+
+      for(uint32 i = 0;i < marketTypeArray.length; i++) {
+          createMarket(0, i, 0);
+          createMarket(1, i, 0);
+      }
+      _initializeEIP712("AM");
+    }
+
+    /**
     * @dev Create the market.
     * @param _marketCurrencyIndex The index of market currency feed
     * @param _marketTypeIndex The time duration of market.
@@ -135,16 +252,69 @@ contract CyclicMarkets {
       require(!_marketType.paused);
       _closePreviousMarketWithRoundId( _marketTypeIndex, _marketCurrencyIndex, _roundId);
       uint32 _startTime = calculateStartTimeForMarket(_marketCurrencyIndex, _marketTypeIndex);
-      (uint64 _minValue, uint64 _maxValue) = _calculateOptionRange(_marketType.optionRangePerc, _marketCurrency.decimals, _marketCurrency.roundOfToNearest, _marketCurrency.marketFeed);
-      uint64 _marketIndex = uint64(marketBasicData.length);
+      // uint64 _marketIndex = allMarkets.createMarket();
+      uint64 _marketIndex;
       MarketCreationData storage _marketCreationData = marketCreationData[_marketTypeIndex][_marketCurrencyIndex];
       (_marketCreationData.penultimateMarket, _marketCreationData.latestMarket) =
        (_marketCreationData.latestMarket, _marketIndex);
       marketPricingData[_marketIndex] = PricingData(stakingFactorMinStake, stakingFactorWeightage, currentPriceWeightage, _marketType.minTimePassed);
+      
       emit OptionPricingParams(_marketIndex, stakingFactorMinStake,stakingFactorWeightage,currentPriceWeightage,_marketType.minTimePassed);
-      address _msgSenderAddress = _msgSender();
-      marketCreationRewards.updateMarketCreationData(_msgSenderAddress, _marketIndex);
-      _placeInitialPrediction(_marketIndex, _msgSenderAddress);
     }
+
+    /**
+    * @dev Calculate start time for next market of provided currency and market type indexes
+    * @param _marketCurrencyIndex Index of the market currency
+    * @param _marketType Index of the market type
+    */
+    function calculateStartTimeForMarket(uint32 _marketCurrencyIndex, uint32 _marketType) public view returns(uint32 _marketStartTime) {
+      _marketStartTime = marketCreationData[_marketType][_marketCurrencyIndex].initialStartTime;
+      uint predictionTime = marketTypeArray[_marketType].predictionTime;
+      if(now > (predictionTime) + (_marketStartTime)) {
+        uint noOfMarketsCycles = ((now) - (_marketStartTime)) / (predictionTime);
+       _marketStartTime = uint32((noOfMarketsCycles * (predictionTime)) + (_marketStartTime));
+      }
+    }
+
+    /**
+    * @dev Internal function to settle the previous market 
+    * @param _marketTypeIndex Index of the market type
+    * @param _marketCurrencyIndex Index of the market currency
+    * @param _roundId RoundId of the feed for the settlement price
+    */
+    function _closePreviousMarketWithRoundId(uint64 _marketTypeIndex, uint64 _marketCurrencyIndex, uint80 _roundId) internal {
+      MarketCreationData storage _marketCreationData = marketCreationData[_marketTypeIndex][_marketCurrencyIndex];
+      uint64 currentMarket = _marketCreationData.latestMarket;
+      if(currentMarket != 0) {
+        // require(allMarkets.marketStatus(currentMarket) >= PredictionStatus.InSettlement);
+        uint64 penultimateMarket = _marketCreationData.penultimateMarket;
+        // if(penultimateMarket > 0 && now >= allMarkets.marketSettleTime(penultimateMarket)) {
+          // _settleMarket(penultimateMarket, _roundId);
+          // _settleMarket(penultimateMarket, _settlementPrice);
+        // }
+      }
+    }
+
+    /**
+    * @dev Settle the market, setting the winning option
+    * @param _marketId Index of market
+    * @param _roundId RoundId of the feed for the settlement price
+    */
+    function settleMarket(uint256 _marketId, uint80 _roundId) external {
+      // address _feedAdd = marketBasicData[_marketId].feedAddress;
+      // (uint256 _value, uint256 _roundIdUsed) = IOracle(_feedAdd).getSettlementPrice(marketSettleTime(_marketId), _roundId);
+      // allMarkets.settleMarket(_marketId, _value);
+    }
+
+
+    /**
+    * @dev Set the flag to pause/resume market creation of particular market type
+    */
+    function toggleMarketCreationType(uint64 _marketTypeIndex, bool _flag) external onlyAuthorized {
+      MarketTypeData storage _marketType = marketTypeArray[_marketTypeIndex];
+      require(_marketType.paused != _flag);
+      _marketType.paused = _flag;
+    }
+
 
 }
