@@ -22,10 +22,9 @@ module.exports = function(deployer, network, accounts){
     let master = await OwnedUpgradeabilityProxy.deployed();
     let allMarkets = await AllMarkets.deployed();
     let mcr = await MarketCreationRewards.deployed();
-    let participationMining = await ParticipationMining.deployed();
     let dr = await DisputeResolution.deployed();
     master = await Master.at(master.address);
-    let implementations = [allMarkets.address, mcr.address, blotToken.address, participationMining.address, dr.address];
+    let implementations = [allMarkets.address, mcr.address, blotToken.address, dr.address];
     console.log(accounts[0])
     await master.initiateMaster(implementations, deployPlotusToken.address, accounts[0], accounts[0]);
     master = await OwnedUpgradeabilityProxy.at(master.address);
@@ -45,6 +44,8 @@ module.exports = function(deployer, network, accounts){
     allMarkets = await AllMarkets.at(allMarketsProxy.address);
     mcr = await MarketCreationRewards.at(mcrProxy.address);
     // await allMarkets.setAssetPlotConversionRate(plotusToken.address, 1);
+
+    let participationMining = await deployer.deploy(ParticipationMining, allMarkets.address, accounts[0]);
 
 
     assert.equal(await master.isInternal(allMarkets.address), true);

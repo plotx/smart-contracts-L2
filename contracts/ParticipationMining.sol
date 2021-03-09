@@ -7,16 +7,10 @@ import "./interfaces/IToken.sol";
 import "./external/proxy/OwnedUpgradeabilityProxy.sol";
 import "./external/openzeppelin-solidity/math/SafeMath.sol";
 
-contract IMaster {
-    mapping(address => bool) public whitelistedSponsor;
-    function getLatestAddress(bytes2 _module) public view returns(address);
-}
-
-contract ParticipationMining is Iupgradable, NativeMetaTransaction {
+contract ParticipationMining is NativeMetaTransaction {
 
     using SafeMath for uint;
 
-	IMaster public ms;
     IAllMarkets internal allMarkets;
 
     struct SponsorIncentives {
@@ -25,6 +19,9 @@ contract ParticipationMining is Iupgradable, NativeMetaTransaction {
         address incentiveSponsoredBy;
     }
     
+    address public authorized;
+    mapping(address => bool) public whitelistedSponsor;
+
     mapping(uint => SponsorIncentives) public marketSponsorship;
     
     mapping(uint => mapping(address=>bool)) public marketRewardUserClaimed;
@@ -34,19 +31,15 @@ contract ParticipationMining is Iupgradable, NativeMetaTransaction {
     event SponsoredIncentive(uint256 indexed marketIndex, address incentiveTokenAddress, address sponsoredBy, uint256 amount);
     event Claimed(uint _marketId, address _user, address _token, uint _reward);
 
-    /**
-     * @dev Changes the master address and update it's instance
-     * @param _authorizedMultiSig Authorized address to execute critical functions in the protocol.
-     * @param _defaultAuthorizedAddress Authorized address to trigger initial functions by passing required external values.
-     */
-    function setMasterAddress(address _authorizedMultiSig, address _defaultAuthorizedAddress) public {
-        OwnedUpgradeabilityProxy proxy = OwnedUpgradeabilityProxy(
-            address(uint160(address(this)))
-        );
-        require(msg.sender == proxy.proxyOwner(), "Sender is not proxy owner.");
-        ms = IMaster(msg.sender);
-        allMarkets = IAllMarkets(ms.getLatestAddress("AM"));
+    constructor(address _allMarkets, address _authorizedToWhitelist) public {
+        allMarkets = IAllMarkets(_allMarkets);
+        authorized = _authorizedToWhitelist;
         _initializeEIP712("PM");    
+    }
+
+    function whitelistSponsor(address _address) external {
+        require(msg.sender == authorized);
+        whitelistedSponsor[_address] = true;
     }
 
     /**
@@ -103,7 +96,7 @@ contract ParticipationMining is Iupgradable, NativeMetaTransaction {
     */
     function sponsorIncentives(uint256 _marketId, address _token, uint256 _value) external {
         address payable msgSender =  _msgSender();
-        require(ms.whitelistedSponsor(msgSender),"Sponsor is not whitelisted");
+        require(whitelistedSponsor[msgSender],"Sponsor is not whitelisted");
         require(_token != address(0), "Incentive Token can not be null");
         require(_value > 0,"Incentive to distribute should not be 0");
         require(allMarkets.marketStatus(_marketId) <= IAllMarkets.PredictionStatus.InSettlement,"Market is not Live/InSettlement");

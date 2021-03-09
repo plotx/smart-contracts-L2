@@ -16,7 +16,6 @@
 pragma solidity 0.5.7;
 
 import "./external/proxy/OwnedUpgradeabilityProxy.sol";
-import "./interfaces/IbLOTToken.sol";
 import "./interfaces/Iupgradable.sol";
 import "./interfaces/IAuth.sol";
 
@@ -27,7 +26,6 @@ contract Master is IAuth {
     bool public masterInitialised;
 
     mapping(address => bool) public contractsActive;
-    mapping(address => bool) public whitelistedSponsor;
     mapping(bytes2 => address payable) public contractAddress;
 
 
@@ -55,7 +53,6 @@ contract Master is IAuth {
         allContractNames.push("AM");
         allContractNames.push("MC");
         allContractNames.push("BL");
-        allContractNames.push("PM");
         allContractNames.push("DR");
 
         require(
@@ -111,11 +108,6 @@ contract Master is IAuth {
             _replaceImplementation(_contractNames[i], _contractAddresses[i]);
         }
     }
-
-    function whitelistSponsor(address _address) external onlyAuthorized {
-        whitelistedSponsor[_address] = true;
-    }
-
     
     /**
      * @dev To check if we use the particular contract.

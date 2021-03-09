@@ -22,7 +22,6 @@ module.exports = function(deployer, network, accounts){
       let master = await deployer.deploy(OwnedUpgradeabilityProxy, masterProxy.address);
       let allMarkets = await deployer.deploy(AllMarkets);
       let mcr = await deployer.deploy(MarketCreationRewards);
-      let participationMining = await deployer.deploy(ParticipationMining);
       let dr = await deployer.deploy(DisputeResolution);
   });
 };
