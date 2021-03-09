@@ -123,4 +123,28 @@ contract CyclicMarkets {
       emit MarketTypes(_marketType, _marketTypeArray.predictionTime, _marketCooldownTime, _optionRangePerc, true, _minTimePassed);
     }
 
+    /**
+    * @dev Create the market.
+    * @param _marketCurrencyIndex The index of market currency feed
+    * @param _marketTypeIndex The time duration of market.
+    * @param _roundId Round Id to settle previous market (If applicable, else pass 0)
+    */
+    function createMarket(uint32 _marketCurrencyIndex,uint32 _marketTypeIndex, uint80 _roundId) public {
+      MarketTypeData storage _marketType = marketTypeArray[_marketTypeIndex];
+      MarketCurrency storage _marketCurrency = marketCurrencies[_marketCurrencyIndex];
+      require(!_marketType.paused);
+      _closePreviousMarketWithRoundId( _marketTypeIndex, _marketCurrencyIndex, _roundId);
+      uint32 _startTime = calculateStartTimeForMarket(_marketCurrencyIndex, _marketTypeIndex);
+      (uint64 _minValue, uint64 _maxValue) = _calculateOptionRange(_marketType.optionRangePerc, _marketCurrency.decimals, _marketCurrency.roundOfToNearest, _marketCurrency.marketFeed);
+      uint64 _marketIndex = uint64(marketBasicData.length);
+      MarketCreationData storage _marketCreationData = marketCreationData[_marketTypeIndex][_marketCurrencyIndex];
+      (_marketCreationData.penultimateMarket, _marketCreationData.latestMarket) =
+       (_marketCreationData.latestMarket, _marketIndex);
+      marketPricingData[_marketIndex] = PricingData(stakingFactorMinStake, stakingFactorWeightage, currentPriceWeightage, _marketType.minTimePassed);
+      emit OptionPricingParams(_marketIndex, stakingFactorMinStake,stakingFactorWeightage,currentPriceWeightage,_marketType.minTimePassed);
+      address _msgSenderAddress = _msgSender();
+      marketCreationRewards.updateMarketCreationData(_msgSenderAddress, _marketIndex);
+      _placeInitialPrediction(_marketIndex, _msgSenderAddress);
+    }
+
 }
