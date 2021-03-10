@@ -129,7 +129,6 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     IbLOTToken internal bPLOTInstance;
     IMarketCreationRewards internal marketCreationRewards;
 
-    uint internal totalOptions;
     uint internal predictionDecimalMultiplier;
     uint internal defaultMaxRecords;
     uint internal minPredictionAmount;
@@ -322,6 +321,11 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       mcDefaultPredictionAmount = 100 * 10**8;
     }
 
+    function initializeDependencies() external {
+      IMaster ms = IMaster(masterAddress);
+      marketCreationRewards = IMarketCreationRewards(ms.getLatestAddress("MC"));
+    }
+
     /**
     * @dev Whitelist an address to create market.
     * @param _authorized Address to whitelist.
@@ -343,7 +347,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       marketDataExtended[_marketIndex].createdBy = msg.sender;
       emit MarketQuestion(_marketIndex, _marketTimes[0], _marketTimes[1], _marketTimes[3], _marketTimes[2], _optionRanges, msg.sender);
       marketCreationRewards.updateMarketCreationData(_createdBy, _marketIndex);
-      _placeInitialPrediction(_marketIndex, _createdBy, uint64(_optionRanges.length));
+      _placeInitialPrediction(_marketIndex, _createdBy, uint64(_optionRanges.length + 1));
       return _marketIndex;
     }
     
@@ -357,13 +361,13 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       uint256 _defaultAmount = (10**predictionDecimalMultiplier).mul(_mcDefaultPredictionAmount);
       (uint _tokenLeft, uint _tokenReward) = getUserUnusedBalance(_msgSenderAddress);
       if(_tokenLeft.add(_tokenReward) < _defaultAmount) {
-        _deposit(_defaultAmount);
+        _deposit(_defaultAmount, _msgSenderAddress);
       }
       address _predictionToken = predictionToken;
       for(uint i = 1;i < _totalOptions; i++) {
-        _placePrediction(_marketId, _predictionToken, _mcDefaultPredictionAmount/_totalOptions, i);
+        _placePrediction(_marketId, _msgSenderAddress, _predictionToken, _mcDefaultPredictionAmount/_totalOptions, i);
       }
-      _placePrediction(_marketId, _predictionToken, _mcDefaultPredictionAmount - (_totalOptions-1)*(_mcDefaultPredictionAmount/_totalOptions), _totalOptions);
+      _placePrediction(_marketId, _msgSenderAddress, _predictionToken, _mcDefaultPredictionAmount - (_totalOptions-1)*(_mcDefaultPredictionAmount/_totalOptions), _totalOptions);
     }
 
     /**
@@ -435,8 +439,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     * @dev Function to deposit prediction token for participation in markets
     * @param _amount Amount of prediction token to deposit
     */
-    function _deposit(uint _amount) internal {
-      address payable _msgSenderAddress = _msgSender();
+    function _deposit(uint _amount, address _msgSenderAddress) internal {
       _transferTokenFrom(predictionToken, _msgSenderAddress, address(this), _amount);
       UserData storage _userData = userData[_msgSenderAddress];
       _userData.unusedBalance = _userData.unusedBalance.add(_amount);
@@ -489,10 +492,11 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     * _predictioStake should be passed with 8 decimals, reduced it to 8 decimals to reduce the storage space of prediction data
     */
     function depositAndPlacePrediction(uint _tokenDeposit, uint _marketId, address _asset, uint64 _predictionStake, uint256 _prediction) external {
+      address payable _msgSenderAddress = _msgSender();
       if(_tokenDeposit > 0) {
-        _deposit(_tokenDeposit);
+        _deposit(_tokenDeposit, _msgSenderAddress);
       }
-      _placePrediction(_marketId, _asset, _predictionStake, _prediction);
+      _placePrediction(_marketId, _msgSenderAddress, _asset, _predictionStake, _prediction);
     }
 
     /**
@@ -503,9 +507,8 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     * @param _prediction The option on which user placed prediction.
     * _predictionStake should be passed with 8 decimals, reduced it to 8 decimals to reduce the storage space of prediction data
     */
-    function _placePrediction(uint _marketId, address _asset, uint64 _predictionStake, uint256 _prediction) internal {
-      address payable _msgSenderAddress = _msgSender();
-      require(!marketCreationPaused && _prediction <= totalOptions && _prediction >0);
+    function _placePrediction(uint _marketId, address _msgSenderAddress, address _asset, uint64 _predictionStake, uint256 _prediction) internal {
+      require(!marketCreationPaused && _prediction <= (marketDataExtended[_marketId].optionRanges.length +1) && _prediction >0);
       require(now >= marketBasicData[_marketId].startTime && now <= marketExpireTime(_marketId));
       uint64 _predictionStakePostDeduction = _predictionStake;
       uint decimalMultiplier = 10**predictionDecimalMultiplier;
@@ -613,7 +616,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       if(_stakeValue < minPredictionAmount || _stakeValue > maxPredictionAmount) {
         return (0, isMultiplierApplied);
       }
-      uint64 _optionPrice = IMarket(msg.sender).getOptionPrice(_marketId, _prediction);
+      uint64 _optionPrice = IMarket(marketDataExtended[_marketId].createdBy).getOptionPrice(_marketId, _prediction);
       predictionPoints = uint64(_predictionStake).div(_optionPrice);
       if(!multiplierApplied) {
         uint256 _predictionPoints;
@@ -722,7 +725,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     * @param _winningOption WinningOption of market
     */
     function _calculateRewardTally(uint256 _marketId, uint256 _winningOption) internal view returns(uint64 totalReward){
-      for(uint i=1;i <= totalOptions;i++){
+      for(uint i=1; i <= marketDataExtended[_marketId].optionRanges.length +1; i++){
         uint64 _tokenStakedOnOption = marketOptionsAvailable[_marketId][i].amountStaked;
         if(i != _winningOption) {
           totalReward = totalReward.add(_tokenStakedOnOption);
@@ -823,8 +826,8 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
         // neutralMinValue = _marketBasicData.neutralMinValue;
         // neutralMaxValue = _marketBasicData.neutralMaxValue;
         
-        _tokenStaked = new uint[](totalOptions);
-        for (uint i = 0; i < totalOptions; i++) {
+        _tokenStaked = new uint[](marketDataExtended[_marketId].optionRanges.length +1);
+        for (uint i = 0; i < marketDataExtended[_marketId].optionRanges.length +1; i++) {
           _tokenStaked[i] = marketOptionsAvailable[_marketId][i+1].amountStaked;
        }
     }
@@ -902,7 +905,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     * @return predictionPoints total prediction points allocated to users
     */
     function getTotalPredictionPoints(uint _marketId) public view returns(uint64 predictionPoints) {
-      for(uint256 i = 1; i<= totalOptions;i++) {
+      for(uint256 i = 1; i<= marketDataExtended[_marketId].optionRanges.length +1;i++) {
         predictionPoints = predictionPoints.add(marketOptionsAvailable[_marketId][i].predictionPoints);
       }
     }
@@ -936,7 +939,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     * @param _user Address of user
     */
     function _hasUserParticipated(uint256 _marketId, address _user) internal view returns(bool _hasParticipated) {
-      for(uint i = 1;i <= totalOptions; i++) {
+      for(uint i = 1;i <= marketDataExtended[_marketId].optionRanges.length +1; i++) {
         if(userData[_user].userMarketData[_marketId].predictionData[i].predictionPoints > 0) {
           _hasParticipated = true;
           break;
@@ -1010,5 +1013,9 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       _optionPricingParams[0] = marketOptionsAvailable[_marketId][_option].amountStaked;
       _optionPricingParams[1] = marketDataExtended[_marketId].totalStaked;
       return (_optionPricingParams,_marketBasicData.startTime);
+    }
+
+    function getTotalMarketsLength() external view returns(uint64) {
+      return uint64(marketBasicData.length);
     }
 }

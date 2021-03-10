@@ -81,7 +81,6 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
     address internal masterAddress;
     address internal plotToken;
     IAllMarkets internal allMarkets;
-    address internal predictionToken;
 
     MarketCurrency[] internal marketCurrencies;
     MarketTypeData[] internal marketTypeArray;
@@ -116,7 +115,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       masterAddress = msg.sender;
       address _plotToken = ms.dAppToken();
       plotToken = _plotToken;
-      predictionToken = _plotToken;
+      allMarkets = IAllMarkets(ms.getLatestAddress("AM"));
       authorizedAddresses[_defaultAuthorizedAddress] = true;
       authorized = _authorizedMultiSig;
       _initializeEIP712("CM");
@@ -227,10 +226,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       require(marketTypeArray.length == 0);
       require(_ethFeed != address(0));
       require(_btcFeed != address(0));
-      
-      IMaster ms = IMaster(masterAddress);
-      allMarkets = IAllMarkets(ms.getLatestAddress("AM"));
-      
+
       totalOptions = 3;
       stakingFactorMinStake = uint(20000).mul(10**8);
       stakingFactorWeightage = 40;
@@ -253,7 +249,6 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
           createMarket(0, i, 0);
           createMarket(1, i, 0);
       }
-      _initializeEIP712("AM");
     }
 
     /**
@@ -277,13 +272,14 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       _marketTimes[3] = _marketType.cooldownTime;
       _optionRanges[0] = _minValue;
       _optionRanges[1] = _maxValue;
-      uint64 _marketIndex = allMarkets.createMarket(_marketTimes, _optionRanges, _msgSender());
+      uint64 _marketIndex = allMarkets.getTotalMarketsLength();
+      marketPricingData[_marketIndex] = PricingData(stakingFactorMinStake, stakingFactorWeightage, currentPriceWeightage, _marketType.minTimePassed);
+      allMarkets.createMarket(_marketTimes, _optionRanges, _msgSender());
       marketData[_marketIndex] = MarketData(_marketTypeIndex, _marketCurrencyIndex);
       // uint64 _marketIndex;
       MarketCreationData storage _marketCreationData = marketCreationData[_marketTypeIndex][_marketCurrencyIndex];
       (_marketCreationData.penultimateMarket, _marketCreationData.latestMarket) =
        (_marketCreationData.latestMarket, _marketIndex);
-      marketPricingData[_marketIndex] = PricingData(stakingFactorMinStake, stakingFactorWeightage, currentPriceWeightage, _marketType.minTimePassed);
       
       emit OptionPricingParams(_marketIndex, stakingFactorMinStake,stakingFactorWeightage,currentPriceWeightage,_marketType.minTimePassed);
     }
@@ -394,10 +390,11 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       uint[] memory _distanceData = getOptionDistanceData(_marketId,_prediction);
 
       // (Time Elapsed x 10000) / ((Max Distance + 1) x currentPriceWeightage)
+      require(_marketPricingData.currentPriceWeightage > 0, "VDSKJ");
       uint timeFactor = timeElapsed.mul(10000).div((_distanceData[0].add(1)).mul(_marketPricingData.currentPriceWeightage));
 
       uint totalTime = _predictionTime;
-
+  require(totalTime > 0,"DSD");
       // (1) + ((Option Distance from max distance + 1) x timeFactor x 10^18 / Total Prediction Time)  -- (2)
       optionPrice = optionPrice.add((_distanceData[1].add(1)).mul(timeFactor).mul(10**18).div(totalTime));  
       // (2) / ((stakingFactorConst x 10^13) + timeFactor x 10^13 x (cummulative option distaance + 3) / Total Prediction Time)
@@ -445,7 +442,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       if(currentPrice < _optionRanges[0])
       {
         currentOption = 1;
-      } else if(currentPrice > _optionRanges[2]) {
+      } else if(currentPrice > _optionRanges[1]) {
         currentOption = 3;
       } else {
         currentOption = 2;

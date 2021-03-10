@@ -16,6 +16,8 @@ contract IAllMarkets {
 
     function addInitialAuthorizedAddress(address _address) external;
 
+    function getTotalMarketsLength() external view returns(uint64);
+
     function getTotalPredictionPoints(uint _marketId) public view returns(uint64 predictionPoints);
 
     function getUserPredictionPoints(address _user, uint256 _marketId, uint256 _option) external view returns(uint64);
