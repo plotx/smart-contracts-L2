@@ -71,6 +71,11 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       mapping (uint256 => uint64) marketCreatorFee;
     }
 
+    struct MarketData {
+      uint64 marketTypeIndex;
+      uint64 marketCurrencyIndex;
+    }
+
     MarketFeeParams internal marketFeeParams;
 
     address internal masterAddress;
@@ -78,8 +83,6 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
     IAllMarkets internal allMarkets;
     address internal predictionToken;
 
-    IbLOTToken internal bPLOTInstance;
-    
     MarketCurrency[] internal marketCurrencies;
     MarketTypeData[] internal marketTypeArray;
     mapping(bytes32 => uint) internal marketCurrency;
@@ -89,6 +92,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
 
     mapping(uint256 => PricingData) internal marketPricingData;
     mapping(address => bool) public authorizedAddresses;
+    mapping(uint256 => MarketData) public marketData;
 
     uint internal totalOptions;
     uint internal stakingFactorMinStake ;
@@ -98,6 +102,24 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
     modifier onlyAuthorizedUsers() {
         require(authorizedAddresses[msg.sender]);
         _;
+    }
+
+    /**
+     * @dev Changes the master address and update it's instance
+     * @param _authorizedMultiSig Authorized address to execute critical functions in the protocol.
+     * @param _defaultAuthorizedAddress Authorized address to trigger initial functions by passing required external values.
+     */
+    function setMasterAddress(address _authorizedMultiSig, address _defaultAuthorizedAddress) public {
+      OwnedUpgradeabilityProxy proxy =  OwnedUpgradeabilityProxy(address(uint160(address(this))));
+      require(msg.sender == proxy.proxyOwner());
+      IMaster ms = IMaster(msg.sender);
+      masterAddress = msg.sender;
+      address _plotToken = ms.dAppToken();
+      plotToken = _plotToken;
+      predictionToken = _plotToken;
+      authorizedAddresses[_defaultAuthorizedAddress] = true;
+      authorized = _authorizedMultiSig;
+      _initializeEIP712("CM");
     }
 
     /**
@@ -246,12 +268,17 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       require(!_marketType.paused);
       _closePreviousMarketWithRoundId( _marketTypeIndex, _marketCurrencyIndex, _roundId);
       uint32 _startTime = calculateStartTimeForMarket(_marketCurrencyIndex, _marketTypeIndex);
+      (uint64 _minValue, uint64 _maxValue) = _calculateOptionRange(_marketType.optionRangePerc, _marketCurrency.decimals, _marketCurrency.roundOfToNearest, _marketCurrency.marketFeed);
       uint32[] memory _marketTimes = new uint32[](4);
+      uint64[] memory _optionRanges = new uint64[](2);
       _marketTimes[0] = _startTime; 
       _marketTimes[1] = _marketType.predictionTime;
       _marketTimes[2] = _marketType.predictionTime*2;
       _marketTimes[3] = _marketType.cooldownTime;
-      // uint64 _marketIndex = allMarkets.createMarket();
+      _optionRanges[0] = _minValue;
+      _optionRanges[1] = _maxValue;
+      uint64 _marketIndex = allMarkets.createMarket(_marketTimes, _optionRanges, _msgSender());
+      marketData[_marketIndex] = MarketData(_marketTypeIndex, _marketCurrencyIndex);
       // uint64 _marketIndex;
       MarketCreationData storage _marketCreationData = marketCreationData[_marketTypeIndex][_marketCurrencyIndex];
       (_marketCreationData.penultimateMarket, _marketCreationData.latestMarket) =
@@ -259,6 +286,14 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       marketPricingData[_marketIndex] = PricingData(stakingFactorMinStake, stakingFactorWeightage, currentPriceWeightage, _marketType.minTimePassed);
       
       emit OptionPricingParams(_marketIndex, stakingFactorMinStake,stakingFactorWeightage,currentPriceWeightage,_marketType.minTimePassed);
+    }
+
+
+    /**
+    * @dev Internal function to perfrom ceil operation of given params
+    */
+    function ceil(uint256 a, uint256 m) internal pure returns (uint256) {
+        return ((a + m - 1) / m) * m;
     }
 
     /**
@@ -285,13 +320,27 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       MarketCreationData storage _marketCreationData = marketCreationData[_marketTypeIndex][_marketCurrencyIndex];
       uint64 currentMarket = _marketCreationData.latestMarket;
       if(currentMarket != 0) {
-        // require(allMarkets.marketStatus(currentMarket) >= PredictionStatus.InSettlement);
+        require(uint(allMarkets.marketStatus(currentMarket)) >= uint(PredictionStatus.InSettlement));
         uint64 penultimateMarket = _marketCreationData.penultimateMarket;
         // if(penultimateMarket > 0 && now >= allMarkets.marketSettleTime(penultimateMarket)) {
-          // _settleMarket(penultimateMarket, _roundId);
+          settleMarket(penultimateMarket, _roundId);
           // _settleMarket(penultimateMarket, _settlementPrice);
         // }
       }
+    }
+
+    /**
+     * @dev Internal function to calculate option ranges for the market
+     * @param _optionRangePerc Defined Option percent
+     * @param _decimals Decimals of the given feed address
+     * @param _roundOfToNearest Round of the option range to the nearest multiple
+     * @param _marketFeed Market Feed address
+     */
+    function _calculateOptionRange(uint _optionRangePerc, uint64 _decimals, uint8 _roundOfToNearest, address _marketFeed) internal view returns(uint64 _minValue, uint64 _maxValue) {
+      uint currentPrice = IOracle(_marketFeed).getLatestPrice();
+      uint optionRangePerc = currentPrice.mul(_optionRangePerc.div(2)).div(10000);
+      _minValue = uint64((ceil(currentPrice.sub(optionRangePerc).div(_roundOfToNearest), 10**_decimals)).mul(_roundOfToNearest));
+      _maxValue = uint64((ceil(currentPrice.add(optionRangePerc).div(_roundOfToNearest), 10**_decimals)).mul(_roundOfToNearest));
     }
 
     /**
@@ -299,10 +348,10 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
     * @param _marketId Index of market
     * @param _roundId RoundId of the feed for the settlement price
     */
-    function settleMarket(uint256 _marketId, uint80 _roundId) external {
-      // address _feedAdd = marketBasicData[_marketId].feedAddress;
-      // (uint256 _value, uint256 _roundIdUsed) = IOracle(_feedAdd).getSettlementPrice(marketSettleTime(_marketId), _roundId);
-      // allMarkets.settleMarket(_marketId, _value);
+    function settleMarket(uint256 _marketId, uint80 _roundId) public {
+      address _feedAdd = marketCurrencies[marketData[_marketId].marketCurrencyIndex].marketFeed;
+      (uint256 _value, uint256 _roundIdUsed) = IOracle(_feedAdd).getSettlementPrice(allMarkets.marketSettleTime(_marketId), _roundId);
+      allMarkets.settleMarket(_marketId, _value);
     }
 
 

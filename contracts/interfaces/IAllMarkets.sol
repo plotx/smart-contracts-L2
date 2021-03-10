@@ -10,6 +10,10 @@ contract IAllMarkets {
       Settled
     }
 
+    function createMarket(uint32[] memory _marketTimes, uint64[] memory _optionRanges, address _createdBy) public returns(uint64 _marketIndex);
+
+    function settleMarket(uint256 _marketId, uint256 _value) external;
+
     function addInitialAuthorizedAddress(address _address) external;
 
     function getTotalPredictionPoints(uint _marketId) public view returns(uint64 predictionPoints);
@@ -17,6 +21,8 @@ contract IAllMarkets {
     function getUserPredictionPoints(address _user, uint256 _marketId, uint256 _option) external view returns(uint64);
 
     function marketStatus(uint256 _marketId) public view returns(PredictionStatus);
+
+    function marketSettleTime(uint256 _marketId) public view returns(uint32);
 
     function burnDisputedProposalTokens(uint _proposaId) external;
 

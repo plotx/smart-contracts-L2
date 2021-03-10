@@ -333,17 +333,18 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     /**
     * @dev Create the market.
     */
-    function createMarket(uint32[] memory _marketTimes, uint64[] memory _optionRanges, address _createdBy) public {
+    function createMarket(uint32[] memory _marketTimes, uint64[] memory _optionRanges, address _createdBy) public returns(uint64 _marketIndex){
       // _marketTimes => [0] _startTime, [1] _predictionTIme, [2] _settlementTime, [3] _cooldownTime
       require(authorizedMarketCreator[msg.sender]);
       require(!marketCreationPaused);
-      uint64 _marketIndex = uint64(marketBasicData.length);
+      _marketIndex = uint64(marketBasicData.length);
       marketBasicData.push(MarketBasicData(_marketTimes[0], _marketTimes[1], _marketTimes[3], _marketTimes[2]));
       marketDataExtended[_marketIndex].optionRanges = _optionRanges;
       marketDataExtended[_marketIndex].createdBy = msg.sender;
       emit MarketQuestion(_marketIndex, _marketTimes[0], _marketTimes[1], _marketTimes[3], _marketTimes[2], _optionRanges, msg.sender);
       marketCreationRewards.updateMarketCreationData(_createdBy, _marketIndex);
       _placeInitialPrediction(_marketIndex, _createdBy, uint64(_optionRanges.length));
+      return _marketIndex;
     }
     
     /**
@@ -990,13 +991,6 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     function setMarketStatus(uint256 _marketId, PredictionStatus _status) public {
       require(msg.sender == disputeResolution);
       marketDataExtended[_marketId].predictionStatus = _status;
-    }
-
-    /**
-    * @dev Internal function to perfrom ceil operation of given params
-    */
-    function ceil(uint256 a, uint256 m) internal pure returns (uint256) {
-        return ((a + m - 1) / m) * m;
     }
 
 }
