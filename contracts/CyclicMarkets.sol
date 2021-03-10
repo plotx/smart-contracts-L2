@@ -364,5 +364,107 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       _marketType.paused = _flag;
     }
 
+    /**
+     * @dev Gets price for given market and option
+     * @param _marketId  Market ID
+     * @param _prediction  prediction option
+     * @return  option price
+     **/
+    function getOptionPrice(uint _marketId, uint256 _prediction) public view returns(uint64) {
+      // MarketBasicData storage _marketBasicData = marketBasicData[_marketId];
+      (uint[] memory _optionPricingParams, uint32 _startTime, address _feedAddress) = allMarkets.getMarketOptionPricingParams(_marketId,_prediction);
+      PricingData storage _marketPricingData = marketPricingData[_marketId];
+      (,,uint _predictionTime,,) = allMarkets.getMarketData(_marketId);
+      uint stakingFactorConst;
+      uint optionPrice; 
+      uint256 totalStaked = _optionPricingParams[1];
+      // Checking if current stake in market reached minimum stake required for considering staking factor.
+      if(totalStaked > _marketPricingData.stakingFactorMinStake)
+      {
+        // 10000 / staking weightage
+        stakingFactorConst = uint(10000).div(_marketPricingData.stakingFactorWeightage); 
+        // (stakingFactorConst x Amount staked in option x 10^18) / Total staked in market --- (1)
+        optionPrice = (stakingFactorConst.mul(_optionPricingParams[0]).mul(10**18).div(totalStaked)); 
+      }
+      uint timeElapsed = uint(now).sub(_startTime);
+      // max(timeElapsed, minTimePassed)
+      if(timeElapsed < _marketPricingData.minTimePassed) {
+        timeElapsed = _marketPricingData.minTimePassed;
+      }
+      uint[] memory _distanceData = getOptionDistanceData(_marketId,_prediction);
 
+      // (Time Elapsed x 10000) / ((Max Distance + 1) x currentPriceWeightage)
+      uint timeFactor = timeElapsed.mul(10000).div((_distanceData[0].add(1)).mul(_marketPricingData.currentPriceWeightage));
+
+      uint totalTime = _predictionTime;
+
+      // (1) + ((Option Distance from max distance + 1) x timeFactor x 10^18 / Total Prediction Time)  -- (2)
+      optionPrice = optionPrice.add((_distanceData[1].add(1)).mul(timeFactor).mul(10**18).div(totalTime));  
+      // (2) / ((stakingFactorConst x 10^13) + timeFactor x 10^13 x (cummulative option distaance + 3) / Total Prediction Time)
+      optionPrice = optionPrice.div(stakingFactorConst.mul(10**13).add(timeFactor.mul(10**13).mul(_distanceData[2].add(3)).div(totalTime)));
+
+      // option price for `_prediction` in 10^5 format
+      return uint64(optionPrice);
+
+    }
+
+    /**
+     * @dev Gets price for all the options in a market
+     * @param _marketId  Market ID
+     * @return _optionPrices array consisting of prices for all available options
+     **/
+    function getAllOptionPrices(uint _marketId) external view returns(uint64[] memory _optionPrices) {
+      _optionPrices = new uint64[](3);
+      for(uint i=0;i<3;i++) {
+        _optionPrices[i] = getOptionPrice(_marketId,i+1);
+      }
+
+    }
+
+    /**
+     * @dev Gets price for given market and option
+     * @param _marketId  Market ID
+     * @param _prediction  prediction option
+     * @return  Array consist of Max Distance between current option and any option, predicting Option distance from max distance, cummulative option distance
+     **/
+    function getOptionDistanceData(uint _marketId,uint _prediction, address _feedAddress) internal view returns(uint[] memory) {
+      (bytes32 _marketCurr, uint minVal, uint maxVal , , , , ) = allMarkets.getMarketData(_marketId);
+      // [0]--> Max Distance between current option and any option, (For 3 options, if current option is 2 it will be `1`. else, it will be `2`) 
+      // [1]--> Predicting option distance from Max distance, (MaxDistance - | currentOption - predicting option |)
+      // [2]--> sum of all possible option distances,  
+      uint[] memory _distanceData = new uint256[](3); 
+
+      // Fetching current price
+      uint currentPrice = IOracle(_feedAddress).getLatestPrice();
+      _distanceData[0] = 2;
+      // current option based on current price
+      uint currentOption;
+      _distanceData[2] = 3;
+      if(currentPrice < minVal)
+      {
+        currentOption = 1;
+      } else if(currentPrice > maxVal) {
+        currentOption = 3;
+      } else {
+        currentOption = 2;
+        _distanceData[0] = 1;
+        _distanceData[2] = 1;
+      }
+
+      // MaxDistance - | currentOption - predicting option |
+      _distanceData[1] = _distanceData[0].sub(modDiff(currentOption,_prediction)); 
+      return _distanceData;
+    }
+
+    /**
+     * @dev  Calculates difference between `a` and `b`.
+     **/
+    function modDiff(uint a, uint b) internal pure returns(uint) {
+      if(a>b)
+      {
+        return a.sub(b);
+      } else {
+        return b.sub(a);
+      }
+    }
 }

@@ -993,4 +993,22 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       marketDataExtended[_marketId].predictionStatus = _status;
     }
 
+    /**
+    * @dev Gets the Option pricing params for market.
+    * @param _marketId Index of market.
+    * @param _option predicting option.
+    * @return uint[] Array consist of pricing param.
+    * @return uint32 start time of market.
+    * @return address feed address for market.
+    */
+    function getMarketOptionPricingParams(uint _marketId, uint _option) external view returns(uint[] memory, uint32,address) {
+
+      // [0] -> amount staked in `_option`
+      // [1] -> Total amount staked in market
+      uint[] memory _optionPricingParams = new uint256[](2);
+      MarketBasicData storage _marketBasicData = marketBasicData[_marketId];
+      _optionPricingParams[0] = marketOptionsAvailable[_marketId][_option].amountStaked;
+      _optionPricingParams[1] = marketDataExtended[_marketId].totalStaked;
+      return (_optionPricingParams,_marketBasicData.startTime,_marketBasicData.feedAddress);
+    }
 }
