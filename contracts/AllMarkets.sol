@@ -51,7 +51,6 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     event Deposited(address indexed user, uint256 amount, uint256 timeStamp);
     event Withdrawn(address indexed user, uint256 amount, uint256 timeStamp);
     event MarketQuestion(uint256 indexed marketIndex, uint256 startTime, uint256 predictionTime, uint256 coolDownTime, uint256 setlementTime, uint64[] optionRanges, address marketCreatorContract);
-    event OptionPricingParams(uint256 indexed marketIndex, uint256 _stakingFactorMinStake,uint32 _stakingFactorWeightage,uint256 _currentPriceWeightage,uint32 _minTimePassed);
     event MarketResult(uint256 indexed marketIndex, uint256 totalReward, uint256 winningOption, uint256 closeValue, uint256 daoFee, uint256 marketCreatorFee);
     // event MarketResult(uint256 indexed marketIndex, uint256 totalReward, uint256 winningOption, uint256 closeValue, uint256 roundId, uint256 daoFee, uint256 marketCreatorFee);
     event ReturnClaimed(address indexed user, uint256 amount);
@@ -319,11 +318,18 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       minPredictionAmount = 10 ether; // Need to be updated
       maxPredictionAmount = 100000 ether; // Need to be updated
       mcDefaultPredictionAmount = 100 * 10**8;
+      MarketFeeParams storage _marketFeeParams = marketFeeParams;
+      _marketFeeParams.cummulativeFeePercent = 200;
+      _marketFeeParams.daoCommissionPercent = 1000;
+      _marketFeeParams.refereeFeePercent = 1000;
+      _marketFeeParams.referrerFeePercent = 2000;
+      _marketFeeParams.marketCreatorFeePercent = 4000;
     }
 
     function initializeDependencies() external {
       IMaster ms = IMaster(masterAddress);
       marketCreationRewards = IMarketCreationRewards(ms.getLatestAddress("MC"));
+      disputeResolution = ms.getLatestAddress("DR");
     }
 
     /**
@@ -392,7 +398,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       if(_marketDataExtended.settleTime > 0) {
         return _marketDataExtended.settleTime;
       }
-      return _marketBasicData.startTime + (_marketBasicData.predictionTime * 2);
+      return _marketBasicData.startTime + (_marketBasicData.settlementTime);
     }
 
     /**
@@ -536,7 +542,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       uint64 predictionPoints = _calculatePredictionPointsAndMultiplier(_msgSenderAddress, _marketId, _prediction, _predictionStakePostDeduction);
       require(predictionPoints > 0);
 
-      _storePredictionData(_marketId, _prediction, _predictionStakePostDeduction, predictionPoints);
+      _storePredictionData(_marketId, _prediction, _msgSenderAddress, _predictionStakePostDeduction, predictionPoints);
       emit PlacePrediction(_msgSenderAddress, _predictionStake, predictionPoints, _asset, _prediction, _marketId);
     }
 
@@ -916,8 +922,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     * @param _predictionStake The amount staked by user at the time of prediction.
     * @param predictionPoints The positions user got during prediction.
     */
-    function _storePredictionData(uint _marketId, uint _prediction, uint64 _predictionStake, uint64 predictionPoints) internal {
-      address payable _msgSenderAddress = _msgSender();
+    function _storePredictionData(uint _marketId, uint _prediction, address _msgSenderAddress, uint64 _predictionStake, uint64 predictionPoints) internal {
       UserData storage _userData = userData[_msgSenderAddress];
       PredictionData storage _predictionData = marketOptionsAvailable[_marketId][_prediction];
       if(!_hasUserParticipated(_marketId, _msgSenderAddress)) {

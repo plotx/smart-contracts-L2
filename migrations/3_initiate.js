@@ -7,7 +7,7 @@ const MockchainLink = artifacts.require('MockChainLinkAggregator');
 const OwnedUpgradeabilityProxy = artifacts.require('OwnedUpgradeabilityProxy');
 const ParticipationMining = artifacts.require('ParticipationMining');
 const DisputeResolution = artifacts.require('DisputeResolution');
-const CyclicMarkets = artifacts.require('CyclicMarkets');
+const CyclicMarkets = artifacts.require('MockCyclicMarkets');
 const EthChainlinkOracle = artifacts.require('EthChainlinkOracle');
 const { assert } = require("chai");
 

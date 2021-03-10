@@ -28,7 +28,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       Settled
     }
 
-    event OptionPricingParams(uint256 indexed marketIndex, uint256 _stakingFactorMinStake,uint32 _stakingFactorWeightage,uint256 _currentPriceWeightage,uint32 _minTimePassed);
+    event MarketParams(uint256 indexed marketIndex, uint256 marketType, bytes32 currencyName, uint256 _stakingFactorMinStake,uint32 _stakingFactorWeightage,uint256 _currentPriceWeightage,uint32 _minTimePassed);
     event MarketTypes(uint256 indexed index, uint32 predictionTime, uint32 cooldownTime, uint32 optionRangePerc, bool status, uint32 minTimePassed);
     event MarketCurrencies(uint256 indexed index, address feedAddress, bytes32 currencyName, bool status);
 
@@ -281,7 +281,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       (_marketCreationData.penultimateMarket, _marketCreationData.latestMarket) =
        (_marketCreationData.latestMarket, _marketIndex);
       
-      emit OptionPricingParams(_marketIndex, stakingFactorMinStake,stakingFactorWeightage,currentPriceWeightage,_marketType.minTimePassed);
+      emit MarketParams(_marketIndex, _marketTypeIndex, _marketCurrency.currencyName, stakingFactorMinStake,stakingFactorWeightage,currentPriceWeightage,_marketType.minTimePassed);
     }
 
 
@@ -318,10 +318,10 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       if(currentMarket != 0) {
         require(uint(allMarkets.marketStatus(currentMarket)) >= uint(PredictionStatus.InSettlement));
         uint64 penultimateMarket = _marketCreationData.penultimateMarket;
-        // if(penultimateMarket > 0 && now >= allMarkets.marketSettleTime(penultimateMarket)) {
+        if(penultimateMarket > 0 && now >= allMarkets.marketSettleTime(penultimateMarket)) {
           settleMarket(penultimateMarket, _roundId);
           // _settleMarket(penultimateMarket, _settlementPrice);
-        // }
+        }
       }
     }
 
