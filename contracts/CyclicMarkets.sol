@@ -372,7 +372,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
      **/
     function getOptionPrice(uint _marketId, uint256 _prediction) public view returns(uint64) {
       // MarketBasicData storage _marketBasicData = marketBasicData[_marketId];
-      (uint[] memory _optionPricingParams, uint32 _startTime, address _feedAddress) = allMarkets.getMarketOptionPricingParams(_marketId,_prediction);
+      (uint[] memory _optionPricingParams, uint32 _startTime) = allMarkets.getMarketOptionPricingParams(_marketId,_prediction);
       PricingData storage _marketPricingData = marketPricingData[_marketId];
       (,,uint _predictionTime,,) = allMarkets.getMarketData(_marketId);
       uint stakingFactorConst;
@@ -427,23 +427,25 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
      * @param _prediction  prediction option
      * @return  Array consist of Max Distance between current option and any option, predicting Option distance from max distance, cummulative option distance
      **/
-    function getOptionDistanceData(uint _marketId,uint _prediction, address _feedAddress) internal view returns(uint[] memory) {
-      (bytes32 _marketCurr, uint minVal, uint maxVal , , , , ) = allMarkets.getMarketData(_marketId);
+    function getOptionDistanceData(uint _marketId,uint _prediction) internal view returns(uint[] memory) {
+      (uint64[] memory _optionRanges,,,,) = allMarkets.getMarketData(_marketId);
       // [0]--> Max Distance between current option and any option, (For 3 options, if current option is 2 it will be `1`. else, it will be `2`) 
       // [1]--> Predicting option distance from Max distance, (MaxDistance - | currentOption - predicting option |)
       // [2]--> sum of all possible option distances,  
       uint[] memory _distanceData = new uint256[](3); 
 
+      uint _marketCurr = marketData[_marketId].marketCurrencyIndex;
+
       // Fetching current price
-      uint currentPrice = IOracle(_feedAddress).getLatestPrice();
+      uint currentPrice = IOracle(marketCurrencies[_marketCurr].marketFeed).getLatestPrice();
       _distanceData[0] = 2;
       // current option based on current price
       uint currentOption;
       _distanceData[2] = 3;
-      if(currentPrice < minVal)
+      if(currentPrice < _optionRanges[0])
       {
         currentOption = 1;
-      } else if(currentPrice > maxVal) {
+      } else if(currentPrice > _optionRanges[2]) {
         currentOption = 3;
       } else {
         currentOption = 2;

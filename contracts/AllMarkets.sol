@@ -1001,7 +1001,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     * @return uint32 start time of market.
     * @return address feed address for market.
     */
-    function getMarketOptionPricingParams(uint _marketId, uint _option) external view returns(uint[] memory, uint32,address) {
+    function getMarketOptionPricingParams(uint _marketId, uint _option) external view returns(uint[] memory, uint32) {
 
       // [0] -> amount staked in `_option`
       // [1] -> Total amount staked in market
@@ -1009,6 +1009,6 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       MarketBasicData storage _marketBasicData = marketBasicData[_marketId];
       _optionPricingParams[0] = marketOptionsAvailable[_marketId][_option].amountStaked;
       _optionPricingParams[1] = marketDataExtended[_marketId].totalStaked;
-      return (_optionPricingParams,_marketBasicData.startTime,_marketBasicData.feedAddress);
+      return (_optionPricingParams,_marketBasicData.startTime);
     }
 }
