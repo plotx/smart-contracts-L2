@@ -709,6 +709,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       for(uint32 i = 0; i< _marketDataExtended.optionRanges.length;i++) {
         if(_value < _marketDataExtended.optionRanges[i]) {
           _winningOption = i+1;
+          break;
         }
       }
       if(_winningOption == 0) {
