@@ -849,6 +849,10 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
        }
     }
 
+    function getTotalOptions(uint256 _marketId) external view returns(uint) {
+      return marketDataExtended[_marketId].optionRanges.length;
+    }
+
     /**
     * @dev Claim the return amount of the specified address.
     * @param _user User address

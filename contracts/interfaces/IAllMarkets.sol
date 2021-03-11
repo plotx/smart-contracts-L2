@@ -42,4 +42,6 @@ contract IAllMarkets {
     function setMarketStatus(uint256 _marketId, PredictionStatus _status) public;
  
     function postMarketResult(uint256 _marketId, uint256 _marketSettleValue) external;
+
+    function getTotalOptions(uint256 _marketId) external view returns(uint);
 }
