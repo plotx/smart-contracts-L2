@@ -348,7 +348,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       require(authorizedMarketCreator[msg.sender]);
       require(!marketCreationPaused);
       _marketIndex = uint64(marketBasicData.length);
-      marketBasicData.push(MarketBasicData(_marketTimes[0], _marketTimes[1], _marketTimes[3], _marketTimes[2]));
+      marketBasicData.push(MarketBasicData(_marketTimes[0], _marketTimes[1], _marketTimes[2], _marketTimes[3]));
       marketDataExtended[_marketIndex].optionRanges = _optionRanges;
       marketDataExtended[_marketIndex].createdBy = msg.sender;
       emit MarketQuestion(_marketIndex, _marketTimes[0], _marketTimes[1], _marketTimes[3], _marketTimes[2], _optionRanges, msg.sender);
@@ -370,10 +370,12 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
         _deposit(_defaultAmount, _msgSenderAddress);
       }
       address _predictionToken = predictionToken;
+      uint64 _predictionAmount = _mcDefaultPredictionAmount/ _totalOptions;
       for(uint i = 1;i < _totalOptions; i++) {
-        _placePrediction(_marketId, _msgSenderAddress, _predictionToken, _mcDefaultPredictionAmount/_totalOptions, i);
+        _placePrediction(_marketId, _msgSenderAddress, _predictionToken, _predictionAmount, i);
+        _mcDefaultPredictionAmount = _mcDefaultPredictionAmount.sub(_predictionAmount);
       }
-      _placePrediction(_marketId, _msgSenderAddress, _predictionToken, _mcDefaultPredictionAmount - (_totalOptions-1)*(_mcDefaultPredictionAmount/_totalOptions), _totalOptions);
+      _placePrediction(_marketId, _msgSenderAddress, _predictionToken, _mcDefaultPredictionAmount, _totalOptions);
     }
 
     /**
@@ -458,9 +460,10 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     * @param _maxRecords Maximum number of records to check
     */
     function withdraw(uint _token, uint _maxRecords) public {
-      (uint _tokenLeft, uint _tokenReward) = getUserUnusedBalance(_msgSender());
+      address payable _msgSenderAddress = _msgSender();
+      (uint _tokenLeft, uint _tokenReward) = getUserUnusedBalance(_msgSenderAddress);
       _tokenLeft = _tokenLeft.add(_tokenReward);
-      _withdraw(_token, _maxRecords, _tokenLeft);
+      _withdraw(_token, _maxRecords, _tokenLeft, _msgSenderAddress);
     }
 
     /**
@@ -469,9 +472,8 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     * @param _maxRecords Maximum number of records to check
     * @param _tokenLeft Amount of prediction token left unused for user
     */
-    function _withdraw(uint _token, uint _maxRecords, uint _tokenLeft) internal {
-      address payable _msgSenderAddress = _msgSender();
-      _withdrawReward(_maxRecords);
+    function _withdraw(uint _token, uint _maxRecords, uint _tokenLeft, address _msgSenderAddress) internal {
+      _withdrawReward(_maxRecords, _msgSenderAddress);
       userData[_msgSenderAddress].unusedBalance = _tokenLeft.sub(_token);
       require(_token > 0);
       _transferAsset(predictionToken, _msgSenderAddress, _token);
@@ -524,7 +526,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
         unusedBalance = unusedBalance.div(decimalMultiplier);
         if(_predictionStake > unusedBalance)
         {
-          _withdrawReward(defaultMaxRecords);
+          _withdrawReward(defaultMaxRecords, _msgSenderAddress);
           unusedBalance = _userData.unusedBalance;
           unusedBalance = unusedBalance.div(decimalMultiplier);
         }
@@ -710,7 +712,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
         }
       }
       if(_winningOption == 0) {
-        _winningOption == _marketDataExtended.optionRanges.length;
+        _winningOption == _marketDataExtended.optionRanges.length + 1;
       }
       // if(_value < _marketBasicData.neutralMinValue) {
       //   _winningOption = 1;
@@ -755,8 +757,8 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     * @dev Claim the pending return of the market.
     * @param maxRecords Maximum number of records to claim reward for
     */
-    function _withdrawReward(uint256 maxRecords) internal {
-      address payable _msgSenderAddress = _msgSender();
+    function _withdrawReward(uint256 maxRecords, address _msgSenderAddress) internal {
+      // address payable _msgSenderAddress = _msgSender();
       uint256 i;
       UserData storage _userData = userData[_msgSenderAddress];
       uint len = _userData.marketsParticipated.length;
@@ -844,7 +846,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     * @param _marketId Index of market
     * @return Flag, if 0:cannot claim, 1: Already Claimed, 2: Claimed; Return in prediction token
     */
-    function claimReturn(address payable _user, uint _marketId) internal view returns(uint256, uint256) {
+    function claimReturn(address _user, uint _marketId) internal view returns(uint256, uint256) {
 
       if(marketStatus(_marketId) != PredictionStatus.Settled) {
         return (0, 0);
