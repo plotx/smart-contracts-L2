@@ -5,6 +5,7 @@ const PlotusToken = artifacts.require("MockPLOT");
 // const BLOT = artifacts.require("BLOT");
 const ParticipationMining = artifacts.require('ParticipationMining');
 const AllMarkets = artifacts.require("MockAllMarkets");
+const CyclicMarkets = artifacts.require("MockCyclicMarkets");
 const DummyTokenMock = artifacts.require('DummyTokenMock');
 const TokenMock = artifacts.require("TokenMock");
 const increaseTime = require("./utils/increaseTime.js").increaseTime;
@@ -33,10 +34,11 @@ contract("Market", async function(users) {
         masterInstance = await Master.at(masterInstance.address);
         plotusToken = await PlotusToken.deployed();
         allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
-        pm = await ParticipationMining.at(await masterInstance.getLatestAddress(web3.utils.toHex("PM")));
+        cyclicMarkets = await CyclicMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("CM")));
+        pm = await ParticipationMining.deployed();
         let address = await masterInstance.getLatestAddress('0x4756');
 
-        await allMarkets.setNextOptionPrice(0);
+        await cyclicMarkets.setNextOptionPrice(0);
 
         token1 = await TokenMock.new("Token1","Token1");
         token2 = await TokenMock.new("Token2","Token2");
@@ -55,17 +57,14 @@ contract("Market", async function(users) {
 
     });
 
-    it("Should revert if non-owner tries to call setMasterAddress()", async () => {
-        await assertRevert(pm.setMasterAddress(users[0], users[0]));
-    });
-
     it("Should revert if non-whitlisted user tries to add sponsorship", async () => {
         await assertRevert(pm.sponsorIncentives(1,token1.address,toWei(100)));
     });
 
     it("Should revert if sponsered token is null", async () => {
-        await masterInstance.whitelistSponsor(users[0]);
-        assert.equal(await masterInstance.whitelistedSponsor(users[0]), true);
+        await assertRevert(pm.whitelistSponsor(users[1]));
+        await pm.whitelistSponsor(users[0]);
+        assert.equal(await pm.whitelistedSponsor(users[0]), true);
         await assertRevert(pm.sponsorIncentives(1,ZERO_ADDRESS,toWei(100)));
     });
 
@@ -127,7 +126,7 @@ contract("Market", async function(users) {
     it("No new prediction other than initial prediction", async () => {
         // Market ID 7, only initial predictions
 
-        await allMarkets.createMarket(0, 0, 0);
+        await cyclicMarkets.createMarket(0, 0, 0);
 
         await pm.sponsorIncentives(7,sponsoredTokens[0].address,sponseredAmount[0]);
 
@@ -139,7 +138,7 @@ contract("Market", async function(users) {
 
     it("User predicts in single options other than market creator", async () => {
         // Market ID 8, 3 players predicts in single option each other than initial predictions
-        await allMarkets.createMarket(0, 0, 0);
+        await cyclicMarkets.createMarket(0, 0, 0);
 
         await pm.sponsorIncentives(8,sponsoredTokens[1].address,sponseredAmount[1]);
 
@@ -186,7 +185,7 @@ contract("Market", async function(users) {
     it("User predicts in multiple options", async () => {
 
         // Market ID 9, players predicts in multiple options 
-        await allMarkets.createMarket(0, 0, 0);
+        await cyclicMarkets.createMarket(0, 0, 0);
         await pm.sponsorIncentives(9,sponsoredTokens[2].address,sponseredAmount[2]);
         await plotusToken.transfer(users[1], toWei(20000));
         await plotusToken.approve(allMarkets.address, toWei(200000), { from: users[1] });

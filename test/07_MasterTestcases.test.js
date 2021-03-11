@@ -2,7 +2,7 @@ const Master = artifacts.require('Master');
 const AllMarkets = artifacts.require("AllMarkets");
 const MarketCreationRewards = artifacts.require("MarketCreationRewards");
 const DisputeResolution = artifacts.require("DisputeResolution");
-const ParticipationMining = artifacts.require("ParticipationMining");
+const CyclicMarkets = artifacts.require("CyclicMarkets");
 const PlotusToken = artifacts.require("MockPLOT");
 const OwnedUpgradeabilityProxy = artifacts.require('OwnedUpgradeabilityProxy');
 const NewProxyInternalContract = artifacts.require('NewProxyInternalContract');
@@ -44,7 +44,7 @@ contract('Master', function(accounts) {
     allMarkets = await AllMarkets.at(await ms.getLatestAddress(toHex('AM')));
     mcr = await MarketCreationRewards.at(await ms.getLatestAddress(toHex("MC")));
     dr = await DisputeResolution.at(await ms.getLatestAddress(toHex("DR")));
-    pm = await ParticipationMining.at(await ms.getLatestAddress(toHex("PM")));
+    cm = await CyclicMarkets.at(await ms.getLatestAddress(toHex("CM")));
   });
 
     describe('Negative Test Cases', function() {
@@ -108,7 +108,7 @@ contract('Master', function(accounts) {
       mas = await OwnedUpgradeabilityProxy.new(mas.address);
       mas = await Master.at(mas.address);
       await assertRevert(
-        mas.initiateMaster([mas.address, mas.address, mas.address, mas.address, mas.address], mas.address, mas.address, mas.address, {from: newOwner})
+        mas.initiateMaster([mas.address, mas.address, mas.address, mas.address, mas.address, mas.address], mas.address, mas.address, mas.address, {from: newOwner})
       );
     });
     it('Should revert if caller is default address passed is null address', async function() {
@@ -116,7 +116,7 @@ contract('Master', function(accounts) {
       mas = await OwnedUpgradeabilityProxy.new(mas.address);
       mas = await Master.at(mas.address);
       await assertRevert(
-        mas.initiateMaster([mas.address, mas.address, mas.address, mas.address, mas.address], mas.address, ZERO_ADDRESS, mas.address)
+        mas.initiateMaster([mas.address, mas.address, mas.address, mas.address, mas.address, mas.address], mas.address, ZERO_ADDRESS, mas.address)
       );
     });
     it('Should revert if caller is multisig auth address passed is null address', async function() {
@@ -124,17 +124,17 @@ contract('Master', function(accounts) {
       mas = await OwnedUpgradeabilityProxy.new(mas.address);
       mas = await Master.at(mas.address);
       await assertRevert(
-        mas.initiateMaster([mas.address, mas.address, mas.address, mas.address, mas.address], mas.address, mas.address, ZERO_ADDRESS)
+        mas.initiateMaster([mas.address, mas.address, mas.address, mas.address, mas.address, mas.address], mas.address, mas.address, ZERO_ADDRESS)
       );
     });
     it('Should revert if length of implementation array and contract array are not same', async function() {
       await assertRevert(
-        mas.initiateMaster([mas.address, mas.address, mas.address], mas.address, mas.address, mas.address)
+        mas.initiateMaster([mas.address, mas.address, mas.address, mas.address], mas.address, mas.address, mas.address)
       );
     });
     it('Should revert if master already initiated', async function() {
       await assertRevert(
-        ms.initiateMaster([mas.address, mas.address, mas.address, mas.address, mas.address], mas.address, mas.address, mas.address, {from: newOwner})
+        ms.initiateMaster([mas.address, mas.address, mas.address, mas.address, mas.address, mas.address], mas.address, mas.address, mas.address, {from: newOwner})
       );
     });
   });
@@ -178,10 +178,10 @@ contract('Master', function(accounts) {
       oldMCR = await MarketCreationRewards.at(
         await ms.getLatestAddress(toHex('MC'))
       );
-      oldPM = await ParticipationMining.at(
-        await ms.getLatestAddress(toHex('PM'))
+      oldCM = await CyclicMarkets.at(
+        await ms.getLatestAddress(toHex('CM'))
       );
-      oldDR = await ParticipationMining.at(
+      oldDR = await DisputeResolution.at(
         await ms.getLatestAddress(toHex('DR'))
       );
       let plbalPlot = await plotTok.balanceOf(
@@ -192,17 +192,17 @@ contract('Master', function(accounts) {
       await increaseTime(100);
       let newMC = await MarketCreationRewards.new();
       let newDR = await DisputeResolution.new();
-      let newPM = await ParticipationMining.new();
+      let newCM = await CyclicMarkets.new();
       actionHash = encode1(
         ['bytes2[]', 'address[]'],
         [
-          [toHex('AM'), toHex("MC"), toHex("PM"), toHex("DR")],
-          [newAllMarkets.address, newMC.address, newPM.address, newDR.address]
+          [toHex('AM'), toHex("MC"), toHex("CM"), toHex("DR")],
+          [newAllMarkets.address, newMC.address, newCM.address, newDR.address]
         ]
       );
       await ms.upgradeMultipleImplementations(
-        [toHex('AM'), toHex("MC"), toHex("PM"), toHex("DR")],
-          [newAllMarkets.address, newMC.address, newPM.address, newDR.address]
+        [toHex('AM'), toHex("MC"), toHex("CM"), toHex("DR")],
+          [newAllMarkets.address, newMC.address, newCM.address, newDR.address]
       );
 
       let oldAMImpl = await OwnedUpgradeabilityProxy.at(
@@ -211,8 +211,8 @@ contract('Master', function(accounts) {
       let oldMCImpl = await OwnedUpgradeabilityProxy.at(
         await ms.getLatestAddress(toHex('MC'))
       );
-      let oldPMImpl = await OwnedUpgradeabilityProxy.at(
-        await ms.getLatestAddress(toHex('PM'))
+      let oldCMImpl = await OwnedUpgradeabilityProxy.at(
+        await ms.getLatestAddress(toHex('CM'))
       );
       let oldDRImpl = await OwnedUpgradeabilityProxy.at(
         await ms.getLatestAddress(toHex('DR'))
@@ -221,7 +221,7 @@ contract('Master', function(accounts) {
       // Checking Upgraded Contract addresses
       assert.equal(newMC.address, await oldMCImpl.implementation());
       assert.equal(newDR.address, await oldDRImpl.implementation());
-      assert.equal(newPM.address, await oldPMImpl.implementation());
+      assert.equal(newCM.address, await oldCMImpl.implementation());
       assert.equal(newAllMarkets.address, await oldAMImpl.implementation());
       
       // Checking Master address in upgraded Contracts

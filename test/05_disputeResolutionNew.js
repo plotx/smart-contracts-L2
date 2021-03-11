@@ -4,6 +4,7 @@ const Master = artifacts.require("Master");
 const PlotusToken = artifacts.require("MockPLOT");
 const MockchainLinkBTC = artifacts.require("MockChainLinkAggregator");
 const AllMarkets = artifacts.require("MockAllMarkets");
+const CyclicMarkets = artifacts.require("MockCyclicMarkets");
 const DisputeResolution = artifacts.require("DisputeResolution");
 const BLOT = artifacts.require("BLOT");
 const MarketCreationRewards = artifacts.require("MarketCreationRewards");
@@ -28,6 +29,7 @@ contract("Market", ([ab1, ab2, ab3, ab4, dr1, dr2, dr3, notMember]) => {
     allMarkets = await AllMarkets.at(allMarkets);
 
     dr = await DisputeResolution.at(await masterInstance.getLatestAddress(toHex("DR")));
+    cyclicMarkets = await CyclicMarkets.at(await masterInstance.getLatestAddress(toHex("CM")));
     await assertRevert(dr.setMasterAddress(dr.address, dr.address));
     await increaseTime(3600*4);
     let nxmToken = await PlotusToken.deployed();
@@ -36,7 +38,7 @@ contract("Market", ([ab1, ab2, ab3, ab4, dr1, dr2, dr3, notMember]) => {
     marketIncentives = await MarketCreationRewards.at(await masterInstance.getLatestAddress(web3.utils.toHex("MC")));
     await plotusToken.transfer(marketIncentives.address, "100000000000000000000");
     let marketIncentivesBalanceBefore = await plotusToken.balanceOf(marketIncentives.address);
-    await allMarkets.createMarket(0,0, 0);
+    await cyclicMarkets.createMarket(0,0, 0);
     await plotusToken.transfer(ab2, "50000000000000000000000");
     await plotusToken.transfer(ab3, "50000000000000000000000");
     await plotusToken.transfer(ab4, "50000000000000000000000");
@@ -46,7 +48,7 @@ contract("Market", ([ab1, ab2, ab3, ab4, dr1, dr2, dr3, notMember]) => {
     await plotusToken.approve(allMarkets.address, "10000000000000000000000");
     // Cannot raise dispute if there is no participation
     // await assertRevert(dr.raiseDispute(7, 1400000000000,"raise dispute","this is description","this is solution hash"));
-    await allMarkets.setNextOptionPrice(9);
+    await cyclicMarkets.setNextOptionPrice(9);
     await allMarkets.depositAndPlacePrediction("10000000000000000000000", 7, plotusToken.address, 100*1e8, 1);
     // cannot raise dispute if market is open
     await plotusToken.approve(allMarkets.address, "10000000000000000000000");
@@ -145,7 +147,7 @@ contract("Market", ([ab1, ab2, ab3, ab4, dr1, dr2, dr3, notMember]) => {
     await plotusToken.approve(allMarkets.address, "30000000000000000000000", {from:dr1});
     // await plotusToken.transfer(marketIncentives.address, "100000000000000000000");
     let marketIncentivesBalanceBefore = await plotusToken.balanceOf(marketIncentives.address);
-    await allMarkets.createMarket(0,0, 0,{from:dr1});
+    await cyclicMarkets.createMarket(0,0, 0,{from:dr1});
    
     await plotusToken.transfer(ab2, "50000000000000000000000");
     await plotusToken.transfer(ab3, "50000000000000000000000");
@@ -156,7 +158,7 @@ contract("Market", ([ab1, ab2, ab3, ab4, dr1, dr2, dr3, notMember]) => {
     await plotusToken.approve(allMarkets.address, "30000000000000000000000");
     // Cannot raise dispute if there is no participation
     await assertRevert(dr.raiseDispute(7, 1400000000000,"raise dispute"));
-    await allMarkets.setNextOptionPrice(9);
+    await cyclicMarkets.setNextOptionPrice(9);
     await allMarkets.depositAndPlacePrediction("10000000000000000000000", 7, plotusToken.address, 100*1e8, 1);
     await allMarkets.depositAndPlacePrediction("20000000000000000000000", 7, plotusToken.address, 200*1e8, 3);
     // cannot raise dispute if market is open
@@ -231,7 +233,7 @@ contract("Market", ([ab1, ab2, ab3, ab4, dr1, dr2, dr3, notMember]) => {
 
 
     await increaseTime(3600*4);
-    await allMarkets.createMarket(0,0, 0);
+    await cyclicMarkets.createMarket(0,0, 0);
     let nxmToken = await PlotusToken.deployed();
     let plotusToken = await PlotusToken.deployed();
     await plotusToken.transfer(marketIncentives.address, "100000000000000000000");
@@ -242,7 +244,7 @@ contract("Market", ([ab1, ab2, ab3, ab4, dr1, dr2, dr3, notMember]) => {
     await plotusToken.transfer(dr1, "50000000000000000000000");
     await plotusToken.transfer(dr2, "50000000000000000000000");
     await plotusToken.transfer(dr3, "50000000000000000000000");
-    await allMarkets.setNextOptionPrice(2);
+    await cyclicMarkets.setNextOptionPrice(2);
     await plotusToken.approve(allMarkets.address, "100000000000000000000");
     await allMarkets.depositAndPlacePrediction("100000000000000000000", 7, plotusToken.address, 100*1e8, 1);
     // cannot raise dispute if market is open
@@ -297,7 +299,7 @@ contract("Market", ([ab1, ab2, ab3, ab4, dr1, dr2, dr3, notMember]) => {
     allMarkets = await AllMarkets.at(allMarkets);
 
     await increaseTime(3600*4);
-    await allMarkets.createMarket(0,0,0);
+    await cyclicMarkets.createMarket(0,0,0);
     let nxmToken = await PlotusToken.deployed();
     let plotusToken = await PlotusToken.deployed();
 
@@ -309,7 +311,7 @@ contract("Market", ([ab1, ab2, ab3, ab4, dr1, dr2, dr3, notMember]) => {
     await plotusToken.transfer(dr1, "50000000000000000000000");
     await plotusToken.transfer(dr2, "50000000000000000000000");
     await plotusToken.transfer(dr3, "50000000000000000000000");
-    await allMarkets.setNextOptionPrice(2);
+    await cyclicMarkets.setNextOptionPrice(2);
     await plotusToken.approve(allMarkets.address, "100000000000000000000");
     await allMarkets.depositAndPlacePrediction("100000000000000000000", 7, plotusToken.address, 100*1e8, 1);
     

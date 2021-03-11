@@ -6,6 +6,7 @@ const PlotusToken = artifacts.require("MockPLOT");
 const MockchainLinkBTC = artifacts.require("MockChainLinkAggregator");
 const BLOT = artifacts.require("BLOT");
 const AllMarkets = artifacts.require("MockAllMarkets");
+const CyclicMarkets = artifacts.require("MockCyclicMarkets");
 const increaseTime = require("./utils/increaseTime.js").increaseTime;
 const increaseTimeTo = require("./utils/increaseTime.js").increaseTimeTo;
 const { encode, encode1,encode3 } = require("./utils/encoder.js");
@@ -26,8 +27,9 @@ contract("Market", async function([user1, user2, user3, user4]) {
 		BLOTInstance = await BLOT.deployed();
 		MockchainLinkInstance = await MockchainLinkBTC.deployed();
 		allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
+		cyclicMarkets = await CyclicMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("CM")));
 		
-		await allMarkets.setNextOptionPrice(0);
+		await cyclicMarkets.setNextOptionPrice(0);
 
 		await MockchainLinkInstance.setLatestAnswer(1195000000000);
 		let currentPriceAfter = await MockchainLinkInstance.latestAnswer();
@@ -36,9 +38,9 @@ contract("Market", async function([user1, user2, user3, user4]) {
 	it("1.Scenario 1 - Stake < minstakes and time passed < min time passed", async () => {
 
 		let expireT = await allMarkets.getMarketData(1);
-		await increaseTime(14400 + expireT[5]/1 - await latestTime());
+		await increaseTime(14400 + expireT[3]/1 - await latestTime());
 
-		await allMarkets.createMarket(0, 0, 0);
+		await cyclicMarkets.createMarket(0, 0, 0);
 		await increaseTime(360);
 
 
@@ -74,7 +76,7 @@ contract("Market", async function([user1, user2, user3, user4]) {
 	      allMarkets,
 	      "AM"
 	      );
-		let optionPrices = await allMarkets.getAllOptionPrices(7);
+		let optionPrices = await cyclicMarkets.getAllOptionPrices(7);
 		assert.equal(optionPrices[0]/1, 25000);
 		assert.equal(optionPrices[1]/1, 50000);
 		assert.equal(optionPrices[2]/1, 25000);
@@ -84,9 +86,9 @@ contract("Market", async function([user1, user2, user3, user4]) {
 		
 
 		let expireT = await allMarkets.getMarketData(7);
-		await increaseTime(14400 + expireT[5]/1 - await latestTime());
+		await increaseTime(14400 + expireT[3]/1 - await latestTime());
 
-		await allMarkets.createMarket(0, 0, 1);
+		await cyclicMarkets.createMarket(0, 0, 1);
 
 
 
@@ -126,20 +128,20 @@ contract("Market", async function([user1, user2, user3, user4]) {
 		let expireTim = await allMarkets.getMarketData(8);
 		await increaseTimeTo(expireTim[5]/1 - 4*3600 +360);
 
-		assert.equal(truncNumber((await allMarkets.getOptionPrice(8,1))/1e5), 0.19);
-		assert.equal(truncNumber((await allMarkets.getOptionPrice(8,2))/1e5), 0.16);
-		assert.equal(truncNumber((await allMarkets.getOptionPrice(8,3))/1e5), 0.63);
+		assert.equal(truncNumber((await cyclicMarkets.getOptionPrice(8,1))/1e5), 0.19);
+		assert.equal(truncNumber((await cyclicMarkets.getOptionPrice(8,2))/1e5), 0.16);
+		assert.equal(truncNumber((await cyclicMarkets.getOptionPrice(8,3))/1e5), 0.63);
 	});
 
 	it("3.Scenario 3 - Stake > minstakes and time passed > min time passed", async () => {
 
 		let expireT = await allMarkets.getMarketData(8);
 
-		await increaseTime(14400 + expireT[5]/1 - await latestTime());
+		await increaseTime(14400 + expireT[3]/1 - await latestTime());
 
 		await assertRevert(allMarkets.postMarketResult(7, 10000000000));
 
-		await allMarkets.createMarket(0, 0, 1);
+		await cyclicMarkets.createMarket(0, 0, 1);
 
 
 		await plotusToken.transfer(user2, toWei(10000));
@@ -183,17 +185,17 @@ contract("Market", async function([user1, user2, user3, user4]) {
 		// let optionPricePaams = await allMarkets.getMarketOptionPricingParams(9,1);
 		// await increaseTimeTo(optionPricePaams[1]/1+41*60);
 
-		assert.equal(truncNumber((await allMarkets.getOptionPrice(9,1))/1e5), 0.19);
-		assert.equal(truncNumber((await allMarkets.getOptionPrice(9,2))/1e5), 0.16);
-		assert.equal(truncNumber((await allMarkets.getOptionPrice(9,3))/1e5), 0.63);
+		assert.equal(truncNumber((await cyclicMarkets.getOptionPrice(9,1))/1e5), 0.19);
+		assert.equal(truncNumber((await cyclicMarkets.getOptionPrice(9,2))/1e5), 0.16);
+		assert.equal(truncNumber((await cyclicMarkets.getOptionPrice(9,3))/1e5), 0.63);
 	});
 
 	it("4.Scenario 4 - Stake > minstakes and time passed > min time passed max distance = 2", async () => {
 		let expireT = await allMarkets.getMarketData(9);
 
-		await increaseTime(14400 + expireT[5]/1 - await latestTime());
+		await increaseTime(14400 + expireT[3]/1 - await latestTime());
 
-		await allMarkets.createMarket(0, 0, 1);
+		await cyclicMarkets.createMarket(0, 0, 1);
 
 		await plotusToken.transfer(user2, toWei(10000));
 	    await plotusToken.approve(allMarkets.address, toWei(100000), { from: user2 });
@@ -234,9 +236,9 @@ contract("Market", async function([user1, user2, user3, user4]) {
 		let expireTim = await allMarkets.getMarketData(10);
 		await increaseTimeTo(expireTim[5]/1 - 4*3600 + 41*60);
 
-		assert.equal(truncNumber((await allMarkets.getOptionPrice(10,1))/1e5), 0.17);
-		assert.equal(truncNumber((await allMarkets.getOptionPrice(10,2))/1e5), 0.13);
-		assert.equal(truncNumber((await allMarkets.getOptionPrice(10,3))/1e5), 0.68);
+		assert.equal(truncNumber((await cyclicMarkets.getOptionPrice(10,1))/1e5), 0.17);
+		assert.equal(truncNumber((await cyclicMarkets.getOptionPrice(10,2))/1e5), 0.13);
+		assert.equal(truncNumber((await cyclicMarkets.getOptionPrice(10,3))/1e5), 0.68);
 	});
 
 });

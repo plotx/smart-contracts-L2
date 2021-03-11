@@ -3,6 +3,7 @@ const OwnedUpgradeabilityProxy = artifacts.require("OwnedUpgradeabilityProxy");
 const Master = artifacts.require("Master");
 const PlotusToken = artifacts.require("MockPLOT");
 const AllMarkets = artifacts.require("MockAllMarkets");
+const CyclicMarkets = artifacts.require("MockCyclicMarkets");
 const BLOT = artifacts.require("BLOT");
 const MarketCreationRewards = artifacts.require('MarketCreationRewards');
 const BigNumber = require("bignumber.js");
@@ -34,14 +35,15 @@ describe("newPlotusWithBlot", () => {
             masterInstance = await Master.at(masterInstance.address);
             plotusToken = await PlotusToken.deployed();
             allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
+			cyclicMarkets = await CyclicMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("CM")));
             marketIncentives = await MarketCreationRewards.at(await masterInstance.getLatestAddress(web3.utils.toHex("MC")));
             await increaseTime(4 * 60 * 60 + 1);
             await allMarkets.claimRelayerRewards();
             await plotusToken.transfer(marketIncentives.address,toWei(100000));
             await plotusToken.transfer(users[11],toWei(1000));
             await plotusToken.approve(allMarkets.address, toWei(10000), {from:users[11]});
-            await allMarkets.setNextOptionPrice(18);
-            await allMarkets.createMarket(0, 0, 0,{from: users[11]});
+            await cyclicMarkets.setNextOptionPrice(18);
+            await cyclicMarkets.createMarket(0, 0, 0,{from: users[11]});
             // await marketIncentives.claimCreationReward(100,{from:users[11]});
             BLOTInstance = await BLOT.at(await masterInstance.getLatestAddress(web3.utils.toHex("BL")));
             await assertRevert(BLOTInstance.convertToPLOT(users[0], users[1],toWei(100)));
@@ -79,7 +81,7 @@ describe("newPlotusWithBlot", () => {
               predictionToken = BLOTInstance.address;
             }
             let functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)",depositAmt , 7, predictionToken, to8Power(predictionVal[i]), options[i]);
-            await allMarkets.setNextOptionPrice(options[i]*9);
+            await cyclicMarkets.setNextOptionPrice(options[i]*9);
             await signAndExecuteMetaTx(
                 pkList[i],
                 users[i],

@@ -1,5 +1,6 @@
 const Master = artifacts.require('Master');
 const AllMarkets = artifacts.require('AllMarkets');
+const CyclicMarkets = artifacts.require('CyclicMarkets');
 const PlotusToken = artifacts.require("MockPLOT");
 const MockchainLink = artifacts.require('MockChainLinkAggregator');
 const MultiSigWallet = artifacts.require('MultiSigWallet');
@@ -36,10 +37,12 @@ contract('Configure Global Parameters', accounts => {
       ms = await OwnedUpgradeabilityProxy.deployed();
       ms = await Master.at(ms.address);
       allMarkets = await AllMarkets.at(await ms.getLatestAddress(toHex('AM')));
+      cyclicMarkets = await CyclicMarkets.at(await ms.getLatestAddress(toHex('CM')));
       plotTok = await PlotusToken.deployed();
       feedInstance = await MockchainLink.deployed();
       multiSigWallet = await MultiSigWallet.new([accounts[0], accounts[1], accounts[2]],3);
       await allMarkets.changeAuthorizedAddress(multiSigWallet.address);
+      await cyclicMarkets.changeAuthorizedAddress(multiSigWallet.address);
       let owners = await multiSigWallet.getOwners();
       for(let i = 0;i<3;i++) {
         owners[i] = accounts[i];
@@ -48,8 +51,6 @@ contract('Configure Global Parameters', accounts => {
     });
 
     async function updateParameter(
-      cId,
-      mrSequence,
       code,
       contractInst,
       type,
@@ -111,8 +112,6 @@ contract('Configure Global Parameters', accounts => {
       }
     }
     async function updateInvalidParameter(
-      cId,
-      mrSequence,
       code,
       contractInst,
       type,
@@ -202,40 +201,40 @@ contract('Configure Global Parameters', accounts => {
 
     describe('Update AllMarkets Parameters', async function() {
       it('Should update Cummulative fee percent', async function() {
-        await updateParameter(19, 2, 'CMFP', allMarkets, 'uint', '5300');
+        await updateParameter( 'CMFP', allMarkets, 'uint', '5300');
         let confirmedBy = await multiSigWallet.getConfirmations(0);
         for(let i = 0; i<3;i++) {
           assert.equal(confirmedBy[i],accounts[i]);
         }
       });
       it('Should update DAO fee percent', async function() {
-        await updateParameter(19, 2, 'DAOF', allMarkets, 'uint', '2500');
+        await updateParameter( 'DAOF', allMarkets, 'uint', '2500');
         let transactions = await multiSigWallet.getTransactionIds(0,2, true, true);
         assert.equal(transactions.length,2);
       });
       it('Should update Market creator fee percent', async function() {
-        await updateParameter(19, 2, 'MCF', allMarkets, 'uint', '1000');
+        await updateParameter( 'MCF', allMarkets, 'uint', '1000');
       });
       it('Should update Referrer fee percent', async function() {
-        await updateParameter(19, 2, 'RFRRF', allMarkets, 'uint', '2600');
+        await updateParameter( 'RFRRF', allMarkets, 'uint', '2600');
       });
       it('Should update Referee fee percent', async function() {
-        await updateParameter(19, 2, 'RFREF', allMarkets, 'uint', '1500');
+        await updateParameter( 'RFREF', allMarkets, 'uint', '1500');
       });
       it('Should update Market creator default prediction amount', async function() {
-        await updateParameter(19, 2, 'MDPA', allMarkets, 'uint', '123');
+        await updateParameter( 'MDPA', allMarkets, 'uint', '123');
       });
-      it('Should update minimum creator default prediction amount', async function() {
-        await updateParameter(19, 2, 'MINP', allMarkets, 'uint', '123');
+      it('Should update minimum prediction amount', async function() {
+        await updateParameter( 'MINP', allMarkets, 'uint', '123');
       });
       it('Should update maximum prediction amount', async function() {
-        await updateParameter(19, 2, 'MAXP', allMarkets, 'uint', '123');
+        await updateParameter( 'MAXP', allMarkets, 'uint', '123');
       });
       it('Should update Current price weightage', async function() {
-        await updateParameter(19, 2, 'CPW', allMarkets, 'uint', '123');
+        await updateParameter( 'CPW', cyclicMarkets, 'uint', '23');
       });
       it('Should update Staking factor min stake', async function() {
-        await updateParameter(19, 2, 'SFMS', allMarkets, 'uint', '123');
+        await updateParameter( 'SFMS', cyclicMarkets, 'uint', '123');
       });
       // it('Should update Multisig address', async function() {
       //   await updateParameter(26, 2, 'MULSIG', allMarkets, 'address', allMarkets.address, "authorizedMultiSig()", true);
@@ -244,16 +243,22 @@ contract('Configure Global Parameters', accounts => {
       //   await updateParameter(26, 2, 'BULSIG', allMarkets, 'address', tc.address, "authorizedMultiSig()", false);
       // });
       it('Should not update if Cummulative fee percent is >= 100', async function() {
-        await updateInvalidParameter(19, 2, 'CMFP', allMarkets, 'uint', '11000');
+        await updateInvalidParameter('CMFP', allMarkets, 'uint', '11000');
       });
       it('Should not update if total fee percents >= 100', async function() {
-        await updateInvalidParameter(19, 2, 'DAOF', allMarkets, 'uint', '8000');
+        await updateInvalidParameter('DAOF', allMarkets, 'uint', '8000');
       });
       it('Should not update if total fee percents >= 100', async function() {
-        await updateInvalidParameter(19, 2, 'MCF', allMarkets, 'uint', '7000');
+        await updateInvalidParameter('MCF', allMarkets, 'uint', '7000');
       });
       it('Should not update if parameter code is incorrect', async function() {
-        await updateInvalidParameter(19, 2, 'EPTIM', allMarkets, 'uint', '2');
+        await updateInvalidParameter('EPTIM', allMarkets, 'uint', '2');
+      });
+      it('Should not update if parameter code is incorrect', async function() {
+        await updateInvalidParameter('EPTIM', cyclicMarkets, 'uint', '2');
+      });
+      it('Should not update if Current price weightage > 100', async function() {
+        await updateInvalidParameter('CPW', cyclicMarkets, 'uint', '200');
       });
     }); 
 
