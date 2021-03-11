@@ -99,7 +99,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
     uint32 internal currentPriceWeightage ;
 
     modifier onlyAuthorizedUsers() {
-        require(authorizedAddress = msg.sender);
+        require(authorizedAddress == msg.sender);
         _;
     }
 
