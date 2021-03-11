@@ -232,7 +232,11 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     * @param value Value to which the parameter should be updated
     */
     function updateUintParameters(bytes8 code, uint256 value) external onlyAuthorized {
-      if(code == "MDPA") { // Market creators default prediction amount
+      if(code == "MINP") { // Minimum prediction amount
+        minPredictionAmount = value;
+      } else if(code == "MAXP") { // Maximum prediction amount
+        maxPredictionAmount = value;
+      } else if(code == "MDPA") { // Market creators default prediction amount
         mcDefaultPredictionAmount = uint64(value);
       } else {
         MarketFeeParams storage _marketFeeParams = marketFeeParams;
@@ -280,7 +284,11 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     */
     function getUintParameters(bytes8 code) external view returns(bytes8 codeVal, uint256 value) {
       codeVal = code;
-      if(code == "CMFP") { // Cummulative fee percent
+      if(code == "MINP") { // Minimum prediction amount
+        value = minPredictionAmount;
+      } else if(code == "MAXP") { // Maximum prediction amount
+        value = maxPredictionAmount;
+      } else if(code == "CMFP") { // Cummulative fee percent
         value = marketFeeParams.cummulativeFeePercent;
       } else if(code == "DAOF") { // DAO Fee percent in Cummulative fee
         value = marketFeeParams.daoCommissionPercent;

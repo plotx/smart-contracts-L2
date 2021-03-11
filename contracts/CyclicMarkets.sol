@@ -90,7 +90,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
     mapping(uint256 => mapping(uint256 => MarketCreationData)) internal marketCreationData;
 
     mapping(uint256 => PricingData) internal marketPricingData;
-    mapping(address => bool) public authorizedAddresses;
+    address public authorizedAddress;
     mapping(uint256 => MarketData) public marketData;
 
     uint internal totalOptions;
@@ -99,7 +99,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
     uint32 internal currentPriceWeightage ;
 
     modifier onlyAuthorizedUsers() {
-        require(authorizedAddresses[msg.sender]);
+        require(authorizedAddress = msg.sender);
         _;
     }
 
@@ -116,16 +116,9 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       address _plotToken = ms.dAppToken();
       plotToken = _plotToken;
       allMarkets = IAllMarkets(ms.getLatestAddress("AM"));
-      authorizedAddresses[_defaultAuthorizedAddress] = true;
+      authorizedAddress = _defaultAuthorizedAddress;
       authorized = _authorizedMultiSig;
       _initializeEIP712("CM");
-    }
-
-    /**
-    * @dev Function to set authorized address
-    **/
-    function addAuthorizedAddress(address _address) external onlyAuthorizedUsers {
-        authorizedAddresses[_address] = true;
     }
     
     /**
@@ -214,6 +207,39 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       _marketTypeArray.cooldownTime = _marketCooldownTime;
       _marketTypeArray.minTimePassed = _minTimePassed;
       emit MarketTypes(_marketType, _marketTypeArray.predictionTime, _marketCooldownTime, _optionRangePerc, true, _minTimePassed);
+    }
+
+    /**
+    * @dev function to update integer parameters
+    * @param code Code of the updating parameter.
+    * @param value Value to which the parameter should be updated
+    */
+    function updateUintParameters(bytes8 code, uint256 value) external onlyAuthorized {
+      if(code == "CPW") { // Current price weighage
+        require(value <= 100);
+        currentPriceWeightage = uint32(value);
+        //Staking factor weightage% = 100% - currentPriceWeightage%
+        stakingFactorWeightage = 100 - currentPriceWeightage;
+      } else if(code == "SFMS") { // Minimum amount for staking factor to apply
+        stakingFactorMinStake = value;
+      } else {
+        revert("Invalid code");
+      }
+    }
+
+    /**
+    * @dev function to get integer parameters
+    * @param code Code of the parameter.
+    * @return codeVal Code of the parameter.
+    * @return value Value of the queried parameter.
+    */
+    function getUintParameters(bytes8 code) external view returns(bytes8 codeVal, uint256 value) {
+      codeVal = code;
+      if(code == "CPW") { // Current price weighage
+        value = currentPriceWeightage;
+      } else if(code == "SFMS") { // Minimum amount for staking factor to apply
+        value = stakingFactorMinStake;
+      }
     }
 
     /**
@@ -390,11 +416,9 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       uint[] memory _distanceData = getOptionDistanceData(_marketId,_prediction);
 
       // (Time Elapsed x 10000) / ((Max Distance + 1) x currentPriceWeightage)
-      require(_marketPricingData.currentPriceWeightage > 0, "VDSKJ");
       uint timeFactor = timeElapsed.mul(10000).div((_distanceData[0].add(1)).mul(_marketPricingData.currentPriceWeightage));
 
       uint totalTime = _predictionTime;
-  require(totalTime > 0,"DSD");
       // (1) + ((Option Distance from max distance + 1) x timeFactor x 10^18 / Total Prediction Time)  -- (2)
       optionPrice = optionPrice.add((_distanceData[1].add(1)).mul(timeFactor).mul(10**18).div(totalTime));  
       // (2) / ((stakingFactorConst x 10^13) + timeFactor x 10^13 x (cummulative option distaance + 3) / Total Prediction Time)
