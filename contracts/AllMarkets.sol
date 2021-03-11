@@ -704,7 +704,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       } else {
         delete _marketDataExtended.settleTime;
       }
-      marketDataExtended[_marketId].predictionStatus = PredictionStatus.Settled;
+      _marketDataExtended.predictionStatus = PredictionStatus.Settled;
       uint32 _winningOption;
       for(uint32 i = 0; i< _marketDataExtended.optionRanges.length;i++) {
         if(_value < _marketDataExtended.optionRanges[i]) {
@@ -712,7 +712,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
         }
       }
       if(_winningOption == 0) {
-        _winningOption == _marketDataExtended.optionRanges.length + 1;
+        _winningOption = uint32(_marketDataExtended.optionRanges.length + 1);
       }
       // if(_value < _marketBasicData.neutralMinValue) {
       //   _winningOption = 1;
