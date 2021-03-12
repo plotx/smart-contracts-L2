@@ -7,6 +7,7 @@ const OwnedUpgradeabilityProxy = artifacts.require('OwnedUpgradeabilityProxy');
 const ParticipationMining = artifacts.require('ParticipationMining');
 const DisputeResolution = artifacts.require('DisputeResolution');
 const CyclicMarkets = artifacts.require('MockCyclicMarkets');
+const AcyclicMarkets = artifacts.require('AcyclicMarkets');
 const EthChainlinkOracle = artifacts.require('EthChainlinkOracle');
 const { assert } = require("chai");
 const encode1 = require('../test/utils/encoder.js').encode1;
@@ -25,5 +26,6 @@ module.exports = function(deployer, network, accounts){
       let mcr = await deployer.deploy(MarketCreationRewards);
       let dr = await deployer.deploy(DisputeResolution);
       let cm = await deployer.deploy(CyclicMarkets);
+      let ac = await deployer.deploy(AcyclicMarkets);
   });
 };

@@ -3,6 +3,7 @@ const AllMarkets = artifacts.require('MockAllMarkets');
 const MarketCreationRewards = artifacts.require('MarketCreationRewards');
 const PlotusToken = artifacts.require('MockPLOT');
 const BLOT = artifacts.require('BLOT');
+const AcyclicMarkets = artifacts.require('AcyclicMarkets');
 const MockchainLink = artifacts.require('MockChainLinkAggregator');
 const OwnedUpgradeabilityProxy = artifacts.require('OwnedUpgradeabilityProxy');
 const ParticipationMining = artifacts.require('ParticipationMining');
@@ -25,8 +26,9 @@ module.exports = function(deployer, network, accounts){
     let mcr = await MarketCreationRewards.deployed();
     let dr = await DisputeResolution.deployed();
     let cm = await CyclicMarkets.deployed();
+    let ac = await AcyclicMarkets.deployed();
     master = await Master.at(master.address);
-    let implementations = [allMarkets.address, mcr.address, blotToken.address, dr.address, cm.address];
+    let implementations = [allMarkets.address, mcr.address, blotToken.address, dr.address, cm.address, am.address];
     console.log(accounts[0])
     await master.initiateMaster(implementations, deployPlotusToken.address, accounts[0], accounts[0]);
     master = await OwnedUpgradeabilityProxy.at(master.address);
