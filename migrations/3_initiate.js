@@ -28,7 +28,7 @@ module.exports = function(deployer, network, accounts){
     let cm = await CyclicMarkets.deployed();
     let ac = await AcyclicMarkets.deployed();
     master = await Master.at(master.address);
-    let implementations = [allMarkets.address, mcr.address, blotToken.address, dr.address, cm.address, am.address];
+    let implementations = [allMarkets.address, mcr.address, blotToken.address, dr.address, cm.address, ac.address];
     console.log(accounts[0])
     await master.initiateMaster(implementations, deployPlotusToken.address, accounts[0], accounts[0]);
     master = await OwnedUpgradeabilityProxy.at(master.address);
