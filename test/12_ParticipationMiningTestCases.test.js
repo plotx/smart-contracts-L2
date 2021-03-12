@@ -62,7 +62,7 @@ contract("Market", async function(users) {
     });
 
     it("Should revert if sponsered token is null", async () => {
-        await assertRevert(pm.whitelistSponsor(users[1]));
+        await assertRevert(pm.whitelistSponsor(users[1]), {from: users[1]});
         await pm.whitelistSponsor(users[0]);
         assert.equal(await pm.whitelistedSponsor(users[0]), true);
         await assertRevert(pm.sponsorIncentives(1,ZERO_ADDRESS,toWei(100)));
