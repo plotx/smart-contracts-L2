@@ -29,6 +29,7 @@ contract DisputeResolution is IAuth, NativeMetaTransaction {
   event DisputeResolved(uint256 indexed marketIndex, bool status);
   event Vote(uint256 indexed marketIndex, address indexed user, bool choice, uint256 voteValue, uint256 date);
   event WithdrawnTokens(uint256 indexed marketIndex, address indexed user, uint256 amount);
+  event ClaimReward(address indexed user, uint256 amount);
 
   struct DisputeData {
     address raisedBy;
@@ -188,6 +189,7 @@ contract DisputeResolution is IAuth, NativeMetaTransaction {
     require(_incentive > 0);
     _userData.lastClaimedIndex = len;
     _transferAsset(_user, _incentive);
+    emit ClaimReward(_user, _incentive);
   }
 
   /**
