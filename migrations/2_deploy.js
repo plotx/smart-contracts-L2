@@ -1,6 +1,5 @@
 const Master = artifacts.require('Master');
 const AllMarkets = artifacts.require('MockAllMarkets');
-const MarketCreationRewards = artifacts.require('MarketCreationRewards');
 const BLOT = artifacts.require('BLOT');
 const MockchainLink = artifacts.require('MockChainLinkAggregator');
 const OwnedUpgradeabilityProxy = artifacts.require('OwnedUpgradeabilityProxy');
@@ -23,7 +22,6 @@ module.exports = function(deployer, network, accounts){
       let masterProxy = await deployer.deploy(Master);
       let master = await deployer.deploy(OwnedUpgradeabilityProxy, masterProxy.address);
       let allMarkets = await deployer.deploy(AllMarkets);
-      let mcr = await deployer.deploy(MarketCreationRewards);
       let dr = await deployer.deploy(DisputeResolution);
       let cm = await deployer.deploy(CyclicMarkets);
       let ac = await deployer.deploy(AcyclicMarkets);
