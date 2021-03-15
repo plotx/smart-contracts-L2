@@ -18,6 +18,7 @@ pragma solidity 0.5.7;
 import "./external/proxy/OwnedUpgradeabilityProxy.sol";
 import "./interfaces/Iupgradable.sol";
 import "./interfaces/IAuth.sol";
+import "./interfaces/IToken.sol";
 
 contract Master is IAuth {
     bytes2[] public allContractNames;
@@ -51,7 +52,6 @@ contract Master is IAuth {
 
         //Initial contract names
         allContractNames.push("AM");
-        allContractNames.push("MC");
         allContractNames.push("BL");
         allContractNames.push("DR");
         allContractNames.push("CM");
@@ -168,5 +168,32 @@ contract Master is IAuth {
         );
         contractAddress[_contractName] = address(tempInstance);
         contractsActive[address(tempInstance)] = true;
+    }
+    
+    /**
+    * @dev Transfer `_amount` number of market registry assets contract to `_to` address
+    */
+    function withdrawForDRVotingRewards(uint _amount) external {
+      require(msg.sender == contractAddress["DR"]);
+      _transferAsset(dAppToken, msg.sender, _amount);
+    }
+
+    /**
+    * @dev Transfer `_amount` number of market registry assets contract to `_to` address
+    */
+    function transferAssets(address _asset, address payable _to, uint _amount) external onlyAuthorized {
+      _transferAsset(_asset, _to, _amount);
+    }
+
+    /**
+    * @dev Transfer the assets to specified address.
+    * @param _asset The asset transfer to the specific address.
+    * @param _recipient The address to transfer the asset of
+    * @param _amount The amount which is transfer.
+    */
+    function _transferAsset(address _asset, address payable _recipient, uint256 _amount) internal {
+      if(_amount > 0) { 
+          require(IToken(_asset).transfer(_recipient, _amount));
+      }
     }
 }

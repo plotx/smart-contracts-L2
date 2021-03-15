@@ -25,7 +25,7 @@ import "./interfaces/IAuth.sol";
 
 contract DisputeResolution is IAuth, NativeMetaTransaction {
   
-  event DisputeRaised(uint256 indexed marketIndex, address indexed raisedBy, uint256 proposedValue, uint256 allowVoteUntil);
+  event DisputeRaised(uint256 indexed marketIndex, address indexed raisedBy, uint256 proposedValue, uint256 allowVoteUntil, string description);
   event DisputeResolved(uint256 indexed marketIndex, bool status);
   event Vote(uint256 indexed marketIndex, address indexed user, bool choice, uint256 voteValue, uint256 date);
   event WithdrawnTokens(uint256 indexed marketIndex, address indexed user, uint256 amount);
@@ -39,19 +39,28 @@ contract DisputeResolution is IAuth, NativeMetaTransaction {
     uint256 acceptedVoteValue;
     uint256 rejectedVoteValue;
     uint256 tokensLockedUntill;
+    uint256 rewardForVoting;
+    bool closed;
     mapping (address => uint256) userVoteValue;
+  }
+
+  struct UserData {
+    uint[] disputesParticipated;
+    uint256 lastClaimedIndex;
   }
 
   IAllMarkets internal allMarkets;
 
   address internal plotToken;
-  address internal marketRewards;
+  address internal masterAddress;
   uint256 internal drVotePeriod;
   uint256 internal tokenStakeForDispute;
   uint256 internal drTokenLockPeriod;
   uint256 internal voteThresholdMultiplier;
+  uint256 internal rewardForVoting;
 
   mapping (uint256 => DisputeData) public marketDisputeData;
+  mapping (address => UserData) public userData;
 
   /**
    * @dev Changes the master address and update it's instance
@@ -66,8 +75,9 @@ contract DisputeResolution is IAuth, NativeMetaTransaction {
     authorized = _authorizedMultiSig;
     plotToken = _plotToken;
     allMarkets = IAllMarkets(ms.getLatestAddress("AM"));
-    marketRewards = ms.getLatestAddress("MC");
+    masterAddress = msg.sender;
     tokenStakeForDispute = 500 ether;
+    rewardForVoting = 500 ether;
     drTokenLockPeriod = 10 days;
     voteThresholdMultiplier = 10;
     drVotePeriod = 3 days;
@@ -94,7 +104,8 @@ contract DisputeResolution is IAuth, NativeMetaTransaction {
     _marketDisputeData.allowVoteUntil = drVotePeriod.add(now);
     _marketDisputeData.stakeAmount = tokenStakeForDispute;
     _marketDisputeData.tokensLockedUntill = drTokenLockPeriod.add(now);
-    emit DisputeRaised(_marketId, _msgSenderAddress, _proposedValue, drVotePeriod.add(now));
+    _marketDisputeData.rewardForVoting = rewardForVoting;
+    emit DisputeRaised(_marketId, _msgSenderAddress, _proposedValue, drVotePeriod.add(now), _description);
     _setMarketStatus(_marketId, IAllMarkets.PredictionStatus.InDispute);
   }
 
@@ -110,6 +121,9 @@ contract DisputeResolution is IAuth, NativeMetaTransaction {
     DisputeData storage _marketDisputeData = marketDisputeData[_marketId];
     require(now <= _marketDisputeData.allowVoteUntil);
     _transferTokenFrom(_msgSenderAddress, address(this), _voteValue);
+    if(_marketDisputeData.userVoteValue[_msgSenderAddress] == 0) {
+      userData[_msgSenderAddress].disputesParticipated.push(_marketId);
+    }
     _marketDisputeData.userVoteValue[_msgSenderAddress] = _voteValue;
     _marketDisputeData.totalVoteValue = _marketDisputeData.totalVoteValue.add(_voteValue);
     if(_choice) {
@@ -129,6 +143,7 @@ contract DisputeResolution is IAuth, NativeMetaTransaction {
     require(now > _marketDisputeData.allowVoteUntil);
     require(allMarkets.marketStatus(_marketId) == IAllMarkets.PredictionStatus.InDispute);
     uint256 plotStakedOnMarket = allMarkets.getTotalStakedWorthInPLOT(_marketId);
+    _marketDisputeData.closed = true;
     if(
       (_marketDisputeData.totalVoteValue >= voteThresholdMultiplier.mul(plotStakedOnMarket)) &&
       (_marketDisputeData.acceptedVoteValue > _marketDisputeData.rejectedVoteValue)
@@ -137,6 +152,7 @@ contract DisputeResolution is IAuth, NativeMetaTransaction {
     } else {
       _resolveDispute(_marketId, false, 0);
     }
+    IMaster(masterAddress).withdrawForDRVotingRewards(_marketDisputeData.rewardForVoting);
   }
 
   /**
@@ -153,10 +169,25 @@ contract DisputeResolution is IAuth, NativeMetaTransaction {
       allMarkets.postMarketResult(_marketId, finalResult);
       _transferAsset(_marketDisputeData.raisedBy, _tokensToTransfer);
     } else {
-      _transferAsset(marketRewards, _tokensToTransfer);
+      _transferAsset(masterAddress, _tokensToTransfer);
     }
     _setMarketStatus(_marketId, IAllMarkets.PredictionStatus.Settled);
     emit DisputeResolved(_marketId, accepted);
+  }
+
+  function claimReward(address _user, uint256 _maxRecord) external {
+    uint _incentive;
+    UserData storage _userData = userData[_user];
+    uint len = _userData.disputesParticipated.length;
+    uint count;
+    for(uint i = _userData.lastClaimedIndex; i < len && count < _maxRecord; i++) {
+      DisputeData storage _marketDisputeData = marketDisputeData[i];
+      _incentive = _incentive.add(_marketDisputeData.rewardForVoting.mul((_marketDisputeData.userVoteValue[_user]).div(_marketDisputeData.totalVoteValue)));
+      count++;
+    }
+    require(_incentive > 0);
+    _userData.lastClaimedIndex = len;
+    _transferAsset(_user, _incentive);
   }
 
   /**
@@ -185,7 +216,7 @@ contract DisputeResolution is IAuth, NativeMetaTransaction {
     require(now <= _marketDisputeData.tokensLockedUntill);
     uint256 _tokensToTransfer = _marketDisputeData.userVoteValue[_user];
     delete _marketDisputeData.userVoteValue[_user];
-    _transferAsset(marketRewards, _tokensToTransfer);
+    _transferAsset(masterAddress, _tokensToTransfer);
   }
 
   /**

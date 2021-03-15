@@ -28,9 +28,11 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       Settled
     }
 
-    event MarketParams(uint256 indexed marketIndex, uint256 marketType, bytes32 currencyName, uint256 _stakingFactorMinStake,uint32 _stakingFactorWeightage,uint256 _currentPriceWeightage,uint32 _minTimePassed);
+    event MarketParams(uint256 indexed marketIndex, address marketCreator, uint256 marketType, bytes32 currencyName, uint256 _stakingFactorMinStake,uint32 _stakingFactorWeightage,uint256 _currentPriceWeightage,uint32 _minTimePassed);
     event MarketTypes(uint256 indexed index, uint32 predictionTime, uint32 cooldownTime, uint32 optionRangePerc, bool status, uint32 minTimePassed);
     event MarketCurrencies(uint256 indexed index, address feedAddress, bytes32 currencyName, bool status);
+	  event MarketCreatorReward(address indexed createdBy, uint256 indexed marketIndex, uint256 tokenIncentive);
+    event ClaimedMarketCreationReward(address indexed user, uint reward, address predictionToken);
 
     struct MarketTypeData {
       uint32 predictionTime;
@@ -74,6 +76,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
     struct MarketData {
       uint64 marketTypeIndex;
       uint64 marketCurrencyIndex;
+      address marketCreator;
     }
 
     MarketFeeParams internal marketFeeParams;
@@ -92,6 +95,8 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
     mapping(uint256 => PricingData) internal marketPricingData;
     address public authorizedAddress;
     mapping(uint256 => MarketData) public marketData;
+
+    mapping(address => uint256) public marketCreationReward;
 
     uint internal totalOptions;
     uint internal stakingFactorMinStake ;
@@ -290,24 +295,23 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       require(!_marketType.paused && !_marketCreationData.paused);
       _closePreviousMarketWithRoundId( _marketTypeIndex, _marketCurrencyIndex, _roundId);
       uint32 _startTime = calculateStartTimeForMarket(_marketCurrencyIndex, _marketTypeIndex);
-      (uint64 _minValue, uint64 _maxValue) = _calculateOptionRange(_marketType.optionRangePerc, _marketCurrency.decimals, _marketCurrency.roundOfToNearest, _marketCurrency.marketFeed);
       uint32[] memory _marketTimes = new uint32[](4);
       uint64[] memory _optionRanges = new uint64[](2);
+      _optionRanges = _calculateOptionRange(_marketType.optionRangePerc, _marketCurrency.decimals, _marketCurrency.roundOfToNearest, _marketCurrency.marketFeed);
       _marketTimes[0] = _startTime; 
       _marketTimes[1] = _marketType.predictionTime;
       _marketTimes[2] = _marketType.predictionTime*2;
       _marketTimes[3] = _marketType.cooldownTime;
-      _optionRanges[0] = _minValue;
-      _optionRanges[1] = _maxValue;
       uint64 _marketIndex = allMarkets.getTotalMarketsLength();
+      address _msgSenderAddress = _msgSender();
       marketPricingData[_marketIndex] = PricingData(stakingFactorMinStake, stakingFactorWeightage, currentPriceWeightage, _marketType.minTimePassed);
-      allMarkets.createMarket(_marketTimes, _optionRanges, _msgSender());
-      marketData[_marketIndex] = MarketData(_marketTypeIndex, _marketCurrencyIndex);
+      allMarkets.createMarket(_marketTimes, _optionRanges, _msgSenderAddress);
+      marketData[_marketIndex] = MarketData(_marketTypeIndex, _marketCurrencyIndex, _msgSenderAddress);
       // uint64 _marketIndex;
       (_marketCreationData.penultimateMarket, _marketCreationData.latestMarket) =
        (_marketCreationData.latestMarket, _marketIndex);
       
-      emit MarketParams(_marketIndex, _marketTypeIndex, _marketCurrency.currencyName, stakingFactorMinStake,stakingFactorWeightage,currentPriceWeightage,_marketType.minTimePassed);
+      emit MarketParams(_marketIndex, _msgSenderAddress, _marketTypeIndex, _marketCurrency.currencyName, stakingFactorMinStake,stakingFactorWeightage,currentPriceWeightage,_marketType.minTimePassed);
     }
 
 
@@ -358,11 +362,12 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
      * @param _roundOfToNearest Round of the option range to the nearest multiple
      * @param _marketFeed Market Feed address
      */
-    function _calculateOptionRange(uint _optionRangePerc, uint64 _decimals, uint8 _roundOfToNearest, address _marketFeed) internal view returns(uint64 _minValue, uint64 _maxValue) {
+    function _calculateOptionRange(uint _optionRangePerc, uint64 _decimals, uint8 _roundOfToNearest, address _marketFeed) internal view returns(uint64[] memory _optionRanges) {
       uint currentPrice = IOracle(_marketFeed).getLatestPrice();
       uint optionRangePerc = currentPrice.mul(_optionRangePerc.div(2)).div(10000);
-      _minValue = uint64((ceil(currentPrice.sub(optionRangePerc).div(_roundOfToNearest), 10**_decimals)).mul(_roundOfToNearest));
-      _maxValue = uint64((ceil(currentPrice.add(optionRangePerc).div(_roundOfToNearest), 10**_decimals)).mul(_roundOfToNearest));
+      _optionRanges = new uint64[](2);
+      _optionRanges[0] = uint64((ceil(currentPrice.sub(optionRangePerc).div(_roundOfToNearest), 10**_decimals)).mul(_roundOfToNearest));
+      _optionRanges[1] = uint64((ceil(currentPrice.add(optionRangePerc).div(_roundOfToNearest), 10**_decimals)).mul(_roundOfToNearest));
     }
 
     /**
@@ -374,6 +379,50 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       address _feedAdd = marketCurrencies[marketData[_marketId].marketCurrencyIndex].marketFeed;
       (uint256 _value, uint256 _roundIdUsed) = IOracle(_feedAdd).getSettlementPrice(allMarkets.marketSettleTime(_marketId), _roundId);
       allMarkets.settleMarket(_marketId, _value);
+    }
+
+    /**
+    * @dev Function to deposit reward for market creator
+    * @param _marketId Index of market
+    * @param _creatorFee prediction token fee share earned by 
+    */
+    function depositMarketCreationReward(uint256 _marketId, uint256 _creatorFee) external {
+      require(msg.sender == address(allMarkets));
+    	marketCreationReward[marketData[_marketId].marketCreator] = _creatorFee;
+      emit MarketCreatorReward(marketData[_marketId].marketCreator, _marketId, _creatorFee);
+    }
+
+    /**
+    * @dev function to reward user for initiating market creation calls as per the new incetive calculations
+    */
+    function claimCreationReward() external {
+      address payable _msgSenderAddress = _msgSender();
+      uint256 rewardEarned = marketCreationReward[_msgSenderAddress];
+      require(rewardEarned > 0, "No pending");
+      _transferAsset(plotToken, _msgSenderAddress, rewardEarned);
+      emit ClaimedMarketCreationReward(_msgSenderAddress, rewardEarned, plotToken);
+    }
+
+    /**
+    * @dev Transfer the assets to specified address.
+    * @param _asset The asset transfer to the specific address.
+    * @param _recipient The address to transfer the asset of
+    * @param _amount The amount which is transfer.
+    */
+    function _transferAsset(address _asset, address payable _recipient, uint256 _amount) internal {
+      if(_amount > 0) { 
+          require(IToken(_asset).transfer(_recipient, _amount));
+      }
+    }
+
+    /**
+    * @dev function to get pending reward of user for initiating market creation calls as per the new incetive calculations
+    * @param _user Address of user for whom pending rewards to be checked
+    * @return tokenIncentive Incentives given for creating market as per the gas consumed
+    * @return pendingTokenReward prediction token Reward pool share of markets created by user
+    */
+    function getPendingMarketCreationRewards(address _user) external view returns(uint256 tokenIncentive){
+      return marketCreationReward[_user];
     }
 
     /**

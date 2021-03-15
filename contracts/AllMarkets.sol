@@ -20,7 +20,6 @@ import "./external/proxy/OwnedUpgradeabilityProxy.sol";
 import "./external/NativeMetaTransaction.sol";
 import "./interfaces/IToken.sol";
 import "./interfaces/IbLOTToken.sol";
-import "./interfaces/IMarketCreationRewards.sol";
 import "./interfaces/IAuth.sol";
 import "./interfaces/IOracle.sol";
 
@@ -31,6 +30,7 @@ contract IMaster {
 
 contract IMarket {
   function getOptionPrice(uint _marketId, uint256 _prediction) public view returns(uint64);
+  function depositMarketCreationReward(uint256 _marketId, uint256 _creatorFee) external;
 }
 
 
@@ -126,7 +126,6 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     address internal predictionToken;
 
     IbLOTToken internal bPLOTInstance;
-    IMarketCreationRewards internal marketCreationRewards;
 
     uint internal predictionDecimalMultiplier;
     uint internal defaultMaxRecords;
@@ -336,7 +335,6 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
 
     function initializeDependencies() external {
       IMaster ms = IMaster(masterAddress);
-      marketCreationRewards = IMarketCreationRewards(ms.getLatestAddress("MC"));
       disputeResolution = ms.getLatestAddress("DR");
     }
 
@@ -360,7 +358,6 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       marketDataExtended[_marketIndex].optionRanges = _optionRanges;
       marketDataExtended[_marketIndex].createdBy = msg.sender;
       emit MarketQuestion(_marketIndex, _marketTimes[0], _marketTimes[1], _marketTimes[3], _marketTimes[2], _optionRanges, msg.sender);
-      marketCreationRewards.updateMarketCreationData(_createdBy, _marketIndex);
       _placeInitialPrediction(_marketIndex, _createdBy, uint64(_optionRanges.length + 1));
       return _marketIndex;
     }
@@ -580,7 +577,6 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       _marketFeeParams.marketCreatorFee[_marketId] = _marketFeeParams.marketCreatorFee[_marketId].add(_marketCreatorFee);
       _fee = _fee.sub(_daoFee).sub(_referrerFee).sub(_refereeFee).sub(_marketCreatorFee);
       relayerFeeEarned[_relayer] = relayerFeeEarned[_relayer].add(_fee);
-      // _transferAsset(predictionToken, address(marketCreationRewards), (10**predictionDecimalMultiplier).mul(_daoFee));
     }
 
     /**
@@ -703,12 +699,13 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       MarketDataExtended storage _marketDataExtended = marketDataExtended[_marketId];
       if(_marketDataExtended.predictionStatus != PredictionStatus.InDispute) {
         _marketDataExtended.settleTime = uint32(now);
-        uint64 amountToTransfer;
+        // uint64 amountToTransfer;
         MarketFeeParams storage _marketFeeParams = marketFeeParams;
-        amountToTransfer = (_marketFeeParams.daoFee[_marketId]).add(_marketFeeParams.marketCreatorFee[_marketId]);
+        // amountToTransfer = (_marketFeeParams.daoFee[_marketId]).add(_marketFeeParams.marketCreatorFee[_marketId]);
         uint _decimalMultiplier = 10**predictionDecimalMultiplier;
-        _transferAsset(predictionToken, address(marketCreationRewards), _decimalMultiplier.mul(amountToTransfer));
-        marketCreationRewards.depositMarketCreationReward(_marketId, _decimalMultiplier.mul(_marketFeeParams.marketCreatorFee[_marketId]));
+        _transferAsset(predictionToken, masterAddress, _decimalMultiplier.mul(_marketFeeParams.daoFee[_marketId]));
+        _transferAsset(predictionToken, _marketDataExtended.createdBy, _decimalMultiplier.mul(_marketFeeParams.marketCreatorFee[_marketId]));
+        IMarket(_marketDataExtended.createdBy).depositMarketCreationReward(_marketId, _decimalMultiplier.mul(_marketFeeParams.marketCreatorFee[_marketId]));
       } else {
         delete _marketDataExtended.settleTime;
       }
