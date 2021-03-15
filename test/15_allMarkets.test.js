@@ -444,6 +444,60 @@ contract("PlotX", ([ab1, ab2, ab3, ab4, mem1, mem2, mem3, mem4, mem5, mem6, mem7
 		// assert.equal(actionStatus / 1, 1);
 	});
 
+	it("Pause market creation of ETH <-> Daily markets", async function() {
+		await increaseTime(604800);
+		await cyclicMarkets.createMarket(0, 1, 0);
+		await cyclicMarkets.toggleTypeAndCurrencyPairCreation(1, 0, true);
+		// pId = (await gv.getProposalLength()).toNumber();
+		// let categoryId = await pc.totalCategories();
+		// categoryId = 22;
+		// let actionHash = encode1(["uint64","bool"],[0,true])
+		// await gvProposal(categoryId, actionHash, await MemberRoles.at(await master.getLatestAddress(toHex("MR"))), gv, 2, 0);
+		// let actionStatus = await gv.proposalActionStatus(pId);
+		// assert.equal(actionStatus / 1, 3);
+		await increaseTime(604800);
+		await assertRevert(cyclicMarkets.createMarket(0, 1, 0));
+		await cyclicMarkets.createMarket(0, 0, 0);
+		await cyclicMarkets.createMarket(1, 0, 0);
+		await cyclicMarkets.createMarket(1, 1, 0);
+		await cyclicMarkets.createMarket(0, 2, 0);
+	});
+
+	it("Resume market creation of ETH <-> Daily markets", async function() {
+		await plotusToken.approve(allMarkets.address, toWei(1000000));
+		await increaseTime(604800);
+		await assertRevert(cyclicMarkets.createMarket(0, 1, 0));
+		await cyclicMarkets.toggleTypeAndCurrencyPairCreation(1, 0, false);
+		// pId = (await gv.getProposalLength()).toNumber();
+		// let categoryId = await pc.totalCategories();
+		// categoryId = 22;
+		// let actionHash = encode1(["uint64","bool"],[0,false])
+		// await gvProposal(categoryId, actionHash, await MemberRoles.at(await master.getLatestAddress(toHex("MR"))), gv, 2, 0);
+		// let actionStatus = await gv.proposalActionStatus(pId);
+		// assert.equal(actionStatus / 1, 3);
+		await increaseTime(604800);
+		await cyclicMarkets.createMarket(0, 0, 0);
+		await cyclicMarkets.createMarket(0, 1, 0);
+		await cyclicMarkets.createMarket(0, 2, 0);
+		await increaseTime(604800);
+	});
+
+	it("Cannot Resume market creation of ETH <-> Daily markets if already live", async function() {
+		await increaseTime(604800);
+		await cyclicMarkets.createMarket(0, 1, 0);
+		await assertRevert(cyclicMarkets.toggleTypeAndCurrencyPairCreation(1, 0, false));
+		// pId = (await gv.getProposalLength()).toNumber();
+		// let categoryId = await pc.totalCategories();
+		// categoryId = 22;
+		// let actionHash = encode1(["uint64","bool"],[0,false])
+		// await gvProposal(categoryId, actionHash, await MemberRoles.at(await master.getLatestAddress(toHex("MR"))), gv, 2, 0);
+		// let actionStatus = await gv.proposalActionStatus(pId);
+		// assert.equal(actionStatus / 1, 1);
+		await increaseTime(604800);
+		await cyclicMarkets.createMarket(0, 1, 0);
+		await increaseTime(604800);
+	});
+
 	it("Pause market creation of 4-hourly markets", async function() {
 		await cyclicMarkets.createMarket(0, 0, 0);
 		await cyclicMarkets.toggleMarketCreationType(0, true);

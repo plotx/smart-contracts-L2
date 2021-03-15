@@ -87,7 +87,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
     mapping(bytes32 => uint) internal marketCurrency;
 
     mapping(uint64 => uint32) internal marketType;
-    mapping(uint256 => mapping(uint256 => MarketCreationData)) internal marketCreationData;
+    mapping(uint256 => mapping(uint256 => MarketCreationData)) public marketCreationData;
 
     mapping(uint256 => PricingData) internal marketPricingData;
     address public authorizedAddress;
@@ -286,7 +286,8 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
     function createMarket(uint32 _marketCurrencyIndex,uint32 _marketTypeIndex, uint80 _roundId) public {
       MarketTypeData storage _marketType = marketTypeArray[_marketTypeIndex];
       MarketCurrency storage _marketCurrency = marketCurrencies[_marketCurrencyIndex];
-      require(!_marketType.paused);
+      MarketCreationData storage _marketCreationData = marketCreationData[_marketTypeIndex][_marketCurrencyIndex];
+      require(!_marketType.paused && !_marketCreationData.paused);
       _closePreviousMarketWithRoundId( _marketTypeIndex, _marketCurrencyIndex, _roundId);
       uint32 _startTime = calculateStartTimeForMarket(_marketCurrencyIndex, _marketTypeIndex);
       (uint64 _minValue, uint64 _maxValue) = _calculateOptionRange(_marketType.optionRangePerc, _marketCurrency.decimals, _marketCurrency.roundOfToNearest, _marketCurrency.marketFeed);
@@ -303,7 +304,6 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       allMarkets.createMarket(_marketTimes, _optionRanges, _msgSender());
       marketData[_marketIndex] = MarketData(_marketTypeIndex, _marketCurrencyIndex);
       // uint64 _marketIndex;
-      MarketCreationData storage _marketCreationData = marketCreationData[_marketTypeIndex][_marketCurrencyIndex];
       (_marketCreationData.penultimateMarket, _marketCreationData.latestMarket) =
        (_marketCreationData.latestMarket, _marketIndex);
       
@@ -376,6 +376,15 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       allMarkets.settleMarket(_marketId, _value);
     }
 
+    /**
+    * @dev Set the flag to pause/resume market creation of particular market type and currency pair
+    */
+    function toggleTypeAndCurrencyPairCreation(uint64 _marketTypeIndex, uint64 _marketCurrencyIndex, bool _flag) external onlyAuthorized {
+      MarketCreationData storage _marketCreationData = marketCreationData[_marketTypeIndex][_marketCurrencyIndex];
+      
+      require(_marketCreationData.paused != _flag);
+      _marketCreationData.paused = _flag;
+    }
 
     /**
     * @dev Set the flag to pause/resume market creation of particular market type
