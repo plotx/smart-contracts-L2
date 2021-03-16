@@ -108,9 +108,6 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
 
     uint internal predictionDecimalMultiplier;
     uint internal defaultMaxRecords;
-    uint internal minPredictionAmount;
-    uint internal maxPredictionAmount;
-
     bool public marketCreationPaused;
 
     MarketBasicData[] internal marketBasicData;
@@ -119,8 +116,6 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     mapping(address => bool) public authorizedAddresses;
     mapping(uint256 => MarketDataExtended) internal marketDataExtended;
     mapping(address => UserData) internal userData;
-    mapping(address => uint256) public userLevel;
-    mapping(uint256 => uint256) public levelMultiplier;
 
     mapping(uint =>mapping(uint=>PredictionData)) internal marketOptionsAvailable;
 
@@ -136,27 +131,6 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
         authorizedAddresses[_address] = true;
     }
 
-    /**
-    * @dev Function to set `_user` level for prediction points multiplier
-    * @param _user User address
-    * @param _level user level indicator
-    */
-    function setUserLevel(address _user, uint256 _level) public onlyAuthorizedUsers {
-      userLevel[_user] = _level;
-    }
-
-    /**
-    * @dev Function to set multiplier per level (With 2 decimals)
-    * @param _userLevels Array of levels
-    * @param _multipliers Array of corresponding multipliers
-    */
-    function setMultiplierLevels(uint256[] memory _userLevels, uint256[] memory _multipliers) public onlyAuthorized {
-      require(_userLevels.length == _multipliers.length);
-      for(uint256 i = 0; i < _userLevels.length; i++) {
-        levelMultiplier[_userLevels[i]] = _multipliers[i];
-      }
-    }
-
     // /**
     // * @dev Function to set `_asset` to PLOT token value conversion rate
     // * @param _asset Token Address
@@ -165,21 +139,6 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     // function setAssetPlotConversionRate(address _asset, uint256 _rate) public onlyAuthorizedUsers {
     //   conversionRate[_asset] = _rate;
     // }
-
-    /**
-    * @dev function to update integer parameters
-    * @param code Code of the updating parameter.
-    * @param value Value to which the parameter should be updated
-    */
-    function updateUintParameters(bytes8 code, uint256 value) external onlyAuthorized {
-      if(code == "MINP") { // Minimum prediction amount
-        minPredictionAmount = value;
-      } else if(code == "MAXP") { // Maximum prediction amount
-        maxPredictionAmount = value;
-      } else {
-        revert("Invalid code");
-      }
-    }
 
     // /**
     // * @dev Function to update address parameters
@@ -191,21 +150,6 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     //     revert("Invalid code");
     //   }
     // }
-
-    /**
-    * @dev function to get integer parameters
-    * @param code Code of the parameter.
-    * @return codeVal Code of the parameter.
-    * @return value Value of the queried parameter.
-    */
-    function getUintParameters(bytes8 code) external view returns(bytes8 codeVal, uint256 value) {
-      codeVal = code;
-      if(code == "MINP") { // Minimum prediction amount
-        value = minPredictionAmount;
-      } else if(code == "MAXP") { // Maximum prediction amount
-        value = maxPredictionAmount;
-      }
-    }
 
     /**
      * @dev Changes the master address and update it's instance
@@ -227,8 +171,6 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       _initializeEIP712("AM");
       predictionDecimalMultiplier = 10;
       defaultMaxRecords = 20;
-      minPredictionAmount = 10 ether; // Need to be updated
-      maxPredictionAmount = 100000 ether; // Need to be updated
     }
 
     function initializeDependencies() external {
@@ -445,7 +387,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       }
       _predictionStakePostDeduction = _deductFee(_marketId, _predictionStake, _msgSenderAddress);
       
-      uint64 predictionPoints = _calculatePredictionPointsAndMultiplier(_msgSenderAddress, _marketId, _prediction, _predictionStakePostDeduction);
+      uint64 predictionPoints = IMarket(marketDataExtended[_marketId].createdBy).calculatePredictionPointsAndMultiplier(_msgSenderAddress, _marketId, _prediction, _predictionStakePostDeduction);
       require(predictionPoints > 0);
 
       _storePredictionData(_marketId, _prediction, _msgSenderAddress, _predictionStakePostDeduction, predictionPoints);
@@ -493,61 +435,61 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     //   }
     // }
 
-    /**
-    * @dev Internal function to calculate prediction points  and multiplier
-    * @param _user User Address
-    * @param _marketId Index of the market
-    * @param _prediction Option predicted by the user
-    * @param _stake Amount staked by the user
-    */
-    function _calculatePredictionPointsAndMultiplier(address _user, uint256 _marketId, uint256 _prediction, uint64 _stake) internal returns(uint64 predictionPoints){
-      bool isMultiplierApplied;
-      UserData storage _userData = userData[_user];
-      (predictionPoints, isMultiplierApplied) = calculatePredictionPoints(_marketId, _prediction, _user, _userData.userMarketData[_marketId].multiplierApplied, _stake);
-      if(isMultiplierApplied) {
-        _userData.userMarketData[_marketId].multiplierApplied = true; 
-      }
-    }
+    // /**
+    // * @dev Internal function to calculate prediction points  and multiplier
+    // * @param _user User Address
+    // * @param _marketId Index of the market
+    // * @param _prediction Option predicted by the user
+    // * @param _stake Amount staked by the user
+    // */
+    // function _calculatePredictionPointsAndMultiplier(address _user, uint256 _marketId, uint256 _prediction, uint64 _stake) internal returns(uint64 predictionPoints){
+    //   bool isMultiplierApplied;
+    //   UserData storage _userData = userData[_user];
+    //   (predictionPoints, isMultiplierApplied) = calculatePredictionPoints(_marketId, _prediction, _user, _userData.userMarketData[_marketId].multiplierApplied, _stake);
+    //   if(isMultiplierApplied) {
+    //     _userData.userMarketData[_marketId].multiplierApplied = true; 
+    //   }
+    // }
 
-    /**
-    * @dev Internal function to calculate prediction points
-    * @param _marketId Index of the market
-    * @param _prediction Option predicted by the user
-    * @param _user User Address
-    * @param multiplierApplied Flag defining if user had already availed multiplier
-    * @param _predictionStake Amount staked by the user
-    */
-    function calculatePredictionPoints(uint _marketId, uint256 _prediction, address _user, bool multiplierApplied, uint _predictionStake) internal view returns(uint64 predictionPoints, bool isMultiplierApplied) {
-      uint _stakeValue = _predictionStake.mul(1e10);
-      if(_stakeValue < minPredictionAmount || _stakeValue > maxPredictionAmount) {
-        return (0, isMultiplierApplied);
-      }
-      uint64 _optionPrice = IMarket(marketDataExtended[_marketId].createdBy).getOptionPrice(_marketId, _prediction);
-      predictionPoints = uint64(_predictionStake).div(_optionPrice);
-      if(!multiplierApplied) {
-        uint256 _predictionPoints;
-        (_predictionPoints, isMultiplierApplied) = checkMultiplier(_user,  predictionPoints);
-        predictionPoints = uint64(_predictionPoints);
-      }
-    }
+    // /**
+    // * @dev Internal function to calculate prediction points
+    // * @param _marketId Index of the market
+    // * @param _prediction Option predicted by the user
+    // * @param _user User Address
+    // * @param multiplierApplied Flag defining if user had already availed multiplier
+    // * @param _predictionStake Amount staked by the user
+    // */
+    // function calculatePredictionPoints(uint _marketId, uint256 _prediction, address _user, bool multiplierApplied, uint _predictionStake) internal view returns(uint64 predictionPoints, bool isMultiplierApplied) {
+    //   uint _stakeValue = _predictionStake.mul(1e10);
+    //   if(_stakeValue < minPredictionAmount || _stakeValue > maxPredictionAmount) {
+    //     return (0, isMultiplierApplied);
+    //   }
+    //   uint64 _optionPrice = IMarket(marketDataExtended[_marketId].createdBy).getOptionPrice(_marketId, _prediction);
+    //   predictionPoints = uint64(_predictionStake).div(_optionPrice);
+    //   if(!multiplierApplied) {
+    //     uint256 _predictionPoints;
+    //     (_predictionPoints, isMultiplierApplied) = checkMultiplier(_user,  predictionPoints);
+    //     predictionPoints = uint64(_predictionPoints);
+    //   }
+    // }
 
-    /**
-    * @dev Check if user gets any multiplier on his positions
-    * @param _user User address
-    * @param _predictionPoints The actual positions user got during prediction.
-    * @return uint256 representing multiplied positions
-    * @return bool returns true if multplier applied
-    */
-    function checkMultiplier(address _user, uint _predictionPoints) internal view returns(uint, bool) {
-      bool multiplierApplied;
-      uint _muliplier = 100;
-      uint256 _userLevel = userLevel[_user];
-      if(_userLevel > 0) {
-        _muliplier = _muliplier + levelMultiplier[_userLevel];
-        multiplierApplied = true;
-      }
-      return (_predictionPoints.mul(_muliplier).div(100),multiplierApplied);
-    }
+    // /**
+    // * @dev Check if user gets any multiplier on his positions
+    // * @param _user User address
+    // * @param _predictionPoints The actual positions user got during prediction.
+    // * @return uint256 representing multiplied positions
+    // * @return bool returns true if multplier applied
+    // */
+    // function checkMultiplier(address _user, uint _predictionPoints) internal view returns(uint, bool) {
+    //   bool multiplierApplied;
+    //   uint _muliplier = 100;
+    //   uint256 _userLevel = userLevel[_user];
+    //   if(_userLevel > 0) {
+    //     _muliplier = _muliplier + levelMultiplier[_userLevel];
+    //     multiplierApplied = true;
+    //   }
+    //   return (_predictionPoints.mul(_muliplier).div(100),multiplierApplied);
+    // }
 
     /**
     * @dev Settle the market, setting the winning option

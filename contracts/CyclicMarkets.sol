@@ -9,6 +9,7 @@ import "./interfaces/IAuth.sol";
 import "./interfaces/IAllMarkets.sol";
 import "./interfaces/IOracle.sol";
 import "./interfaces/IReferral.sol";
+import "./interfaces/IUserLevels.sol";
 
 contract IMaster {
     function dAppToken() public view returns(address);
@@ -87,6 +88,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
     address internal plotToken;
     IAllMarkets internal allMarkets;
     IReferral internal referral;
+    IUserLevels internal userLevels;
 
     MarketCurrency[] internal marketCurrencies;
     MarketTypeData[] internal marketTypeArray;
@@ -102,11 +104,15 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
     mapping(address => uint256) public marketCreationReward;
     mapping (address => uint256) public relayerFeeEarned;
 
+    mapping(address => mapping(uint256 => bool)) public multiplierApplied;
+
     uint internal totalOptions;
     uint internal stakingFactorMinStake;
     uint32 internal stakingFactorWeightage;
     uint32 internal currentPriceWeightage;
     uint internal predictionDecimalMultiplier;
+    uint internal minPredictionAmount;
+    uint internal maxPredictionAmount;
 
     modifier onlyAuthorizedUsers() {
         require(authorizedAddress == msg.sender);
@@ -238,6 +244,10 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
         stakingFactorWeightage = 100 - currentPriceWeightage;
       } else if(code == "SFMS") { // Minimum amount for staking factor to apply
         stakingFactorMinStake = value;
+      } else if(code == "MINP") { // Minimum prediction amount
+        minPredictionAmount = value;
+      } else if(code == "MAXP") { // Maximum prediction amount
+        maxPredictionAmount = value;
       } else {
         MarketFeeParams storage _marketFeeParams = marketFeeParams;
         require(value < 10000);
@@ -277,6 +287,10 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
         value = currentPriceWeightage;
       } else if(code == "SFMS") { // Minimum amount for staking factor to apply
         value = stakingFactorMinStake;
+      } else if(code == "MINP") { // Minimum prediction amount
+        value = minPredictionAmount;
+      } else if(code == "MAXP") { // Maximum prediction amount
+        value = maxPredictionAmount;
       } else if(code == "CMFP") { // Cummulative fee percent
         value = marketFeeParams.cummulativeFeePercent;
       } else if(code == "DAOF") { // DAO Fee percent in Cummulative fee
@@ -303,6 +317,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
 
       totalOptions = 3;
       stakingFactorMinStake = uint(20000).mul(10**8);
+      userLevels = IUserLevels(IMaster(masterAddress).getLatestAddress("UL"));
       stakingFactorWeightage = 40;
       currentPriceWeightage = 60;
       predictionDecimalMultiplier = 10;
@@ -312,6 +327,8 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       _marketFeeParams.refereeFeePercent = 1000;
       _marketFeeParams.referrerFeePercent = 2000;
       _marketFeeParams.marketCreatorFeePercent = 4000;
+      minPredictionAmount = 10 ether; // Need to be updated
+      maxPredictionAmount = 100000 ether; // Need to be updated
       
       _addMarketType(4 hours, 100, 1 hours, 40 minutes, (100 * 10**8));
       _addMarketType(24 hours, 200, 6 hours, 4 hours, (100 * 10**8));
@@ -454,6 +471,61 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
 
     function _setRelayerFee(address _relayer, uint _cummulativeFee, uint _daoFee, uint _referrerFee, uint _refereeFee, uint _marketCreatorFee) internal {
       relayerFeeEarned[_relayer] = relayerFeeEarned[_relayer].add(_cummulativeFee.sub(_daoFee).sub(_referrerFee).sub(_refereeFee).sub(_marketCreatorFee));
+    }
+
+    /**
+    * @dev Internal function to calculate prediction points  and multiplier
+    * @param _user User Address
+    * @param _marketId Index of the market
+    * @param _prediction Option predicted by the user
+    * @param _stake Amount staked by the user
+    */
+    function _calculatePredictionPointsAndMultiplier(address _user, uint256 _marketId, uint256 _prediction, uint64 _stake) internal returns(uint64 predictionPoints){
+      bool isMultiplierApplied;
+      (predictionPoints, isMultiplierApplied) = calculatePredictionPoints(_marketId, _prediction, _user, multiplierApplied[_user][_marketId], _stake);
+      if(isMultiplierApplied) {
+        multiplierApplied[_user][_marketId] = true; 
+      }
+    }
+
+    /**
+    * @dev Internal function to calculate prediction points
+    * @param _marketId Index of the market
+    * @param _prediction Option predicted by the user
+    * @param _user User Address
+    * @param multiplierApplied Flag defining if user had already availed multiplier
+    * @param _predictionStake Amount staked by the user
+    */
+    function calculatePredictionPoints(uint _marketId, uint256 _prediction, address _user, bool multiplierApplied, uint _predictionStake) internal view returns(uint64 predictionPoints, bool isMultiplierApplied) {
+      uint _stakeValue = _predictionStake.mul(1e10);
+      if(_stakeValue < minPredictionAmount || _stakeValue > maxPredictionAmount) {
+        return (0, isMultiplierApplied);
+      }
+      uint64 _optionPrice = getOptionPrice(_marketId, _prediction);
+      predictionPoints = uint64(_predictionStake).div(_optionPrice);
+      if(!multiplierApplied) {
+        uint256 _predictionPoints;
+        (_predictionPoints, isMultiplierApplied) = checkMultiplier(_user,  predictionPoints);
+        predictionPoints = uint64(_predictionPoints);
+      }
+    }
+
+    /**
+    * @dev Check if user gets any multiplier on his positions
+    * @param _user User address
+    * @param _predictionPoints The actual positions user got during prediction.
+    * @return uint256 representing multiplied positions
+    * @return bool returns true if multplier applied
+    */
+    function checkMultiplier(address _user, uint _predictionPoints) internal view returns(uint, bool) {
+      bool _multiplierApplied;
+      uint _muliplier = 100;
+      (uint256 _userLevel, uint256 _levelMultiplier) = userLevels.getUserLevelAndMultiplier(_user);
+      if(_userLevel > 0) {
+        _muliplier = _muliplier + _levelMultiplier;
+        _multiplierApplied = true;
+      }
+      return (_predictionPoints.mul(_muliplier).div(100), _multiplierApplied);
     }
 
     /**
