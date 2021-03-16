@@ -65,8 +65,9 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
 
     // uint internal totalOptions;
     uint internal stakingFactorMinStake;
-    uint32 internal stakingFactorWeightage ;
-    uint32 internal timeWeightage ;
+    uint32 internal stakingFactorWeightage;
+    uint32 internal timeWeightage;
+    uint64 internal marketInitialLiquidity;
 
     modifier onlyAuthorizedUsers() {
         require(authorizedAddresses[msg.sender]);
@@ -99,6 +100,7 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
       _marketFeeParams.referrerFeePercent = 2000;
       _marketFeeParams.marketCreatorFeePercent = 4000;
       minTimePassed = 10 hours; // need to set
+      marketInitialLiquidity = 100 * 1e8;
       _initializeEIP712("AC");
     }
 
@@ -115,7 +117,7 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
     function createMarket(string calldata _question, uint64[] calldata _optionRanges, uint32[] calldata _marketTimes) external {
       require(!paused);
       require(_marketTimes[0] >= now);
-      uint64 _marketIndex = allMarkets.createMarket(_marketTimes, _optionRanges, _msgSender());
+      uint64 _marketIndex = allMarkets.createMarket(_marketTimes, _optionRanges, _msgSender(), marketInitialLiquidity);
       
       marketPricingData[_marketIndex] = PricingData(stakingFactorMinStake, stakingFactorWeightage, timeWeightage, minTimePassed);
       

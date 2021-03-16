@@ -22,17 +22,12 @@ import "./interfaces/IToken.sol";
 import "./interfaces/IbLOTToken.sol";
 import "./interfaces/IAuth.sol";
 import "./interfaces/IOracle.sol";
+import "./interfaces/IMarket.sol";
 
 contract IMaster {
     function dAppToken() public view returns(address);
     function getLatestAddress(bytes2 _module) public view returns(address);
 }
-
-contract IMarket {
-  function getOptionPrice(uint _marketId, uint256 _prediction) public view returns(uint64);
-  function depositMarketCreationReward(uint256 _marketId, uint256 _creatorFee) external;
-}
-
 
 contract AllMarkets is IAuth, NativeMetaTransaction {
     using SafeMath32 for uint32;
@@ -51,11 +46,10 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     event Deposited(address indexed user, uint256 amount, uint256 timeStamp);
     event Withdrawn(address indexed user, uint256 amount, uint256 timeStamp);
     event MarketQuestion(uint256 indexed marketIndex, uint256 startTime, uint256 predictionTime, uint256 coolDownTime, uint256 setlementTime, uint64[] optionRanges, address marketCreatorContract);
-    event MarketResult(uint256 indexed marketIndex, uint256 totalReward, uint256 winningOption, uint256 closeValue, uint256 daoFee, uint256 marketCreatorFee);
+    event MarketResult(uint256 indexed marketIndex, uint256 totalReward, uint256 winningOption, uint256 closeValue);
     // event MarketResult(uint256 indexed marketIndex, uint256 totalReward, uint256 winningOption, uint256 closeValue, uint256 roundId, uint256 daoFee, uint256 marketCreatorFee);
     event ReturnClaimed(address indexed user, uint256 amount);
     event PlacePrediction(address indexed user,uint256 value, uint256 predictionPoints, address predictionAsset,uint256 prediction,uint256 indexed marketIndex);
-    event ReferralLog(address indexed referrer, address indexed referee, uint256 referredOn);
 
     struct PredictionData {
       uint64 predictionPoints;
@@ -73,9 +67,6 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       uint128 lastClaimedIndex;
       uint[] marketsParticipated;
       uint unusedBalance;
-      uint referrerFee;
-      uint refereeFee;
-      address referrer;
       mapping(uint => UserMarketData) userMarketData;
     }
 
@@ -104,18 +95,6 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       uint32 minTimePassed;
     }
 
-    struct MarketFeeParams {
-      uint32 cummulativeFeePercent;
-      uint32 daoCommissionPercent;
-      uint32 referrerFeePercent;
-      uint32 refereeFeePercent;
-      uint32 marketCreatorFeePercent;
-      mapping (uint256 => uint64) daoFee;
-      mapping (uint256 => uint64) marketCreatorFee;
-    }
-
-    MarketFeeParams internal marketFeeParams;
-    mapping (address => uint256) public relayerFeeEarned;
     mapping(uint256 => PricingData) internal marketPricingData;
     // mapping(address => uint256) public conversionRate;
     
@@ -131,7 +110,6 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     uint internal defaultMaxRecords;
     uint internal minPredictionAmount;
     uint internal maxPredictionAmount;
-    uint64 internal mcDefaultPredictionAmount;
 
     bool public marketCreationPaused;
 
@@ -156,43 +134,6 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     **/
     function addAuthorizedAddress(address _address) external onlyAuthorizedUsers {
         authorizedAddresses[_address] = true;
-    }
-
-    /**
-    * @dev Set referrer address of a user, can be set only by the authorized users
-    * @param _referrer User who is referring new user
-    * @return _referee User who is getting referred
-    */
-    function setReferrer(address _referrer, address _referee) external onlyAuthorizedUsers {
-      UserData storage _userData = userData[_referee];
-      require(_userData.totalStaked == 0);
-      require(_userData.referrer == address(0));
-      _userData.referrer = _referrer;
-      emit ReferralLog(_referrer, _referee, now);
-    }
-
-    /**
-    * @dev Get fees earned by participating in the referral program
-    * @param _user Address of the user
-    * @return _referrerFee Fees earned by referring other users
-    * @return _refereeFee Fees earned if referred by some one
-    */
-    function getReferralFees(address _user) external view returns(uint256 _referrerFee, uint256 _refereeFee) {
-      UserData storage _userData = userData[_user];
-      return (_userData.referrerFee, _userData.refereeFee);
-    }
-
-    /**
-    * @dev Claim the fee earned by referrals
-    * @param _user Address to claim the fee for
-     */
-    function claimReferralFee(address _user) external {
-      UserData storage _userData = userData[_user];
-      uint256 _referrerFee = _userData.referrerFee;
-      delete _userData.referrerFee;
-      uint256 _refereeFee = _userData.refereeFee;
-      delete _userData.refereeFee;
-      _transferAsset(predictionToken, _user, (_refereeFee.add(_referrerFee)).mul(10**predictionDecimalMultiplier));
     }
 
     /**
@@ -235,32 +176,8 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
         minPredictionAmount = value;
       } else if(code == "MAXP") { // Maximum prediction amount
         maxPredictionAmount = value;
-      } else if(code == "MDPA") { // Market creators default prediction amount
-        mcDefaultPredictionAmount = uint64(value);
       } else {
-        MarketFeeParams storage _marketFeeParams = marketFeeParams;
-        require(value < 10000);
-        if(code == "CMFP") { // Cummulative fee percent
-          _marketFeeParams.cummulativeFeePercent = uint32(value);
-        } else {
-          if(code == "DAOF") { // DAO Fee percent in Cummulative fee
-            _marketFeeParams.daoCommissionPercent = uint32(value);
-          } else if(code == "RFRRF") { // Referrer fee percent in Cummulative fee
-            _marketFeeParams.referrerFeePercent = uint32(value);
-          } else if(code == "RFREF") { // Referee fee percent in Cummulative fee
-            _marketFeeParams.refereeFeePercent = uint32(value);
-          } else if(code == "MCF") { // Market Creator fee percent in Cummulative fee
-            _marketFeeParams.marketCreatorFeePercent = uint32(value);
-          } else {
-            revert("Invalid code");
-          } 
-          require(
-            _marketFeeParams.daoCommissionPercent + 
-            _marketFeeParams.referrerFeePercent + 
-            _marketFeeParams.refereeFeePercent + 
-            _marketFeeParams.marketCreatorFeePercent
-            < 10000);
-        }
+        revert("Invalid code");
       }
     }
 
@@ -287,18 +204,6 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
         value = minPredictionAmount;
       } else if(code == "MAXP") { // Maximum prediction amount
         value = maxPredictionAmount;
-      } else if(code == "CMFP") { // Cummulative fee percent
-        value = marketFeeParams.cummulativeFeePercent;
-      } else if(code == "DAOF") { // DAO Fee percent in Cummulative fee
-        value = marketFeeParams.daoCommissionPercent;
-      } else if(code == "RFRRF") { // Referrer fee percent in Cummulative fee
-        value = marketFeeParams.referrerFeePercent;
-      } else if(code == "RFREF") { // Referee fee percent in Cummulative fee
-        value = marketFeeParams.refereeFeePercent;
-      } else if(code == "MCF") { // Market Creator fee percent in Cummulative fee
-        value = marketFeeParams.marketCreatorFeePercent;
-      } else if(code == "MDPA") { // Market creators default prediction amount
-        value = mcDefaultPredictionAmount;
       }
     }
 
@@ -324,13 +229,6 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       defaultMaxRecords = 20;
       minPredictionAmount = 10 ether; // Need to be updated
       maxPredictionAmount = 100000 ether; // Need to be updated
-      mcDefaultPredictionAmount = 100 * 10**8;
-      MarketFeeParams storage _marketFeeParams = marketFeeParams;
-      _marketFeeParams.cummulativeFeePercent = 200;
-      _marketFeeParams.daoCommissionPercent = 1000;
-      _marketFeeParams.refereeFeePercent = 1000;
-      _marketFeeParams.referrerFeePercent = 2000;
-      _marketFeeParams.marketCreatorFeePercent = 4000;
     }
 
     function initializeDependencies() external {
@@ -349,7 +247,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     /**
     * @dev Create the market.
     */
-    function createMarket(uint32[] memory _marketTimes, uint64[] memory _optionRanges, address _createdBy) public returns(uint64 _marketIndex){
+    function createMarket(uint32[] memory _marketTimes, uint64[] memory _optionRanges, address _createdBy, uint64 _initialLiquidity) public returns(uint64 _marketIndex){
       // _marketTimes => [0] _startTime, [1] _predictionTIme, [2] _settlementTime, [3] _cooldownTime
       require(authorizedMarketCreator[msg.sender]);
       require(!marketCreationPaused);
@@ -358,7 +256,9 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       marketDataExtended[_marketIndex].optionRanges = _optionRanges;
       marketDataExtended[_marketIndex].createdBy = msg.sender;
       emit MarketQuestion(_marketIndex, _marketTimes[0], _marketTimes[1], _marketTimes[3], _marketTimes[2], _optionRanges, msg.sender);
-      _placeInitialPrediction(_marketIndex, _createdBy, uint64(_optionRanges.length + 1));
+      if(_initialLiquidity > 0) {
+        _placeInitialPrediction(_marketIndex, _createdBy, _initialLiquidity, uint64(_optionRanges.length + 1));
+      }
       return _marketIndex;
     }
     
@@ -367,20 +267,19 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
      * @param _marketId Index of the market to place prediction
      * @param _msgSenderAddress Address of the user who is placing the prediction
      */
-    function _placeInitialPrediction(uint64 _marketId, address _msgSenderAddress, uint64 _totalOptions) internal {
-      uint64 _mcDefaultPredictionAmount = mcDefaultPredictionAmount;
-      uint256 _defaultAmount = (10**predictionDecimalMultiplier).mul(_mcDefaultPredictionAmount);
+    function _placeInitialPrediction(uint64 _marketId, address _msgSenderAddress, uint64 _initialLiquidity, uint64 _totalOptions) internal {
+      uint256 _defaultAmount = (10**predictionDecimalMultiplier).mul(_initialLiquidity);
       (uint _tokenLeft, uint _tokenReward) = getUserUnusedBalance(_msgSenderAddress);
       if(_tokenLeft.add(_tokenReward) < _defaultAmount) {
         _deposit(_defaultAmount, _msgSenderAddress);
       }
       address _predictionToken = predictionToken;
-      uint64 _predictionAmount = _mcDefaultPredictionAmount/ _totalOptions;
+      uint64 _predictionAmount = _initialLiquidity/ _totalOptions;
       for(uint i = 1;i < _totalOptions; i++) {
         _placePrediction(_marketId, _msgSenderAddress, _predictionToken, _predictionAmount, i);
-        _mcDefaultPredictionAmount = _mcDefaultPredictionAmount.sub(_predictionAmount);
+        _initialLiquidity = _initialLiquidity.sub(_predictionAmount);
       }
-      _placePrediction(_marketId, _msgSenderAddress, _predictionToken, _mcDefaultPredictionAmount, _totalOptions);
+      _placePrediction(_marketId, _msgSenderAddress, _predictionToken, _initialLiquidity, _totalOptions);
     }
 
     /**
@@ -567,37 +466,32 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       } else {
         _relayer = _msgSenderAddress;
       }
-      MarketFeeParams storage _marketFeeParams = marketFeeParams;
-      _fee = _calculateAmulBdivC(_marketFeeParams.cummulativeFeePercent, _amount, 10000);
+      (, uint _cummulativeFeePercent)= IMarket(marketDataExtended[_marketId].createdBy).getUintParameters("CMFP");
+      _fee = _calculateAmulBdivC(uint64(_cummulativeFeePercent), _amount, 10000);
+      _transferAsset(plotToken, marketDataExtended[_marketId].createdBy, _fee);
+      IMarket(marketDataExtended[_marketId].createdBy).handleFee(_marketId, _fee, _msgSenderAddress, _relayer);
       _amountPostFee = _amount.sub(_fee);
-      (uint64 _referrerFee, uint64 _refereeFee) = _calculateReferalFee(_msgSenderAddress, _fee, _marketFeeParams.refereeFeePercent, _marketFeeParams.referrerFeePercent);
-      uint64 _daoFee = _calculateAmulBdivC(_marketFeeParams.daoCommissionPercent, _fee, 10000);
-      uint64 _marketCreatorFee = _calculateAmulBdivC(_marketFeeParams.marketCreatorFeePercent, _fee, 10000);
-      _marketFeeParams.daoFee[_marketId] = _marketFeeParams.daoFee[_marketId].add(_daoFee);
-      _marketFeeParams.marketCreatorFee[_marketId] = _marketFeeParams.marketCreatorFee[_marketId].add(_marketCreatorFee);
-      _fee = _fee.sub(_daoFee).sub(_referrerFee).sub(_refereeFee).sub(_marketCreatorFee);
-      relayerFeeEarned[_relayer] = relayerFeeEarned[_relayer].add(_fee);
     }
 
-    /**
-     * @dev Internal function to check and calcualte the referral fee from the cummulative fee
-     * @param _msgSenderAddress User address
-     * @param _cummulativeFee Total fee deducted from the user's prediction amount 
-     * @param _refereeFeePerc Referee fee percent to be deducted from the cummulative fee
-     * @param _referrerFeePerc Referrer fee percent to be deducted from the cummulative fee
-     */
-    function _calculateReferalFee(address _msgSenderAddress, uint64 _cummulativeFee, uint32 _refereeFeePerc, uint32 _referrerFeePerc) internal returns(uint64 _referrerFee, uint64 _refereeFee) {
-      UserData storage _userData = userData[_msgSenderAddress];
-      address _referrer = _userData.referrer;
-      if(_referrer != address(0)) {
-        //Commission for referee
-        _refereeFee = _calculateAmulBdivC(_refereeFeePerc, _cummulativeFee, 10000);
-        _userData.refereeFee = _userData.refereeFee.add(_refereeFee);
-        //Commission for referrer
-        _referrerFee = _calculateAmulBdivC(_referrerFeePerc, _cummulativeFee, 10000);
-        userData[_referrer].referrerFee = userData[_referrer].referrerFee.add(_referrerFee);
-      }
-    }
+    // /**
+    //  * @dev Internal function to check and calcualte the referral fee from the cummulative fee
+    //  * @param _msgSenderAddress User address
+    //  * @param _cummulativeFee Total fee deducted from the user's prediction amount 
+    //  * @param _refereeFeePerc Referee fee percent to be deducted from the cummulative fee
+    //  * @param _referrerFeePerc Referrer fee percent to be deducted from the cummulative fee
+    //  */
+    // function _calculateReferalFee(address _msgSenderAddress, uint64 _cummulativeFee, uint32 _refereeFeePerc, uint32 _referrerFeePerc) internal returns(uint64 _referrerFee, uint64 _refereeFee) {
+    //   UserData storage _userData = userData[_msgSenderAddress];
+    //   address _referrer = _userData.referrer;
+    //   if(_referrer != address(0)) {
+    //     //Commission for referee
+    //     _refereeFee = _calculateAmulBdivC(_refereeFeePerc, _cummulativeFee, 10000);
+    //     _userData.refereeFee = _userData.refereeFee.add(_refereeFee);
+    //     //Commission for referrer
+    //     _referrerFee = _calculateAmulBdivC(_referrerFeePerc, _cummulativeFee, 10000);
+    //     userData[_referrer].referrerFee = userData[_referrer].referrerFee.add(_referrerFee);
+    //   }
+    // }
 
     /**
     * @dev Internal function to calculate prediction points  and multiplier
@@ -699,13 +593,13 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       MarketDataExtended storage _marketDataExtended = marketDataExtended[_marketId];
       if(_marketDataExtended.predictionStatus != PredictionStatus.InDispute) {
         _marketDataExtended.settleTime = uint32(now);
-        // uint64 amountToTransfer;
-        MarketFeeParams storage _marketFeeParams = marketFeeParams;
-        // amountToTransfer = (_marketFeeParams.daoFee[_marketId]).add(_marketFeeParams.marketCreatorFee[_marketId]);
-        uint _decimalMultiplier = 10**predictionDecimalMultiplier;
-        _transferAsset(predictionToken, masterAddress, _decimalMultiplier.mul(_marketFeeParams.daoFee[_marketId]));
-        _transferAsset(predictionToken, _marketDataExtended.createdBy, _decimalMultiplier.mul(_marketFeeParams.marketCreatorFee[_marketId]));
-        IMarket(_marketDataExtended.createdBy).depositMarketCreationReward(_marketId, _decimalMultiplier.mul(_marketFeeParams.marketCreatorFee[_marketId]));
+        // // uint64 amountToTransfer;
+        // MarketFeeParams storage _marketFeeParams = marketFeeParams;
+        // // amountToTransfer = (_marketFeeParams.daoFee[_marketId]).add(_marketFeeParams.marketCreatorFee[_marketId]);
+        // uint _decimalMultiplier = 10**predictionDecimalMultiplier;
+        // _transferAsset(predictionToken, masterAddress, _decimalMultiplier.mul(_marketFeeParams.daoFee[_marketId]));
+        // _transferAsset(predictionToken, _marketDataExtended.createdBy, _decimalMultiplier.mul(_marketFeeParams.marketCreatorFee[_marketId]));
+        // IMarket(_marketDataExtended.createdBy).depositMarketCreationReward(_marketId, _decimalMultiplier.mul(_marketFeeParams.marketCreatorFee[_marketId]));
       } else {
         delete _marketDataExtended.settleTime;
       }
@@ -730,7 +624,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       _marketDataExtended.WinningOption = _winningOption;
       uint64 totalReward = _calculateRewardTally(_marketId, _winningOption);
       _marketDataExtended.rewardToDistribute = totalReward;
-      emit MarketResult(_marketId, _marketDataExtended.rewardToDistribute, _winningOption, _value, marketFeeParams.daoFee[_marketId], marketFeeParams.marketCreatorFee[_marketId]);
+      emit MarketResult(_marketId, _marketDataExtended.rewardToDistribute, _winningOption, _value);
     }
 
     /**
@@ -745,18 +639,6 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
           totalReward = totalReward.add(_tokenStakedOnOption);
         }
       }
-    }
-
-    /**
-    * @dev Claim fees earned by the relayer address
-    */
-    function claimRelayerRewards() external {
-      uint _decimalMultiplier = 10**predictionDecimalMultiplier;
-      address _relayer = msg.sender;
-      uint256 _fee = (_decimalMultiplier).mul(relayerFeeEarned[_relayer]);
-      delete relayerFeeEarned[_relayer];
-      require(_fee > 0);
-      _transferAsset(predictionToken, _relayer, _fee);
     }
 
     /**
@@ -1034,5 +916,9 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
 
     function getTotalMarketsLength() external view returns(uint64) {
       return uint64(marketBasicData.length);
+    }
+
+    function getTotalStakedByUser(address _user) external view returns(uint) {
+      return userData[_user].totalStaked;
     }
 }

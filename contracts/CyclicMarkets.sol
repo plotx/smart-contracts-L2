@@ -8,6 +8,7 @@ import "./interfaces/IbLOTToken.sol";
 import "./interfaces/IAuth.sol";
 import "./interfaces/IAllMarkets.sol";
 import "./interfaces/IOracle.sol";
+import "./interfaces/IReferral.sol";
 
 contract IMaster {
     function dAppToken() public view returns(address);
@@ -29,7 +30,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
     }
 
     event MarketParams(uint256 indexed marketIndex, address marketCreator, uint256 marketType, bytes32 currencyName, uint256 _stakingFactorMinStake,uint32 _stakingFactorWeightage,uint256 _currentPriceWeightage,uint32 _minTimePassed);
-    event MarketTypes(uint256 indexed index, uint32 predictionTime, uint32 cooldownTime, uint32 optionRangePerc, bool status, uint32 minTimePassed);
+    event MarketTypes(uint256 indexed index, uint32 predictionTime, uint32 cooldownTime, uint32 optionRangePerc, bool status, uint32 minTimePassed, uint64 initialLiquidity);
     event MarketCurrencies(uint256 indexed index, address feedAddress, bytes32 currencyName, bool status);
 	  event MarketCreatorReward(address indexed createdBy, uint256 indexed marketIndex, uint256 tokenIncentive);
     event ClaimedMarketCreationReward(address indexed user, uint reward, address predictionToken);
@@ -39,6 +40,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       uint32 optionRangePerc;
       uint32 cooldownTime;
       uint32 minTimePassed;
+      uint64 initialLiquidity;
       bool paused;
     }
 
@@ -84,6 +86,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
     address internal masterAddress;
     address internal plotToken;
     IAllMarkets internal allMarkets;
+    IReferral internal referral;
 
     MarketCurrency[] internal marketCurrencies;
     MarketTypeData[] internal marketTypeArray;
@@ -97,15 +100,22 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
     mapping(uint256 => MarketData) public marketData;
 
     mapping(address => uint256) public marketCreationReward;
+    mapping (address => uint256) public relayerFeeEarned;
 
     uint internal totalOptions;
-    uint internal stakingFactorMinStake ;
-    uint32 internal stakingFactorWeightage ;
-    uint32 internal currentPriceWeightage ;
+    uint internal stakingFactorMinStake;
+    uint32 internal stakingFactorWeightage;
+    uint32 internal currentPriceWeightage;
+    uint internal predictionDecimalMultiplier;
 
     modifier onlyAuthorizedUsers() {
         require(authorizedAddress == msg.sender);
         _;
+    }
+
+    modifier onlyAllMarkets {
+      require(msg.sender == address(allMarkets));
+      _;
     }
 
     /**
@@ -168,13 +178,13 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
     * @param _marketCooldownTime Cool down time of the market after market is settled
     * @param _minTimePassed Minimum amount of time to be passed for the time factor to be kicked in while calculating option price
     */
-    function addMarketType(uint32 _predictionTime, uint32 _optionRangePerc, uint32 _marketStartTime, uint32 _marketCooldownTime, uint32 _minTimePassed) external onlyAuthorized {
+    function addMarketType(uint32 _predictionTime, uint32 _optionRangePerc, uint32 _marketStartTime, uint32 _marketCooldownTime, uint32 _minTimePassed, uint64 _initialLiquidity) external onlyAuthorized {
       require(marketTypeArray[marketType[_predictionTime]].predictionTime != _predictionTime);
       require(_predictionTime > 0);
       require(_optionRangePerc > 0);
       require(_marketCooldownTime > 0);
       require(_minTimePassed > 0);
-      uint32 index = _addMarketType(_predictionTime, _optionRangePerc, _marketCooldownTime, _minTimePassed);
+      uint32 index = _addMarketType(_predictionTime, _optionRangePerc, _marketCooldownTime, _minTimePassed, _initialLiquidity);
       for(uint32 i = 0;i < marketCurrencies.length; i++) {
           marketCreationData[index][i].initialStartTime = _marketStartTime;
       }
@@ -187,11 +197,11 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
     * @param _marketCooldownTime Cool down time of the market after market is settled
     * @param _minTimePassed Minimum amount of time to be passed for the time factor to be kicked in while calculating option price
     */
-    function _addMarketType(uint32 _predictionTime, uint32 _optionRangePerc, uint32 _marketCooldownTime, uint32 _minTimePassed) internal returns(uint32) {
+    function _addMarketType(uint32 _predictionTime, uint32 _optionRangePerc, uint32 _marketCooldownTime, uint32 _minTimePassed, uint64 _initialLiquidity) internal returns(uint32) {
       uint32 index = uint32(marketTypeArray.length);
       marketType[_predictionTime] = index;
-      marketTypeArray.push(MarketTypeData(_predictionTime, _optionRangePerc, _marketCooldownTime, _minTimePassed, false));
-      emit MarketTypes(index, _predictionTime, _marketCooldownTime, _optionRangePerc, true, _minTimePassed);
+      marketTypeArray.push(MarketTypeData(_predictionTime, _optionRangePerc, _marketCooldownTime, _minTimePassed, _initialLiquidity, false));
+      emit MarketTypes(index, _predictionTime, _marketCooldownTime, _optionRangePerc, true, _minTimePassed, _initialLiquidity);
       return index;
     }
 
@@ -202,7 +212,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
     * @param _marketCooldownTime Cool down time of the market after market is settled
     * @param _minTimePassed Minimum amount of time to be passed for the time factor to be kicked in while calculating option price
     */
-    function updateMarketType(uint32 _marketType, uint32 _optionRangePerc, uint32 _marketCooldownTime, uint32 _minTimePassed) external onlyAuthorized {
+    function updateMarketType(uint32 _marketType, uint32 _optionRangePerc, uint32 _marketCooldownTime, uint32 _minTimePassed, uint64 _initialLiquidity) external onlyAuthorized {
       require(_optionRangePerc > 0);
       require(_marketCooldownTime > 0);
       require(_minTimePassed > 0);
@@ -211,7 +221,8 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       _marketTypeArray.optionRangePerc = _optionRangePerc;
       _marketTypeArray.cooldownTime = _marketCooldownTime;
       _marketTypeArray.minTimePassed = _minTimePassed;
-      emit MarketTypes(_marketType, _marketTypeArray.predictionTime, _marketCooldownTime, _optionRangePerc, true, _minTimePassed);
+      _marketTypeArray.initialLiquidity = _initialLiquidity;
+      emit MarketTypes(_marketType, _marketTypeArray.predictionTime, _marketCooldownTime, _optionRangePerc, true, _minTimePassed, _initialLiquidity);
     }
 
     /**
@@ -228,7 +239,29 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       } else if(code == "SFMS") { // Minimum amount for staking factor to apply
         stakingFactorMinStake = value;
       } else {
-        revert("Invalid code");
+        MarketFeeParams storage _marketFeeParams = marketFeeParams;
+        require(value < 10000);
+        if(code == "CMFP") { // Cummulative fee percent
+          _marketFeeParams.cummulativeFeePercent = uint32(value);
+        } else {
+          if(code == "DAOF") { // DAO Fee percent in Cummulative fee
+            _marketFeeParams.daoCommissionPercent = uint32(value);
+          } else if(code == "RFRRF") { // Referrer fee percent in Cummulative fee
+            _marketFeeParams.referrerFeePercent = uint32(value);
+          } else if(code == "RFREF") { // Referee fee percent in Cummulative fee
+            _marketFeeParams.refereeFeePercent = uint32(value);
+          } else if(code == "MCF") { // Market Creator fee percent in Cummulative fee
+            _marketFeeParams.marketCreatorFeePercent = uint32(value);
+          } else {
+            revert("Invalid code");
+          } 
+          require(
+            _marketFeeParams.daoCommissionPercent + 
+            _marketFeeParams.referrerFeePercent + 
+            _marketFeeParams.refereeFeePercent + 
+            _marketFeeParams.marketCreatorFeePercent
+            < 10000);
+        }
       }
     }
 
@@ -244,6 +277,16 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
         value = currentPriceWeightage;
       } else if(code == "SFMS") { // Minimum amount for staking factor to apply
         value = stakingFactorMinStake;
+      } else if(code == "CMFP") { // Cummulative fee percent
+        value = marketFeeParams.cummulativeFeePercent;
+      } else if(code == "DAOF") { // DAO Fee percent in Cummulative fee
+        value = marketFeeParams.daoCommissionPercent;
+      } else if(code == "RFRRF") { // Referrer fee percent in Cummulative fee
+        value = marketFeeParams.referrerFeePercent;
+      } else if(code == "RFREF") { // Referee fee percent in Cummulative fee
+        value = marketFeeParams.refereeFeePercent;
+      } else if(code == "MCF") { // Market Creator fee percent in Cummulative fee
+        value = marketFeeParams.marketCreatorFeePercent;
       }
     }
 
@@ -262,6 +305,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       stakingFactorMinStake = uint(20000).mul(10**8);
       stakingFactorWeightage = 40;
       currentPriceWeightage = 60;
+      predictionDecimalMultiplier = 10;
       MarketFeeParams storage _marketFeeParams = marketFeeParams;
       _marketFeeParams.cummulativeFeePercent = 200;
       _marketFeeParams.daoCommissionPercent = 1000;
@@ -269,9 +313,9 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       _marketFeeParams.referrerFeePercent = 2000;
       _marketFeeParams.marketCreatorFeePercent = 4000;
       
-      _addMarketType(4 hours, 100, 1 hours, 40 minutes);
-      _addMarketType(24 hours, 200, 6 hours, 4 hours);
-      _addMarketType(168 hours, 500, 8 hours, 28 hours);
+      _addMarketType(4 hours, 100, 1 hours, 40 minutes, (100 * 10**8));
+      _addMarketType(24 hours, 200, 6 hours, 4 hours, (100 * 10**8));
+      _addMarketType(168 hours, 500, 8 hours, 28 hours, (100 * 10**8));
 
       _addMarketCurrency("ETH/USD", _ethFeed, 8, 1, _marketStartTime);
       _addMarketCurrency("BTC/USD", _btcFeed, 8, 25, _marketStartTime);
@@ -305,7 +349,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       uint64 _marketIndex = allMarkets.getTotalMarketsLength();
       address _msgSenderAddress = _msgSender();
       marketPricingData[_marketIndex] = PricingData(stakingFactorMinStake, stakingFactorWeightage, currentPriceWeightage, _marketType.minTimePassed);
-      allMarkets.createMarket(_marketTimes, _optionRanges, _msgSenderAddress);
+      allMarkets.createMarket(_marketTimes, _optionRanges, _msgSenderAddress, _marketType.initialLiquidity);
       marketData[_marketIndex] = MarketData(_marketTypeIndex, _marketCurrencyIndex, _msgSenderAddress);
       // uint64 _marketIndex;
       (_marketCreationData.penultimateMarket, _marketCreationData.latestMarket) =
@@ -379,17 +423,59 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       address _feedAdd = marketCurrencies[marketData[_marketId].marketCurrencyIndex].marketFeed;
       (uint256 _value, uint256 _roundIdUsed) = IOracle(_feedAdd).getSettlementPrice(allMarkets.marketSettleTime(_marketId), _roundId);
       allMarkets.settleMarket(_marketId, _value);
+      if(allMarkets.marketStatus(_marketId) == IAllMarkets.PredictionStatus.Settled) {
+        _transferAsset(plotToken, masterAddress, (10**predictionDecimalMultiplier).mul(marketFeeParams.daoFee[_marketId]));
+        delete marketFeeParams.daoFee[_marketId];
+
+    	  marketCreationReward[marketData[_marketId].marketCreator] = marketFeeParams.marketCreatorFee[_marketId];
+        emit MarketCreatorReward(marketData[_marketId].marketCreator, _marketId, marketFeeParams.marketCreatorFee[_marketId]);
+        delete marketFeeParams.marketCreatorFee[_marketId];
+      }
     }
 
     /**
-    * @dev Function to deposit reward for market creator
-    * @param _marketId Index of market
-    * @param _creatorFee prediction token fee share earned by 
+     * @dev Internal function to deduct fee from the prediction amount
+     * @param _marketId Index of the market
+     * @param _cummulativeFee Total fee amount
+     * @param _msgSenderAddress User address
+     */
+    function handleFee(uint _marketId, uint64 _cummulativeFee, address _msgSenderAddress, address _relayer) external onlyAllMarkets {
+      MarketFeeParams storage _marketFeeParams = marketFeeParams;
+      // _fee = _calculateAmulBdivC(_marketFeeParams.cummulativeFeePercent, _amount, 10000);
+      uint64 _referrerFee = _calculateAmulBdivC(_marketFeeParams.referrerFeePercent, _cummulativeFee, 10000);
+      uint64 _refereeFee = _calculateAmulBdivC(_marketFeeParams.refereeFeePercent, _cummulativeFee, 10000);
+      referral.setReferralRewardData(_msgSenderAddress, _referrerFee, _refereeFee);
+      uint64 _daoFee = _calculateAmulBdivC(_marketFeeParams.daoCommissionPercent, _cummulativeFee, 10000);
+      uint64 _marketCreatorFee = _calculateAmulBdivC(_marketFeeParams.marketCreatorFeePercent, _cummulativeFee, 10000);
+      _marketFeeParams.daoFee[_marketId] = _marketFeeParams.daoFee[_marketId].add(_daoFee);
+      _marketFeeParams.marketCreatorFee[_marketId] = _marketFeeParams.marketCreatorFee[_marketId].add(_marketCreatorFee);
+      _setRelayerFee(_relayer, _cummulativeFee, _daoFee, _referrerFee, _refereeFee, _marketCreatorFee);
+    }
+
+    function _setRelayerFee(address _relayer, uint _cummulativeFee, uint _daoFee, uint _referrerFee, uint _refereeFee, uint _marketCreatorFee) internal {
+      relayerFeeEarned[_relayer] = relayerFeeEarned[_relayer].add(_cummulativeFee.sub(_daoFee).sub(_referrerFee).sub(_refereeFee).sub(_marketCreatorFee));
+    }
+
+    /**
+    * @dev Claim fees earned by the relayer address
     */
-    function depositMarketCreationReward(uint256 _marketId, uint256 _creatorFee) external {
-      require(msg.sender == address(allMarkets));
-    	marketCreationReward[marketData[_marketId].marketCreator] = _creatorFee;
-      emit MarketCreatorReward(marketData[_marketId].marketCreator, _marketId, _creatorFee);
+    function claimRelayerRewards() external {
+      uint _decimalMultiplier = 10**predictionDecimalMultiplier;
+      address _relayer = msg.sender;
+      uint256 _fee = (_decimalMultiplier).mul(relayerFeeEarned[_relayer]);
+      delete relayerFeeEarned[_relayer];
+      require(_fee > 0);
+      _transferAsset(plotToken, _relayer, _fee);
+    }
+
+    /**
+    * @dev Basic function to perform mathematical operation of (`_a` * `_b` / `_c`)
+    * @param _a value of variable a
+    * @param _b value of variable b
+    * @param _c value of variable c
+    */
+    function _calculateAmulBdivC(uint64 _a, uint64 _b, uint64 _c) internal pure returns(uint64) {
+      return _a.mul(_b).div(_c);
     }
 
     /**
@@ -409,7 +495,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
     * @param _recipient The address to transfer the asset of
     * @param _amount The amount which is transfer.
     */
-    function _transferAsset(address _asset, address payable _recipient, uint256 _amount) internal {
+    function _transferAsset(address _asset, address _recipient, uint256 _amount) internal {
       if(_amount > 0) { 
           require(IToken(_asset).transfer(_recipient, _amount));
       }

@@ -10,7 +10,7 @@ contract IAllMarkets {
       Settled
     }
 
-    function createMarket(uint32[] memory _marketTimes, uint64[] memory _optionRanges, address _createdBy) public returns(uint64 _marketIndex);
+    function createMarket(uint32[] memory _marketTimes, uint64[] memory _optionRanges, address _createdBy, uint64 _initialLiquidity) public returns(uint64 _marketIndex);
 
     function settleMarket(uint256 _marketId, uint256 _value) external;
 
@@ -44,4 +44,6 @@ contract IAllMarkets {
     function postMarketResult(uint256 _marketId, uint256 _marketSettleValue) external;
 
     function getTotalOptions(uint256 _marketId) external view returns(uint);
+ 
+    function getTotalStakedByUser(address _user) external view returns(uint);
 }
