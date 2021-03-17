@@ -317,6 +317,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
 
       totalOptions = 3;
       stakingFactorMinStake = uint(20000).mul(10**8);
+      referral = IReferral(IMaster(masterAddress).getLatestAddress("RF"));
       userLevels = IUserLevels(IMaster(masterAddress).getLatestAddress("UL"));
       stakingFactorWeightage = 40;
       currentPriceWeightage = 60;
@@ -461,7 +462,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       // _fee = _calculateAmulBdivC(_marketFeeParams.cummulativeFeePercent, _amount, 10000);
       uint64 _referrerFee = _calculateAmulBdivC(_marketFeeParams.referrerFeePercent, _cummulativeFee, 10000);
       uint64 _refereeFee = _calculateAmulBdivC(_marketFeeParams.refereeFeePercent, _cummulativeFee, 10000);
-      referral.setReferralRewardData(_msgSenderAddress, _referrerFee, _refereeFee);
+      referral.setReferralRewardData(_msgSenderAddress, plotToken, _referrerFee, _refereeFee);
       uint64 _daoFee = _calculateAmulBdivC(_marketFeeParams.daoCommissionPercent, _cummulativeFee, 10000);
       uint64 _marketCreatorFee = _calculateAmulBdivC(_marketFeeParams.marketCreatorFeePercent, _cummulativeFee, 10000);
       _marketFeeParams.daoFee[_marketId] = _marketFeeParams.daoFee[_marketId].add(_daoFee);
@@ -480,7 +481,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
     * @param _prediction Option predicted by the user
     * @param _stake Amount staked by the user
     */
-    function _calculatePredictionPointsAndMultiplier(address _user, uint256 _marketId, uint256 _prediction, uint64 _stake) internal returns(uint64 predictionPoints){
+    function calculatePredictionPointsAndMultiplier(address _user, uint256 _marketId, uint256 _prediction, uint64 _stake) external returns(uint64 predictionPoints){
       bool isMultiplierApplied;
       (predictionPoints, isMultiplierApplied) = calculatePredictionPoints(_marketId, _prediction, _user, multiplierApplied[_user][_marketId], _stake);
       if(isMultiplierApplied) {

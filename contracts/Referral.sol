@@ -26,18 +26,17 @@ import "./interfaces/IAuth.sol";
 contract Referral is IAuth, NativeMetaTransaction {
 
     event ReferralLog(address indexed referrer, address indexed referee, uint256 referredOn);
-    event ClaimedReferralReward(address indexed user, uint256 amount);
+    event ClaimedReferralReward(address indexed user, address token, uint256 amount);
 
     struct UserData {
-      uint referrerFee; // Fee earned by referring another user
-      uint refereeFee; // Fee earned after being referred by another user
+      mapping(address => uint256) referrerFee; // Fee earned by referring another user for a given token
+      mapping(address => uint256) refereeFee; // Fee earned after being referred by another user for a given token
       address referrer; // Address of the referrer 
     }
 
     IAllMarkets internal allMarkets;
     address internal masterAddress;
-    address internal plotToken;
-
+    
     uint internal predictionDecimalMultiplier;
 
     mapping (address => UserData) public userData;
@@ -57,8 +56,6 @@ contract Referral is IAuth, NativeMetaTransaction {
       require(msg.sender == proxy.proxyOwner());
       IMaster ms = IMaster(msg.sender);
       masterAddress = msg.sender;
-      address _plotToken = ms.dAppToken();
-      plotToken = _plotToken;
       allMarkets = IAllMarkets(ms.getLatestAddress("AM"));
       authorized = _authorizedMultiSig;
       predictionDecimalMultiplier = 10;
@@ -83,14 +80,14 @@ contract Referral is IAuth, NativeMetaTransaction {
     * @dev Set referrer address of a user, can be set only by the authorized users
     * @param _referee User who is referring new user
     */
-    function setReferralRewardData(address _referee, uint _referrerFee, uint _refereeFee) external onlyInternal {
+    function setReferralRewardData(address _referee, address _token, uint _referrerFee, uint _refereeFee) external onlyInternal {
       UserData storage _userData = userData[_referee];
       address _referrer = _userData.referrer;
       if(_referrer != address(0)) {
         //Commission for referee
-        _userData.refereeFee = _userData.refereeFee.add(_refereeFee);
+        _userData.refereeFee[_token] = _userData.refereeFee[_token].add(_refereeFee);
         //Commission for referrer
-        userData[_referrer].referrerFee = userData[_referrer].referrerFee.add(_referrerFee);
+        userData[_referrer].referrerFee[_token] = userData[_referrer].referrerFee[_token].add(_referrerFee);
       }
     }
 
@@ -100,24 +97,24 @@ contract Referral is IAuth, NativeMetaTransaction {
     * @return _referrerFee Fees earned by referring other users
     * @return _refereeFee Fees earned if referred by some one
     */
-    function getReferralFees(address _user) external view returns(uint256 _referrerFee, uint256 _refereeFee) {
+    function getReferralFees(address _user, address _token) external view returns(uint256 _referrerFee, uint256 _refereeFee) {
       UserData storage _userData = userData[_user];
-      return (_userData.referrerFee, _userData.refereeFee);
+      return (_userData.referrerFee[_token], _userData.refereeFee[_token]);
     }
 
     /**
     * @dev Claim the fee earned by referrals
     * @param _user Address to claim the fee for
      */
-    function claimReferralFee(address _user) external {
+    function claimReferralFee(address _user, address _token) external {
       UserData storage _userData = userData[_user];
-      uint256 _referrerFee = _userData.referrerFee;
-      delete _userData.referrerFee;
-      uint256 _refereeFee = _userData.refereeFee;
-      delete _userData.refereeFee;
+      uint256 _referrerFee = _userData.referrerFee[_token];
+      delete _userData.referrerFee[_token];
+      uint256 _refereeFee = _userData.refereeFee[_token];
+      delete _userData.refereeFee[_token];
       uint _tokenToTransfer = (_refereeFee.add(_referrerFee)).mul(10**predictionDecimalMultiplier);
-      _transferAsset(plotToken, _user, _tokenToTransfer);
-      emit ClaimedReferralReward(_user, _tokenToTransfer);
+      _transferAsset(_token, _user, _tokenToTransfer);
+      emit ClaimedReferralReward(_user, _token, _tokenToTransfer);
     }
 
     /**
