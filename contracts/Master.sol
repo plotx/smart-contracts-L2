@@ -56,6 +56,8 @@ contract Master is IAuth {
         allContractNames.push("DR");
         allContractNames.push("CM");
         allContractNames.push("AC");
+        allContractNames.push("RF");
+        allContractNames.push("UL");
 
         require(
             allContractNames.length == _implementations.length,
@@ -115,7 +117,7 @@ contract Master is IAuth {
      * @dev To check if we use the particular contract.
      * @param _address The contract address to check if it is active or not.
      */
-    function isInternal(address _address) public view returns (bool) {
+function isInternal(address _address) public view returns (bool) {
         return contractsActive[_address];
     }
 
