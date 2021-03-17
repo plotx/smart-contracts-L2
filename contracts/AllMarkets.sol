@@ -400,7 +400,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       }
       (, uint _cummulativeFeePercent)= IMarket(marketDataExtended[_marketId].marketCreatorContract).getUintParameters("CMFP");
       _fee = _calculateAmulBdivC(uint64(_cummulativeFeePercent), _amount, 10000);
-      _transferAsset(plotToken, marketDataExtended[_marketId].marketCreatorContract, _fee);
+      _transferAsset(plotToken, marketDataExtended[_marketId].marketCreatorContract, (10**predictionDecimalMultiplier).mul(_fee));
       IMarket(marketDataExtended[_marketId].marketCreatorContract).handleFee(_marketId, _fee, _msgSenderAddress, _relayer);
       _amountPostFee = _amount.sub(_fee);
     }

@@ -38,6 +38,7 @@ contract UserLevels is IAuth, NativeMetaTransaction {
     function setMasterAddress(address _authorizedMultiSig, address _defaultAuthorizedAddress) public {
       OwnedUpgradeabilityProxy proxy =  OwnedUpgradeabilityProxy(address(uint160(address(this))));
       require(msg.sender == proxy.proxyOwner());
+      authorized = _authorizedMultiSig;
       masterAddress = msg.sender;
     }
 

@@ -367,7 +367,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       uint64 _marketIndex = allMarkets.getTotalMarketsLength();
       address _msgSenderAddress = _msgSender();
       marketPricingData[_marketIndex] = PricingData(stakingFactorMinStake, stakingFactorWeightage, currentPriceWeightage, _marketType.minTimePassed);
-      allMarkets.createMarket(_marketTimes, _optionRanges, _msgSenderAddress, 100*1e8);
+      allMarkets.createMarket(_marketTimes, _optionRanges, _msgSenderAddress, _marketType.initialLiquidity);
       marketData[_marketIndex] = MarketData(_marketTypeIndex, _marketCurrencyIndex, _msgSenderAddress);
       // uint64 _marketIndex;
       (_marketCreationData.penultimateMarket, _marketCreationData.latestMarket) =
@@ -441,12 +441,12 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       address _feedAdd = marketCurrencies[marketData[_marketId].marketCurrencyIndex].marketFeed;
       (uint256 _value, uint256 _roundIdUsed) = IOracle(_feedAdd).getSettlementPrice(allMarkets.marketSettleTime(_marketId), _roundId);
       allMarkets.settleMarket(_marketId, _value);
-      if(allMarkets.marketStatus(_marketId) == IAllMarkets.PredictionStatus.Settled) {
+      if(allMarkets.marketStatus(_marketId) >= IAllMarkets.PredictionStatus.InSettlement) {
         _transferAsset(plotToken, masterAddress, (10**predictionDecimalMultiplier).mul(marketFeeParams.daoFee[_marketId]));
         delete marketFeeParams.daoFee[_marketId];
 
-    	  marketCreationReward[marketData[_marketId].marketCreator] = marketFeeParams.marketCreatorFee[_marketId];
-        emit MarketCreatorReward(marketData[_marketId].marketCreator, _marketId, marketFeeParams.marketCreatorFee[_marketId]);
+    	  marketCreationReward[marketData[_marketId].marketCreator] = (10**predictionDecimalMultiplier).mul(marketFeeParams.marketCreatorFee[_marketId]);
+        emit MarketCreatorReward(marketData[_marketId].marketCreator, _marketId, (10**predictionDecimalMultiplier).mul(marketFeeParams.marketCreatorFee[_marketId]));
         delete marketFeeParams.marketCreatorFee[_marketId];
       }
     }
@@ -462,6 +462,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       // _fee = _calculateAmulBdivC(_marketFeeParams.cummulativeFeePercent, _amount, 10000);
       uint64 _referrerFee = _calculateAmulBdivC(_marketFeeParams.referrerFeePercent, _cummulativeFee, 10000);
       uint64 _refereeFee = _calculateAmulBdivC(_marketFeeParams.refereeFeePercent, _cummulativeFee, 10000);
+      _transferAsset(plotToken, address(referral), (10**predictionDecimalMultiplier).mul(_referrerFee.add(_refereeFee)));
       referral.setReferralRewardData(_msgSenderAddress, plotToken, _referrerFee, _refereeFee);
       uint64 _daoFee = _calculateAmulBdivC(_marketFeeParams.daoCommissionPercent, _cummulativeFee, 10000);
       uint64 _marketCreatorFee = _calculateAmulBdivC(_marketFeeParams.marketCreatorFeePercent, _cummulativeFee, 10000);
