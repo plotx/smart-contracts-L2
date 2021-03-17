@@ -7,6 +7,8 @@ const MockchainLink = artifacts.require('MockChainLinkAggregator');
 const OwnedUpgradeabilityProxy = artifacts.require('OwnedUpgradeabilityProxy');
 const ParticipationMining = artifacts.require('ParticipationMining');
 const DisputeResolution = artifacts.require('DisputeResolution');
+const Referral = artifacts.require('Referral');
+const UserLevels = artifacts.require('UserLevels');
 const CyclicMarkets = artifacts.require('MockCyclicMarkets');
 const EthChainlinkOracle = artifacts.require('EthChainlinkOracle');
 const { assert } = require("chai");
@@ -25,8 +27,10 @@ module.exports = function(deployer, network, accounts){
     let dr = await DisputeResolution.deployed();
     let cm = await CyclicMarkets.deployed();
     let ac = await AcyclicMarkets.deployed();
+    let rf = await Referral.deployed();
+    let ul = await UserLevels.deployed();
     master = await Master.at(master.address);
-    let implementations = [allMarkets.address, blotToken.address, dr.address, cm.address, ac.address];
+    let implementations = [allMarkets.address, blotToken.address, rf.address, ul.address, dr.address, cm.address, ac.address];
     console.log(accounts[0])
     await master.initiateMaster(implementations, deployPlotusToken.address, accounts[0], accounts[0]);
     master = await OwnedUpgradeabilityProxy.at(master.address);
