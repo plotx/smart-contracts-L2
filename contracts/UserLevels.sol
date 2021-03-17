@@ -25,8 +25,21 @@ import "./interfaces/IAuth.sol";
 
 contract UserLevels is IAuth, NativeMetaTransaction {
 
+    address public masterAddress;
+
     mapping(address => uint256) public userLevel;
     mapping(uint256 => uint256) public levelMultiplier;
+
+    /**
+     * @dev Changes the master address and update it's instance
+     * @param _authorizedMultiSig Authorized address to execute critical functions in the protocol.
+     * @param _defaultAuthorizedAddress Authorized address to trigger initial functions by passing required external values.
+     */
+    function setMasterAddress(address _authorizedMultiSig, address _defaultAuthorizedAddress) public {
+      OwnedUpgradeabilityProxy proxy =  OwnedUpgradeabilityProxy(address(uint160(address(this))));
+      require(msg.sender == proxy.proxyOwner());
+      masterAddress = msg.sender;
+    }
 
     /**
     * @dev Function to set `_user` level for prediction points multiplier

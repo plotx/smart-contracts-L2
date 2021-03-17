@@ -53,11 +53,11 @@ contract Master is IAuth {
         //Initial contract names
         allContractNames.push("AM");
         allContractNames.push("BL");
+        allContractNames.push("RF");
+        allContractNames.push("UL");
         allContractNames.push("DR");
         allContractNames.push("CM");
         allContractNames.push("AC");
-        allContractNames.push("RF");
-        allContractNames.push("UL");
 
         require(
             allContractNames.length == _implementations.length,

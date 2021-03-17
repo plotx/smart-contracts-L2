@@ -137,6 +137,8 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       address _plotToken = ms.dAppToken();
       plotToken = _plotToken;
       allMarkets = IAllMarkets(ms.getLatestAddress("AM"));
+      referral = IReferral(IMaster(masterAddress).getLatestAddress("RF"));
+      userLevels = IUserLevels(IMaster(masterAddress).getLatestAddress("UL"));
       authorizedAddress = _defaultAuthorizedAddress;
       authorized = _authorizedMultiSig;
       _initializeEIP712("CM");
@@ -317,8 +319,6 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
 
       totalOptions = 3;
       stakingFactorMinStake = uint(20000).mul(10**8);
-      referral = IReferral(IMaster(masterAddress).getLatestAddress("RF"));
-      userLevels = IUserLevels(IMaster(masterAddress).getLatestAddress("UL"));
       stakingFactorWeightage = 40;
       currentPriceWeightage = 60;
       predictionDecimalMultiplier = 10;
@@ -367,7 +367,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       uint64 _marketIndex = allMarkets.getTotalMarketsLength();
       address _msgSenderAddress = _msgSender();
       marketPricingData[_marketIndex] = PricingData(stakingFactorMinStake, stakingFactorWeightage, currentPriceWeightage, _marketType.minTimePassed);
-      allMarkets.createMarket(_marketTimes, _optionRanges, _msgSenderAddress, _marketType.initialLiquidity);
+      allMarkets.createMarket(_marketTimes, _optionRanges, _msgSenderAddress, 100*1e8);
       marketData[_marketIndex] = MarketData(_marketTypeIndex, _marketCurrencyIndex, _msgSenderAddress);
       // uint64 _marketIndex;
       (_marketCreationData.penultimateMarket, _marketCreationData.latestMarket) =

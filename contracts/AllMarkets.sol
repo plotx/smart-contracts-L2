@@ -123,7 +123,6 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       address _plotToken = ms.dAppToken();
       plotToken = _plotToken;
       predictionToken = _plotToken;
-      bPLOTInstance = IbLOTToken(ms.getLatestAddress("BL"));
       authorized = _authorizedMultiSig;
       marketBasicData.push(MarketBasicData(0,0,0,0));
       _initializeEIP712("AM");
@@ -134,6 +133,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     function initializeDependencies() external {
       IMaster ms = IMaster(masterAddress);
       disputeResolution = ms.getLatestAddress("DR");
+      bPLOTInstance = IbLOTToken(ms.getLatestAddress("BL"));
     }
 
     /**
@@ -182,7 +182,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       for(uint i=0;i<_marketTimes.length;i++) {
         require(_marketTimes[i] != 0);
       }
-      require(_marketTimes[1] > _marketTimes[2]); // Settlement time should be greater than prediction time
+      require(_marketTimes[2] > _marketTimes[1]); // Settlement time should be greater than prediction time
     }
 
     function checkForValidOptionRanges(uint64[] memory _optionRanges) internal pure {
