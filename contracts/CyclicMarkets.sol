@@ -313,9 +313,9 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
     * @param _btcFeed Feed Address of btc/usd market
     */
     function addInitialMarketTypesAndStart(uint32 _marketStartTime, address _ethFeed, address _btcFeed) external onlyAuthorizedUsers {
-      require(marketTypeArray.length == 0);
       require(_ethFeed != address(0));
       require(_btcFeed != address(0));
+      require(marketTypeArray.length == 0);
 
       totalOptions = 3;
       stakingFactorMinStake = uint(20000).mul(10**8);
@@ -462,8 +462,13 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       // _fee = _calculateAmulBdivC(_marketFeeParams.cummulativeFeePercent, _amount, 10000);
       uint64 _referrerFee = _calculateAmulBdivC(_marketFeeParams.referrerFeePercent, _cummulativeFee, 10000);
       uint64 _refereeFee = _calculateAmulBdivC(_marketFeeParams.refereeFeePercent, _cummulativeFee, 10000);
-      _transferAsset(plotToken, address(referral), (10**predictionDecimalMultiplier).mul(_referrerFee.add(_refereeFee)));
-      referral.setReferralRewardData(_msgSenderAddress, plotToken, _referrerFee, _refereeFee);
+      bool _isEligibleForReferralReward = referral.setReferralRewardData(_msgSenderAddress, plotToken, _referrerFee, _refereeFee);
+      if(_isEligibleForReferralReward){
+        _transferAsset(plotToken, address(referral), (10**predictionDecimalMultiplier).mul(_referrerFee.add(_refereeFee)));
+      } else {
+        _refereeFee = 0;
+        _referrerFee = 0;
+      }
       uint64 _daoFee = _calculateAmulBdivC(_marketFeeParams.daoCommissionPercent, _cummulativeFee, 10000);
       uint64 _marketCreatorFee = _calculateAmulBdivC(_marketFeeParams.marketCreatorFeePercent, _cummulativeFee, 10000);
       _marketFeeParams.daoFee[_marketId] = _marketFeeParams.daoFee[_marketId].add(_daoFee);

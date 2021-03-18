@@ -80,10 +80,11 @@ contract Referral is IAuth, NativeMetaTransaction {
     * @dev Set referrer address of a user, can be set only by the authorized users
     * @param _referee User who is referring new user
     */
-    function setReferralRewardData(address _referee, address _token, uint _referrerFee, uint _refereeFee) external onlyInternal {
+    function setReferralRewardData(address _referee, address _token, uint _referrerFee, uint _refereeFee) external onlyInternal returns(bool _isEligible) {
       UserData storage _userData = userData[_referee];
       address _referrer = _userData.referrer;
       if(_referrer != address(0)) {
+        _isEligible = true;
         //Commission for referee
         _userData.refereeFee[_token] = _userData.refereeFee[_token].add(_refereeFee);
         //Commission for referrer

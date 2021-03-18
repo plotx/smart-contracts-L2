@@ -162,9 +162,9 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     {
       // _marketTimes => [0] _startTime, [1] _predictionTIme, [2] _settlementTime, [3] _cooldownTime
       // _optionRanges => For 3 options, the array will be like, First option will be the value less than zeroth index of this array, the next option will be the value less than first index of the array and the last option will be the value greater than the first index of array
+      require(_marketCreator != address(0));
       require(authorizedMarketCreator[msg.sender]);
       require(!marketCreationPaused);
-      require(_marketCreator != address(0));
       checkForValidMarketTimes(_marketTimes);
       checkForValidOptionRanges(_optionRanges);
       _marketIndex = uint64(marketBasicData.length);
@@ -483,7 +483,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       uint len = _userData.marketsParticipated.length;
       uint lastClaimed = len;
       uint count;
-      uint tokenReward =0 ;
+      uint tokenReward =0;
       require(!marketCreationPaused);
       for(i = _userData.lastClaimedIndex; i < len && count < maxRecords; i++) {
         (uint claimed, uint tempTokenReward) = claimReturn(_msgSenderAddress, _userData.marketsParticipated[i]);
@@ -557,7 +557,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     }
 
     function getTotalOptions(uint256 _marketId) external view returns(uint) {
-      return marketDataExtended[_marketId].optionRanges.length;
+      return marketDataExtended[_marketId].optionRanges.length + 1;
     }
 
     /**

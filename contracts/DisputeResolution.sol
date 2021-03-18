@@ -48,6 +48,7 @@ contract DisputeResolution is IAuth, NativeMetaTransaction {
   struct UserData {
     uint[] disputesParticipated;
     uint256 lastClaimedIndex;
+    mapping (uint256 => bool) claimedReward;
   }
 
   IAllMarkets internal allMarkets;
@@ -125,7 +126,7 @@ contract DisputeResolution is IAuth, NativeMetaTransaction {
     if(_marketDisputeData.userVoteValue[_msgSenderAddress] == 0) {
       userData[_msgSenderAddress].disputesParticipated.push(_marketId);
     }
-    _marketDisputeData.userVoteValue[_msgSenderAddress] = _voteValue;
+    _marketDisputeData.userVoteValue[_msgSenderAddress] = _marketDisputeData.userVoteValue[_msgSenderAddress].add(_voteValue);
     _marketDisputeData.totalVoteValue = _marketDisputeData.totalVoteValue.add(_voteValue);
     if(_choice) {
       _marketDisputeData.acceptedVoteValue = _marketDisputeData.acceptedVoteValue.add(_voteValue);
@@ -153,7 +154,9 @@ contract DisputeResolution is IAuth, NativeMetaTransaction {
     } else {
       _resolveDispute(_marketId, false, 0);
     }
-    IMaster(masterAddress).withdrawForDRVotingRewards(_marketDisputeData.rewardForVoting);
+    if(_marketDisputeData.totalVoteValue > 0) {
+      IMaster(masterAddress).withdrawForDRVotingRewards(_marketDisputeData.rewardForVoting);
+    }
   }
 
   /**
@@ -180,16 +183,41 @@ contract DisputeResolution is IAuth, NativeMetaTransaction {
     uint _incentive;
     UserData storage _userData = userData[_user];
     uint len = _userData.disputesParticipated.length;
+    uint lastClaimed = len;
     uint count;
+    uint _marketId;
     for(uint i = _userData.lastClaimedIndex; i < len && count < _maxRecord; i++) {
-      DisputeData storage _marketDisputeData = marketDisputeData[i];
-      _incentive = _incentive.add(_marketDisputeData.rewardForVoting.mul((_marketDisputeData.userVoteValue[_user]).div(_marketDisputeData.totalVoteValue)));
-      count++;
+      _marketId = _userData.disputesParticipated[i];
+      DisputeData storage _marketDisputeData = marketDisputeData[_marketId];
+      if(_marketDisputeData.closed) {
+        if(!_userData.claimedReward[_marketId]) {
+          _incentive = _incentive.add((_marketDisputeData.rewardForVoting.mul(_marketDisputeData.userVoteValue[_user])).div(_marketDisputeData.totalVoteValue));
+          _userData.claimedReward[_marketId] = true;
+          count++;
+        }
+      } else {
+        if(lastClaimed == len) {
+          lastClaimed = i;
+        }
+      }
     }
     require(_incentive > 0);
-    _userData.lastClaimedIndex = len;
+    _userData.lastClaimedIndex = lastClaimed;
     _transferAsset(_user, _incentive);
     emit ClaimReward(_user, _incentive);
+  }
+
+  function getPendingReward(address _user) external view returns(uint _pendingReward){
+    UserData storage _userData = userData[_user];
+    uint len = _userData.disputesParticipated.length;
+    uint _marketId;
+    for(uint i = _userData.lastClaimedIndex; i < len; i++) {
+      _marketId = _userData.disputesParticipated[i];
+      DisputeData storage _marketDisputeData = marketDisputeData[_userData.disputesParticipated[i]];
+      if(!_userData.claimedReward[_marketId] && _marketDisputeData.closed) {
+        _pendingReward = _pendingReward.add((_marketDisputeData.rewardForVoting.mul(_marketDisputeData.userVoteValue[_user])).div(_marketDisputeData.totalVoteValue));
+      }
+    }
   }
 
   /**
