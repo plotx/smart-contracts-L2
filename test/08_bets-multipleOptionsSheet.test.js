@@ -5,7 +5,6 @@ const PlotusToken = artifacts.require("MockPLOT");
 const AllMarkets = artifacts.require("MockAllMarkets");
 const MockChainLinkAggregator = artifacts.require("MockChainLinkAggregator");
 const CyclicMarkets = artifacts.require('MockCyclicMarkets');
-const MarketCreationRewards = artifacts.require('MarketCreationRewards');
 
 const ethAddress = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
 const increaseTime = require("./utils/increaseTime.js").increaseTime;

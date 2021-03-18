@@ -1,5 +1,4 @@
 const AllMarkets = artifacts.require('AllMarkets');
-const MarketCreationRewards = artifacts.require('MarketCreationRewards');
 const Master = artifacts.require('Master');
 const PlotusToken = artifacts.require("MockPLOT");
 const OwnedUpgradeabilityProxy = artifacts.require('OwnedUpgradeabilityProxy');
@@ -18,7 +17,7 @@ let mr;
 let tc;
 let ms;
 let pl;
-let allMarkets, mcr;
+let allMarkets;
 let marketConfig;
 let plotTok;
 let snapshotId;
@@ -35,7 +34,6 @@ contract('Configure Global Parameters', accounts => {
       snapshotId = await takeSnapshot();
       ms = await OwnedUpgradeabilityProxy.deployed();
       ms = await Master.at(ms.address);
-      mcr = await MarketCreationRewards.at(await ms.getLatestAddress(toHex("MC")));
       allMarkets = await AllMarkets.at(await ms.getLatestAddress(toHex("AM")));
       plotTok = await PlotusToken.deployed();
       await plotTok.transfer(allMarkets.address, toWei(20));
@@ -82,13 +80,13 @@ contract('Configure Global Parameters', accounts => {
         assert.equal(await allMarkets.marketCreationPaused(), false);
       });
 
-      it('Transfer Plotus Assets(PlotusToken)', async function() {
-        let plbalPlot = await plotTok.balanceOf(mcr.address);
-        await plotTok.burnTokens(mcr.address, plbalPlot);
-        await plotTok.transfer(mcr.address, 1000000000000);
-        plbalPlot = await plotTok.balanceOf(mcr.address);
+      it('Transfer DAO Assets(PlOT)', async function() {
+        let plbalPlot = await plotTok.balanceOf(ms.address);
+        await plotTok.burnTokens(ms.address, plbalPlot);
+        await plotTok.transfer(ms.address, 1000000000000);
+        plbalPlot = await plotTok.balanceOf(ms.address);
         let userbalPlot = await plotTok.balanceOf(newAB);
-        await mcr.transferAssets(plotTok.address, newAB, 1000000000000);
+        await ms.transferAssets(plotTok.address, newAB, 1000000000000);
         let actionHash = encode(
           'transferAssets(address,address,uint256)',
           plotTok.address,
@@ -96,7 +94,7 @@ contract('Configure Global Parameters', accounts => {
           1000000000000
         );
 
-        let plbalPlotAfter = await plotTok.balanceOf(mcr.address);
+        let plbalPlotAfter = await plotTok.balanceOf(ms.address);
         let userbalPlotAfter = await plotTok.balanceOf(newAB);
         assert.equal(plbalPlot/1 - plbalPlotAfter/1, 1000000000000);
         assert.equal(userbalPlotAfter/1 - userbalPlot/1, 1000000000000);

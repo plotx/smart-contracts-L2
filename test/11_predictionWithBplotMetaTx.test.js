@@ -4,8 +4,8 @@ const Master = artifacts.require("Master");
 const PlotusToken = artifacts.require("MockPLOT");
 const AllMarkets = artifacts.require("MockAllMarkets");
 const CyclicMarkets = artifacts.require("MockCyclicMarkets");
+const EthChainlinkOracle = artifacts.require('MockChainLinkAggregator');
 const BLOT = artifacts.require("BLOT");
-const MarketCreationRewards = artifacts.require('MarketCreationRewards');
 const BigNumber = require("bignumber.js");
 
 const increaseTime = require("./utils/increaseTime.js").increaseTime;
@@ -27,8 +27,7 @@ describe("newPlotusWithBlot", () => {
         // Multiplier Sheet
         let masterInstance,
             plotusToken,
-            allMarkets,
-            marketIncentives;
+            allMarkets;
         let predictionPointsBeforeUser1, predictionPointsBeforeUser2, predictionPointsBeforeUser3, predictionPointsBeforeUser4;
         before(async () => {
             masterInstance = await OwnedUpgradeabilityProxy.deployed();
@@ -36,10 +35,9 @@ describe("newPlotusWithBlot", () => {
             plotusToken = await PlotusToken.deployed();
             allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
 			cyclicMarkets = await CyclicMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("CM")));
-            marketIncentives = await MarketCreationRewards.at(await masterInstance.getLatestAddress(web3.utils.toHex("MC")));
             await increaseTime(4 * 60 * 60 + 1);
-            await allMarkets.claimRelayerRewards();
-            await plotusToken.transfer(marketIncentives.address,toWei(100000));
+            await cyclicMarkets.claimRelayerRewards();
+            // await plotusToken.transfer(masterInstance.address,toWei(100000));
             await plotusToken.transfer(users[11],toWei(1000));
             await plotusToken.approve(allMarkets.address, toWei(10000), {from:users[11]});
             await cyclicMarkets.setNextOptionPrice(18);
@@ -104,7 +102,7 @@ describe("newPlotusWithBlot", () => {
         it("1.2 Relayer should get apt reward", async () => {
 
             let relayerBalBefore = await plotusToken.balanceOf(users[0]);
-            await allMarkets.claimRelayerRewards();
+            await cyclicMarkets.claimRelayerRewards();
             let relayerBalAfter = await plotusToken.balanceOf(users[0]);
 
             assert.equal(Math.round((relayerBalAfter-relayerBalBefore)/1e15),22.33*1e3);
@@ -131,9 +129,11 @@ describe("newPlotusWithBlot", () => {
             }
             // console.log(await plotusToken.balanceOf(user1));
 
+            let ethChainlinkOracle = await EthChainlinkOracle.deployed();
+            await ethChainlinkOracle.setLatestAnswer(1);
             // close market
             await increaseTime(8 * 60 * 60);
-            await allMarkets.postResultMock(1, 7);
+            await cyclicMarkets.settleMarket(7, 1);
             await increaseTime(8 * 60 * 60);
         });
         it("1.4 Check total return for each user Prediction values in plot", async () => {
@@ -191,18 +191,18 @@ describe("newPlotusWithBlot", () => {
             }
         });
         it("1.6 Market creator should get apt reward", async () => {
-            let marketCreatorReward = await marketIncentives.getPendingMarketCreationRewards(users[11]);
+            let marketCreatorReward = await cyclicMarkets.getPendingMarketCreationRewards(users[11]);
             assert.equal(Math.round(1866.39),Math.round(marketCreatorReward/1e16));
 
             let plotBalBeforeCreator = await plotusToken.balanceOf(users[11]);
 
-            functionSignature = encode3("claimCreationReward(uint256)", 100);
+            functionSignature = encode3("claimCreationReward()");
             await signAndExecuteMetaTx(
                 pkList[11],
                 users[11],
                 functionSignature,
-                marketIncentives,
-                "MC"
+                cyclicMarkets,
+                "CM"
                 );
 
             let plotBalAfterCreator = await plotusToken.balanceOf(users[11]);

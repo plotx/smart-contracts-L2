@@ -1,6 +1,7 @@
 const Master = artifacts.require('Master');
 const AllMarkets = artifacts.require("AllMarkets");
-const MarketCreationRewards = artifacts.require("MarketCreationRewards");
+const Referral = artifacts.require("Referral");
+const UserLevels = artifacts.require("UserLevels");
 const DisputeResolution = artifacts.require("DisputeResolution");
 const CyclicMarkets = artifacts.require("CyclicMarkets");
 const PlotusToken = artifacts.require("MockPLOT");
@@ -42,7 +43,8 @@ contract('Master', function(accounts) {
     ms = await OwnedUpgradeabilityProxy.deployed();
     ms = await Master.at(ms.address);
     allMarkets = await AllMarkets.at(await ms.getLatestAddress(toHex('AM')));
-    mcr = await MarketCreationRewards.at(await ms.getLatestAddress(toHex("MC")));
+    rf = await Referral.at(await ms.getLatestAddress(toHex("RF")));
+    ul = await UserLevels.at(await ms.getLatestAddress(toHex("UL")));
     dr = await DisputeResolution.at(await ms.getLatestAddress(toHex("DR")));
     cm = await CyclicMarkets.at(await ms.getLatestAddress(toHex("CM")));
   });
@@ -57,13 +59,13 @@ contract('Master', function(accounts) {
       actionHash = encode1(
         ['bytes2[]', 'address[]'],
         [
-          [toHex('MC')],
-          [mcr.address, allMarkets.address]
+          [toHex('UL')],
+          [ul.address, allMarkets.address]
         ]
       );
 
-      await assertRevert(ms.upgradeMultipleImplementations([toHex('MC')],
-                [mcr.address, allMarkets.address]));
+      await assertRevert(ms.upgradeMultipleImplementations([toHex('UL')],
+                [ul.address, allMarkets.address]));
       // await gvProp(
       //   6,
       //   actionHash,
@@ -108,15 +110,16 @@ contract('Master', function(accounts) {
       mas = await OwnedUpgradeabilityProxy.new(mas.address);
       mas = await Master.at(mas.address);
       await assertRevert(
-        mas.initiateMaster([mas.address, mas.address, mas.address, mas.address, mas.address, mas.address], mas.address, mas.address, mas.address, {from: newOwner})
+        mas.initiateMaster([mas.address, mas.address, mas.address, mas.address, mas.address, mas.address, mas.address, mas.address], mas.address, mas.address, mas.address, {from: newOwner})
       );
+      await assertRevert(rf.setMasterAddress(mas.address, mas.address));
     });
     it('Should revert if caller is default address passed is null address', async function() {
       mas = await Master.new();
       mas = await OwnedUpgradeabilityProxy.new(mas.address);
       mas = await Master.at(mas.address);
       await assertRevert(
-        mas.initiateMaster([mas.address, mas.address, mas.address, mas.address, mas.address, mas.address], mas.address, ZERO_ADDRESS, mas.address)
+        mas.initiateMaster([mas.address, mas.address, mas.address, mas.address, mas.address, mas.address, mas.address, mas.address], mas.address, ZERO_ADDRESS, mas.address)
       );
     });
     it('Should revert if caller is multisig auth address passed is null address', async function() {
@@ -124,7 +127,7 @@ contract('Master', function(accounts) {
       mas = await OwnedUpgradeabilityProxy.new(mas.address);
       mas = await Master.at(mas.address);
       await assertRevert(
-        mas.initiateMaster([mas.address, mas.address, mas.address, mas.address, mas.address, mas.address], mas.address, mas.address, ZERO_ADDRESS)
+        mas.initiateMaster([mas.address, mas.address, mas.address, mas.address, mas.address, mas.address, mas.address, mas.address], mas.address, mas.address, ZERO_ADDRESS)
       );
     });
     it('Should revert if length of implementation array and contract array are not same', async function() {
@@ -134,7 +137,7 @@ contract('Master', function(accounts) {
     });
     it('Should revert if master already initiated', async function() {
       await assertRevert(
-        ms.initiateMaster([mas.address, mas.address, mas.address, mas.address, mas.address, mas.address], mas.address, mas.address, mas.address, {from: newOwner})
+        ms.initiateMaster([mas.address, mas.address, mas.address, mas.address, mas.address, mas.address, mas.address, mas.address], mas.address, mas.address, mas.address, {from: newOwner})
       );
     });
   });
@@ -149,24 +152,16 @@ contract('Master', function(accounts) {
       assert.equal(await implInc.implementation(), newMaster.address);
     });
 
-    it('Create a sample proposal after updating master', async function() {
-      let actionHash = encode(
-        'updateUintParameters(bytes8,uint256)',
-        toHex('REJCOUNT'),
-        2
-      );
-      await allMarkets.updateUintParameters(toHex("MDPA"),65);
+    it('Check if other contract is working after updating master', async function() {
+      await cm.updateUintParameters(toHex("CPW"),65);
       assert.equal(
-        (await allMarkets.getUintParameters(toHex('MDPA')))[1].toNumber(),
+        (await cm.getUintParameters(toHex('CPW')))[1].toNumber(),
         65
       );
     });
 
-    it('Sending funds to funds to MCR', async function() {
-      mcr = await MarketCreationRewards.at(
-        await ms.getLatestAddress(toHex('MC'))
-      );
-      await plotTok.transfer(mcr.address, toWei(1));
+    it('Sending funds to funds to master', async function() {
+      await plotTok.transfer(ms.address, toWei(1));
       await plotTok.transfer(allMarkets.address, toWei(1));
     });
 
@@ -175,41 +170,36 @@ contract('Master', function(accounts) {
       oldAM = await AllMarkets.at(
         await ms.getLatestAddress(toHex('AM'))
       );
-      oldMCR = await MarketCreationRewards.at(
-        await ms.getLatestAddress(toHex('MC'))
-      );
       oldCM = await CyclicMarkets.at(
         await ms.getLatestAddress(toHex('CM'))
       );
       oldDR = await DisputeResolution.at(
         await ms.getLatestAddress(toHex('DR'))
       );
+      oldRF = await Referral.at(
+        await ms.getLatestAddress(toHex('RF'))
+      );
+      oldUL = await UserLevels.at(
+        await ms.getLatestAddress(toHex('UL'))
+      );
       let plbalPlot = await plotTok.balanceOf(
         await ms.getLatestAddress(toHex('MC'))
       );
-      let relayerFeePercent = (await oldAM.getUintParameters(toHex("DAOF")))[1];
+      let relayerFeePercent = (await oldCM.getUintParameters(toHex("DAOF")))[1];
       let newAllMarkets = await AllMarkets.new();
       await increaseTime(100);
-      let newMC = await MarketCreationRewards.new();
       let newDR = await DisputeResolution.new();
       let newCM = await CyclicMarkets.new();
-      actionHash = encode1(
-        ['bytes2[]', 'address[]'],
-        [
-          [toHex('AM'), toHex("MC"), toHex("CM"), toHex("DR")],
-          [newAllMarkets.address, newMC.address, newCM.address, newDR.address]
-        ]
-      );
+      let newRF = await Referral.new();
+      let newUL = await UserLevels.new();
+
       await ms.upgradeMultipleImplementations(
-        [toHex('AM'), toHex("MC"), toHex("CM"), toHex("DR")],
-          [newAllMarkets.address, newMC.address, newCM.address, newDR.address]
+          [toHex('AM'), toHex("CM"), toHex("DR"), toHex("RF"), toHex("UL")],
+          [newAllMarkets.address, newCM.address, newDR.address, newRF.address, newUL.address]
       );
 
       let oldAMImpl = await OwnedUpgradeabilityProxy.at(
         await ms.getLatestAddress(toHex('AM'))
-      );
-      let oldMCImpl = await OwnedUpgradeabilityProxy.at(
-        await ms.getLatestAddress(toHex('MC'))
       );
       let oldCMImpl = await OwnedUpgradeabilityProxy.at(
         await ms.getLatestAddress(toHex('CM'))
@@ -217,11 +207,18 @@ contract('Master', function(accounts) {
       let oldDRImpl = await OwnedUpgradeabilityProxy.at(
         await ms.getLatestAddress(toHex('DR'))
       );
+      let oldRFImpl = await OwnedUpgradeabilityProxy.at(
+        await ms.getLatestAddress(toHex('RF'))
+      );
+      let oldULImpl = await OwnedUpgradeabilityProxy.at(
+        await ms.getLatestAddress(toHex('UL'))
+      );
 
       // Checking Upgraded Contract addresses
-      assert.equal(newMC.address, await oldMCImpl.implementation());
       assert.equal(newDR.address, await oldDRImpl.implementation());
       assert.equal(newCM.address, await oldCMImpl.implementation());
+      assert.equal(newRF.address, await oldRFImpl.implementation());
+      assert.equal(newUL.address, await oldULImpl.implementation());
       assert.equal(newAllMarkets.address, await oldAMImpl.implementation());
       
       // Checking Master address in upgraded Contracts
@@ -237,7 +234,7 @@ contract('Master', function(accounts) {
       );
 
       // Checking getters in upgraded Contracts
-      assert.equal(((await oldAM.getUintParameters(toHex("DAOF")))[1]).toString(), relayerFeePercent.toString());
+      assert.equal(((await oldCM.getUintParameters(toHex("DAOF")))[1]).toString(), relayerFeePercent.toString());
     });
     it('Add new Proxy Internal contract', async function() {
       let nic = await NewProxyInternalContract.new();

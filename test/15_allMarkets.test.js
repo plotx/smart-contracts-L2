@@ -2,7 +2,6 @@ const OwnedUpgradeabilityProxy = artifacts.require("OwnedUpgradeabilityProxy");
 const Master = artifacts.require("Master");
 const AllMarkets = artifacts.require("MockAllMarkets");
 const CyclicMarkets = artifacts.require("MockCyclicMarkets");
-const MarketCreationRewards = artifacts.require('MarketCreationRewards');
 const PlotusToken = artifacts.require("MockPLOT");
 const MockchainLink = artifacts.require("MockChainLinkAggregator");
 const EThOracle = artifacts.require("EthChainlinkOracle");
@@ -48,11 +47,10 @@ contract("PlotX", ([ab1, ab2, ab3, ab4, mem1, mem2, mem3, mem4, mem5, mem6, mem7
         // await marketConfig.setInitialCummulativePrice();
 		allMarkets = await AllMarkets.at(await master.getLatestAddress(toHex("AM")));
 		cyclicMarkets = await CyclicMarkets.at(await master.getLatestAddress(toHex("CM")));
-		marketIncentives = await MarketCreationRewards.at(await master.getLatestAddress(toHex("MC")));
-        // await assertRevert(marketIncentives.setMasterAddress());
+		// await assertRevert(marketIncentives.setMasterAddress());
         // await assertRevert(marketIncentives.initialise(marketConfig.address, mockchainLinkInstance.address));
         await increaseTime(5 * 3600);
-        await plotusToken.transfer(marketIncentives.address,toWei(100000));
+        await plotusToken.transfer(master.address,toWei(100000));
         await plotusToken.transfer(user11,toWei(100000));
         await plotusToken.transfer(user12,toWei(100000));
 		await plotusToken.transfer(user14,toWei(100000));
@@ -67,9 +65,22 @@ contract("PlotX", ([ab1, ab2, ab3, ab4, mem1, mem2, mem3, mem4, mem5, mem6, mem7
 		await assertRevert(cyclicMarkets.setMasterAddress(mem1, mem1));
 	});
 
-	it("Should not create market directly in allMarkets", async function() {
-		await assertRevert(allMarkets.createMarket([1,2],[1,2],mem1));
+	it("Should not be able to create initial markets invalid params", async function() {
+		await assertRevert(cyclicMarkets.addInitialMarketTypesAndStart(await latestTime(), nullAddress, mem1));
+		await assertRevert(cyclicMarkets.addInitialMarketTypesAndStart(await latestTime(), mem1, nullAddress));
 	})
+
+	it("Should not be able to create initial markets twice", async function() {
+		await assertRevert(cyclicMarkets.addInitialMarketTypesAndStart(await latestTime(), mem1, mem1));
+	});
+
+	it("Should not create market directly in allMarkets", async function() {
+		await assertRevert(allMarkets.createMarket([1,2],[1,2],mem1, 100));
+	})
+
+	it("Total options should be 3 for markets created by cyclic markets contract", async function() {
+		assert.equal((await allMarkets.getTotalOptions(1))/1, 3);
+	});
 
 	it("Should not add new market curreny if already exists", async function() {
 		await increaseTime(604810);
@@ -182,7 +193,7 @@ contract("PlotX", ([ab1, ab2, ab3, ab4, mem1, mem2, mem3, mem4, mem5, mem6, mem7
 		await increaseTime(604810);
 		let startTime = Math.round(Date.now());
 		startTime = (await latestTime()) / 1 + 2 * 604800;
-		await assertRevert(cyclicMarkets.addMarketType(24 * 60 * 60, 50, startTime, 3600, 100));
+		await assertRevert(cyclicMarkets.addMarketType(24 * 60 * 60, 50, startTime, 3600, 100, 100));
 		await increaseTime(604810);
 		// pId = (await gv.getProposalLength()).toNumber();
 		// await gv.createProposal("Proposal2", "Proposal2", "Proposal2", 0); //Pid 3
@@ -199,7 +210,7 @@ contract("PlotX", ([ab1, ab2, ab3, ab4, mem1, mem2, mem3, mem4, mem5, mem6, mem7
 		await increaseTime(604810);
 		let startTime = Math.round(Date.now());
 		startTime = (await latestTime()) / 1 + 2 * 604800;
-		await assertRevert(cyclicMarkets.addMarketType(0, 50, startTime, 3600, 100));
+		await assertRevert(cyclicMarkets.addMarketType(0, 50, startTime, 3600, 100, 100));
 		await increaseTime(604810);
 		// pId = (await gv.getProposalLength()).toNumber();
 		// await gv.createProposal("Proposal2", "Proposal2", "Proposal2", 0); //Pid 3
@@ -216,7 +227,7 @@ contract("PlotX", ([ab1, ab2, ab3, ab4, mem1, mem2, mem3, mem4, mem5, mem6, mem7
 		await increaseTime(604810);
 		let startTime = Math.round(Date.now());
 		startTime = (await latestTime()) / 1 + 2 * 604800;
-		await assertRevert(cyclicMarkets.addMarketType(6 * 60 * 60, 0, startTime, 3600, 100));
+		await assertRevert(cyclicMarkets.addMarketType(6 * 60 * 60, 0, startTime, 3600, 100, 100));
 		await increaseTime(604810);
 		// pId = (await gv.getProposalLength()).toNumber();
 		// await gv.createProposal("Proposal2", "Proposal2", "Proposal2", 0); //Pid 3
@@ -237,7 +248,7 @@ contract("PlotX", ([ab1, ab2, ab3, ab4, mem1, mem2, mem3, mem4, mem5, mem6, mem7
 		await increaseTime(604810);
 		let startTime = Math.round(Date.now());
 		startTime = (await latestTime()) / 1 + 2 * 604800;
-		await assertRevert(cyclicMarkets.addMarketType(6 * 60 * 60, 50, startTime, 0, 100));
+		await assertRevert(cyclicMarkets.addMarketType(6 * 60 * 60, 50, startTime, 0, 100, 100));
 		await increaseTime(604810);
 
 		// pId = (await gv.getProposalLength()).toNumber();
@@ -258,7 +269,7 @@ contract("PlotX", ([ab1, ab2, ab3, ab4, mem1, mem2, mem3, mem4, mem5, mem6, mem7
 		await increaseTime(604810);
 		let startTime = Math.round(Date.now());
 		startTime = (await latestTime()) / 1 + 2 * 604800;
-		await assertRevert(cyclicMarkets.addMarketType(6 * 60 * 60, 50, startTime, 3600, 0));
+		await assertRevert(cyclicMarkets.addMarketType(6 * 60 * 60, 50, startTime, 3600, 0, 100));
 		await increaseTime(604810);
 
 		// pId = (await gv.getProposalLength()).toNumber();
@@ -279,7 +290,7 @@ contract("PlotX", ([ab1, ab2, ab3, ab4, mem1, mem2, mem3, mem4, mem5, mem6, mem7
 		await increaseTime(604810);
 		let startTime = Math.round(Date.now());
 		startTime = (await latestTime()) / 1 + 3 * 604800;
-		await assertRevert(cyclicMarkets.updateMarketType(6 * 60 * 60, 0, 3600, 100));
+		await assertRevert(cyclicMarkets.updateMarketType(6 * 60 * 60, 0, 3600, 100, 100));
 		// pId = (await gv.getProposalLength()).toNumber();
 		// await gv.createProposal("Proposal2", "Proposal2", "Proposal2", 0); //Pid 3
 		// await gv.categorizeProposal(pId, 25, 0);
@@ -296,7 +307,7 @@ contract("PlotX", ([ab1, ab2, ab3, ab4, mem1, mem2, mem3, mem4, mem5, mem6, mem7
 		await increaseTime(604810);
 		let startTime = Math.round(Date.now());
 		startTime = (await latestTime()) / 1 + 3 * 604800;
-		await assertRevert(cyclicMarkets.updateMarketType(6 * 60 * 60, 50, 0, 100));
+		await assertRevert(cyclicMarkets.updateMarketType(6 * 60 * 60, 50, 0, 100, 100));
 		// pId = (await gv.getProposalLength()).toNumber();
 		// await gv.createProposal("Proposal2", "Proposal2", "Proposal2", 0); //Pid 3
 		// await gv.categorizeProposal(pId, 25, 0);
@@ -313,7 +324,7 @@ contract("PlotX", ([ab1, ab2, ab3, ab4, mem1, mem2, mem3, mem4, mem5, mem6, mem7
 		await increaseTime(604810);
 		let startTime = Math.round(Date.now());
 		startTime = (await latestTime()) / 1 + 3 * 604800;
-		await assertRevert(cyclicMarkets.updateMarketType(6 * 60 * 60, 50, 3600, 0));
+		await assertRevert(cyclicMarkets.updateMarketType(6 * 60 * 60, 50, 3600, 0, 100));
 		// pId = (await gv.getProposalLength()).toNumber();
 		// await gv.createProposal("Proposal2", "Proposal2", "Proposal2", 0); //Pid 3
 		// await gv.categorizeProposal(pId, 25, 0);
@@ -332,7 +343,7 @@ contract("PlotX", ([ab1, ab2, ab3, ab4, mem1, mem2, mem3, mem4, mem5, mem6, mem7
 		await increaseTime(604810);
 		let startTime = Math.round(Date.now());
 		startTime = (await latestTime()) / 1 + 3 * 604800;
-		await assertRevert(cyclicMarkets.updateMarketType(12, 10, 3600, 100));
+		await assertRevert(cyclicMarkets.updateMarketType(12, 10, 3600, 100, 100));
 		// pId = (await gv.getProposalLength()).toNumber();
 		// await gv.createProposal("Proposal2", "Proposal2", "Proposal2", 0); //Pid 3
 		// await gv.categorizeProposal(pId, 25, 0);
@@ -351,7 +362,7 @@ contract("PlotX", ([ab1, ab2, ab3, ab4, mem1, mem2, mem3, mem4, mem5, mem6, mem7
 		await increaseTime(604810);
 		let startTime = Math.round(Date.now());
 		startTime = (await latestTime()) / 1 + 2 * 604800;
-		await cyclicMarkets.addMarketType(60 * 60, 50, startTime, 7200, 100)
+		await cyclicMarkets.addMarketType(60 * 60, 50, startTime, 7200, 100, 0)
 		
 		await increaseTime(604810);
 		await increaseTime(604820);
@@ -543,7 +554,7 @@ contract("PlotX", ([ab1, ab2, ab3, ab4, mem1, mem2, mem3, mem4, mem5, mem6, mem7
 		// assert.equal(actionStatus / 1, 1);
 		await increaseTime(604800);
 		await cyclicMarkets.createMarket(0, 0, 0);
-		await marketIncentives.getPendingMarketCreationRewards(ab1);
+		await cyclicMarkets.getPendingMarketCreationRewards(ab1);
 		await cyclicMarkets.createMarket(0, 1, 0);
 		await increaseTime(604800);
 	});
@@ -552,16 +563,16 @@ contract("PlotX", ([ab1, ab2, ab3, ab4, mem1, mem2, mem3, mem4, mem5, mem6, mem7
 		await increaseTime(604800);
 		// pId = (await gv.getProposalLength()).toNumber();
 		// let categoryId = 18;
-		await plotusToken.transfer(marketIncentives.address, toWei(100));
-		let daoPLOTbalanceBefore = await plotusToken.balanceOf(marketIncentives.address);
+		await plotusToken.transfer(master.address, toWei(100));
+		let daoPLOTbalanceBefore = await plotusToken.balanceOf(master.address);
 		let userPLOTbalanceBefore = await plotusToken.balanceOf(user11);
 
-		await marketIncentives.transferAssets(plotusToken.address, user11, toWei(100));
+		await master.transferAssets(plotusToken.address, user11, toWei(100));
 		// let actionHash = encode1(["address","address","uint256"],[plotusToken.address, user11, toWei(100)])
 		// await gvProposal(categoryId, actionHash, await MemberRoles.at(await master.getLatestAddress(toHex("MR"))), gv, 2, 0);
 		// let actionStatus = await gv.proposalActionStatus(pId);
 		// assert.equal(actionStatus / 1, 3);
-		let daoPLOTbalanceAfter = await plotusToken.balanceOf(marketIncentives.address);
+		let daoPLOTbalanceAfter = await plotusToken.balanceOf(master.address);
 		let userPLOTbalanceAfter = await plotusToken.balanceOf(user11);
 		assert.equal((daoPLOTbalanceBefore/1e18 - 100).toFixed(2), (daoPLOTbalanceAfter/1e18).toFixed(2));
 		assert.equal((userPLOTbalanceBefore/1e18 + 100).toFixed(2), (userPLOTbalanceAfter/1e18).toFixed(2));
@@ -572,17 +583,17 @@ contract("PlotX", ([ab1, ab2, ab3, ab4, mem1, mem2, mem3, mem4, mem5, mem6, mem7
 		await increaseTime(604800);
 		// pId = (await gv.getProposalLength()).toNumber();
 		// let categoryId = 18;
-		await plotusToken.transfer(marketIncentives.address, toWei(100));
-		let daoPLOTbalanceBefore = await plotusToken.balanceOf(marketIncentives.address);
+		await plotusToken.transfer(master.address, toWei(100));
+		let daoPLOTbalanceBefore = await plotusToken.balanceOf(master.address);
 		let userPLOTbalanceBefore = await plotusToken.balanceOf(user11);
 
-		await assertRevert(marketIncentives.transferAssets(plotusToken.address, user11, toWei(100000000)));
+		await assertRevert(master.transferAssets(plotusToken.address, user11, toWei(100000000)));
 
 		// let actionHash = encode1(["address","address","uint256"],[plotusToken.address, user11, toWei(100000000)])
 		// await gvProposal(categoryId, actionHash, await MemberRoles.at(await master.getLatestAddress(toHex("MR"))), gv, 2, 0);
 		// let actionStatus = await gv.proposalActionStatus(pId);
 		// assert.equal(actionStatus / 1, 1);
-		let daoPLOTbalanceAfter = await plotusToken.balanceOf(marketIncentives.address);
+		let daoPLOTbalanceAfter = await plotusToken.balanceOf(master.address);
 		let userPLOTbalanceAfter = await plotusToken.balanceOf(user11);
 		assert.equal((daoPLOTbalanceBefore/1e18).toFixed(2), (daoPLOTbalanceAfter/1e18).toFixed(2));
 		assert.equal((userPLOTbalanceBefore/1e18).toFixed(2), (userPLOTbalanceAfter/1e18).toFixed(2));
@@ -608,7 +619,7 @@ contract("PlotX", ([ab1, ab2, ab3, ab4, mem1, mem2, mem3, mem4, mem5, mem6, mem7
 
 	it("Should update market type", async function() {
 		await increaseTime(604810);
-		await cyclicMarkets.updateMarketType(0, 10, 3600, 100);
+		await cyclicMarkets.updateMarketType(0, 10, 3600, 100, 100);
 		// pId = (await gv.getProposalLength()).toNumber();
 		// await gv.createProposal("Proposal2", "Proposal2", "Proposal2", 0); //Pid 3
 		// await gv.categorizeProposal(pId, 25, 0);
@@ -621,6 +632,24 @@ contract("PlotX", ([ab1, ab2, ab3, ab4, mem1, mem2, mem3, mem4, mem5, mem6, mem7
 		// await gv.closeProposal(pId);
 		// let actionStatus = await gv.proposalActionStatus(pId);
 		// assert.equal(actionStatus / 1, 3);
+	});
+
+	it("Should be able to remove authorized market creator contract", async function() {
+		await increaseTime(604800);
+		await cyclicMarkets.createMarket(0,1,0);
+		await allMarkets.removeAuthorizedMarketCreator(cyclicMarkets.address);
+		await increaseTime(604800);
+		await assertRevert(cyclicMarkets.createMarket(0,1,0));
+	});
+
+	it("Should not add authorized market creator contract if zero address is passed", async function() {
+		await increaseTime(604800);
+		await assertRevert(cyclicMarkets.createMarket(0,1,0));
+		await assertRevert(allMarkets.addAuthorizedMarketCreator(nullAddress));
+	});
+
+	it("Should not be able to post result directly", async function() {
+		await assertRevert(allMarkets.postMarketResult(10, 10));
 	});
 
 	// it("Should update address paramters", async function() {

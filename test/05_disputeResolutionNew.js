@@ -6,8 +6,8 @@ const MockchainLinkBTC = artifacts.require("MockChainLinkAggregator");
 const AllMarkets = artifacts.require("MockAllMarkets");
 const CyclicMarkets = artifacts.require("MockCyclicMarkets");
 const DisputeResolution = artifacts.require("DisputeResolution");
+const EthChainlinkOracle = artifacts.require('MockChainLinkAggregator');
 const BLOT = artifacts.require("BLOT");
-const MarketCreationRewards = artifacts.require("MarketCreationRewards");
 const MockChainLinkGasPriceAgg = artifacts.require("MockChainLinkGasPriceAgg");
 const gvProposal = require("./utils/gvProposal.js").gvProposalWithIncentiveViaTokenHolder;
 const increaseTime = require("./utils/increaseTime.js").increaseTime;
@@ -27,6 +27,7 @@ contract("Market", ([ab1, ab2, ab3, ab4, dr1, dr2, dr3, notMember]) => {
       
     let allMarkets = await masterInstance.getLatestAddress(web3.utils.toHex("AM"));
     allMarkets = await AllMarkets.at(allMarkets);
+    ethChainlinkOracle = await EthChainlinkOracle.deployed();
 
     dr = await DisputeResolution.at(await masterInstance.getLatestAddress(toHex("DR")));
     cyclicMarkets = await CyclicMarkets.at(await masterInstance.getLatestAddress(toHex("CM")));
@@ -35,9 +36,8 @@ contract("Market", ([ab1, ab2, ab3, ab4, dr1, dr2, dr3, notMember]) => {
     let nxmToken = await PlotusToken.deployed();
     let address = await masterInstance.getLatestAddress(web3.utils.toHex("GV"));
     let plotusToken = await PlotusToken.deployed();
-    marketIncentives = await MarketCreationRewards.at(await masterInstance.getLatestAddress(web3.utils.toHex("MC")));
-    await plotusToken.transfer(marketIncentives.address, "100000000000000000000");
-    let marketIncentivesBalanceBefore = await plotusToken.balanceOf(marketIncentives.address);
+    await plotusToken.transfer(masterInstance.address, "10000000000000000000000");
+    let masterInstanceBalanceBefore = await plotusToken.balanceOf(masterInstance.address);
     await cyclicMarkets.createMarket(0,0, 0);
     await plotusToken.transfer(ab2, "50000000000000000000000");
     await plotusToken.transfer(ab3, "50000000000000000000000");
@@ -59,12 +59,14 @@ contract("Market", ([ab1, ab2, ab3, ab4, dr1, dr2, dr3, notMember]) => {
     await plotusToken.approve(allMarkets.address, "10000000000000000000000");
     await assertRevert(dr.raiseDispute(7, 1400000000000, "this is solution hash"));
    
+    await ethChainlinkOracle.setLatestAnswer("10000000000000000000");
     await increaseTime(8*3600);
-    await allMarkets.postResultMock("10000000000000000000", 7);
+    await cyclicMarkets.settleMarket(7, 1);
     let allMarketsBalanceBefore = await plotusToken.balanceOf(allMarkets.address);
-    let marketIncentivesBalance = await plotusToken.balanceOf(marketIncentives.address);
-    let fee = "1999999960000000000";
-    assert.equal(marketIncentivesBalance*1, marketIncentivesBalanceBefore/1+fee*1);
+    let masterInstanceBalance = await plotusToken.balanceOf(masterInstance.address);
+    // let fee = "1999999960000000000";
+    let daoFee = "399999980000000000";
+    assert.equal(masterInstanceBalance*1, masterInstanceBalanceBefore/1+daoFee*1);
      // cannot raise dispute with less than minimum stake
     await plotusToken.approve(dr.address, "10000000000000000000000");
     await assertRevert(dr.raiseDispute(7, 1400000000000,"raise dispute",{from : notMember}));
@@ -105,8 +107,9 @@ contract("Market", ([ab1, ab2, ab3, ab4, dr1, dr2, dr3, notMember]) => {
     let allMarketsBalanceAfter = await plotusToken.balanceOf(allMarkets.address);
     let commission = 3.6 * 1e18;
     // let marketCreatorIncentives = 99.95*((0.05)/100) * 1e18;
-    let marketIncentivesBalanceAfter = await plotusToken.balanceOf(marketIncentives.address);
-    assert.equal(marketIncentivesBalanceBefore*1  + fee*1, marketIncentivesBalanceAfter*1);
+    let masterInstanceBalanceAfter = await plotusToken.balanceOf(masterInstance.address);
+    let votingReward = "500000000000000000000";
+    assert.equal(masterInstanceBalanceBefore*1  + daoFee*1 - votingReward*1, masterInstanceBalanceAfter*1);
 
     assert.equal((allMarketsBalanceAfter/1), allMarketsBalanceBefore/1, "Tokens staked for dispute not burned");
     // let data = await plotusNewInstance.marketDisputeData(marketInstance.address)
@@ -142,11 +145,12 @@ contract("Market", ([ab1, ab2, ab3, ab4, dr1, dr2, dr3, notMember]) => {
     await increaseTime(3600*4);
     let nxmToken = await PlotusToken.deployed();
     let address = await masterInstance.getLatestAddress(web3.utils.toHex("GV"));
-    let plotusToken = await PlotusToken.deployed();
+    plotusToken = await PlotusToken.deployed();
+    await plotusToken.transfer(masterInstance.address, "10000000000000000000000");
     await plotusToken.transfer(dr1, "50000000000000000000000");
     await plotusToken.approve(allMarkets.address, "30000000000000000000000", {from:dr1});
-    // await plotusToken.transfer(marketIncentives.address, "100000000000000000000");
-    let marketIncentivesBalanceBefore = await plotusToken.balanceOf(marketIncentives.address);
+    // await plotusToken.transfer(masterInstance.address, "100000000000000000000");
+    let masterInstanceBalanceBefore = await plotusToken.balanceOf(masterInstance.address);
     await cyclicMarkets.createMarket(0,0, 0,{from:dr1});
    
     await plotusToken.transfer(ab2, "50000000000000000000000");
@@ -170,15 +174,17 @@ contract("Market", ([ab1, ab2, ab3, ab4, dr1, dr2, dr3, notMember]) => {
     await plotusToken.approve(dr.address, "10000000000000000000000");
     await assertRevert(dr.raiseDispute(7, 1400000000000,"raise dispute"));
    
+    await ethChainlinkOracle.setLatestAnswer("10000000000000000000");
     await increaseTime(8*3600);
     let allMarketsBalanceBefore = await plotusToken.balanceOf(allMarkets.address);
-    await allMarkets.postResultMock("10000000000000000000", 7);
-    let marketIncentivesBalance = await plotusToken.balanceOf(marketIncentives.address);
+    await cyclicMarkets.settleMarket(7, 1);
+    let masterInstanceBalance = await plotusToken.balanceOf(masterInstance.address);
     let commission = 7.2 * 1e18;
     let rewardPool = 163.33333333*1e18;
     let marketCreatorIncentive = 0 * 0.5/100;
     let fee = "3999999960000000000"/1;
-    assert.equal(marketIncentivesBalance*1, marketIncentivesBalanceBefore/1 + fee);
+    let daoFee = "799999980000000000";
+    assert.equal(masterInstanceBalance*1, masterInstanceBalanceBefore/1 + daoFee/1);
      // cannot raise dispute with less than minimum stake
     await plotusToken.approve(dr.address, "10000000000000000000000",{from : notMember});
     await assertRevert(dr.raiseDispute(7, 1400000000000,"raise dispute",{from : notMember}));
@@ -199,8 +205,11 @@ contract("Market", ([ab1, ab2, ab3, ab4, dr1, dr2, dr3, notMember]) => {
   
     await plotusToken.approve(dr.address, "100000000000000000000000",{from : dr3});
     await dr.submitVote(7, toWei(2000), 1, {from:dr1});
+    assert.equal((await dr.getUserVoteValue(dr1, 7))/1, toWei(2000));
     await dr.submitVote(7, toWei(2000), 1, {from:dr2});
+    assert.equal((await dr.getUserVoteValue(dr2, 7))/1, toWei(2000));
     await dr.submitVote(7, toWei(2000), 1, {from:dr3});
+    assert.equal((await dr.getUserVoteValue(dr3, 7))/1, toWei(2000));
     await increaseTime(604800);
     await dr.declareResult(7);
     await assertRevert(dr.declareResult(7));
@@ -211,15 +220,60 @@ contract("Market", ([ab1, ab2, ab3, ab4, dr1, dr2, dr3, notMember]) => {
 
     let allMarketsBalanceAfter = await plotusToken.balanceOf(allMarkets.address);
     // let marketCreatorIncentives = 99.95*((0.05)/100) * 1e18;
-    let marketIncentivesBalanceAfter = await plotusToken.balanceOf(marketIncentives.address);
-    assert.equal(marketIncentivesBalanceBefore*1 + fee, marketIncentivesBalanceAfter*1);
-    assert.equal((allMarketsBalanceAfter/1), allMarketsBalanceBefore/1 - fee/1 , "Tokens staked for dispute not burned");
+    let masterInstanceBalanceAfter = await plotusToken.balanceOf(masterInstance.address);
+    let votingReward = "500000000000000000000";
+    assert.equal(((masterInstanceBalanceBefore*1 + daoFee/1 - votingReward/1)/1e18).toFixed(8), (masterInstanceBalanceAfter/1e18).toFixed(8));
+    // assert.equal((allMarketsBalanceAfter/1), allMarketsBalanceBefore/1 - fee/1 , "Tokens staked for dispute not burned");
     // let data = await plotusNewInstance.marketDisputeData(marketInstance.address)
     // assert.equal(data[0], proposalId,"dispute proposal mismatch");
     // let marketDetails = await plotusNewInstance.getMarketDetails(marketInstance.address);
     // assert.equal(marketDetails[7]/1, 3, "status not updated");
     let userBalAfter = await plotusToken.balanceOf(ab1);
     assert.equal(~~(userBalAfter/1e16), ~~(userBalBefore/1e16)+50000);
+  });
+  it("Should be able to claim rewards for voting in DR", async() => {
+    let rewards = [16666666667, 16666666667, 16666666667]
+    let voters = [dr1, dr2, dr3];
+    for(let i = 0;i<3;i++) {
+      let pendingReward = await dr.getPendingReward(voters[i]);
+      assert.equal(rewards[i], (pendingReward/1e10).toFixed(0));
+      let userBalanceBefore = await plotusToken.balanceOf(voters[i]);
+      await dr.claimReward(voters[i], 100);
+      let userBalanceAfter = await plotusToken.balanceOf(voters[i]);
+      assert.equal(userBalanceBefore/1e10 + rewards[i], (userBalanceAfter/1e10).toFixed(0));
+    }
+  });
+  it("Claim rewards for multiple DR", async()=> {
+    await increaseTime(4*3600);
+    await cyclicMarkets.createMarket(0,0,1);
+    await cyclicMarkets.createMarket(1,0,0);
+    await increaseTime(4*3600);
+    await cyclicMarkets.createMarket(0,0,1);
+    await increaseTime(8*3600);
+    await cyclicMarkets.settleMarket(8, 1);
+    await cyclicMarkets.settleMarket(9, 1);
+    await cyclicMarkets.settleMarket(10, 1);
+    await dr.raiseDispute(8, 1, "Raise dispute");
+    await dr.raiseDispute(9, 1, "Raise dispute");
+    await dr.raiseDispute(10, 1, "Raise dispute");
+    await dr.submitVote(8, toWei(2000), 1, {from:dr2});
+    await dr.submitVote(8, toWei(2000), 0, {from:dr2});
+    await dr.submitVote(9, toWei(2000), 1, {from:dr2});
+    await dr.submitVote(10, toWei(2000), 1, {from:dr2});
+    await increaseTime(86500*3);
+    await dr.declareResult(9);
+    let pendingReward = await dr.getPendingReward(dr2);
+    assert.equal(pendingReward/1e18, 500);
+    await dr.claimReward(dr2, 100);
+    await dr.declareResult(8);
+    await dr.declareResult(10);
+    pendingReward = await dr.getPendingReward(dr2);
+    assert.equal(pendingReward/1e18, 1000);
+    await dr.claimReward(dr2, 100);
+    await assertRevert(dr.claimReward(dr2, 100));
+  });
+  it("Should not be able to withdraw tokens from dao", async() => {
+    await assertRevert(masterInstance.withdrawForDRVotingRewards(toWei(100)));
   });
 });
 contract("Market", ([ab1, ab2, ab3, ab4, dr1, dr2, dr3, notMember]) => {
@@ -229,14 +283,12 @@ contract("Market", ([ab1, ab2, ab3, ab4, dr1, dr2, dr3, notMember]) => {
 
     let allMarkets = await masterInstance.getLatestAddress(web3.utils.toHex("AM"));
     allMarkets = await AllMarkets.at(allMarkets);
-    marketIncentives = await MarketCreationRewards.at(await masterInstance.getLatestAddress(web3.utils.toHex("MC")));
-
 
     await increaseTime(3600*4);
     await cyclicMarkets.createMarket(0,0, 0);
     let nxmToken = await PlotusToken.deployed();
     let plotusToken = await PlotusToken.deployed();
-    await plotusToken.transfer(marketIncentives.address, "100000000000000000000");
+    await plotusToken.transfer(masterInstance.address, "100000000000000000000");
    
     await plotusToken.transfer(ab2, "50000000000000000000000");
     await plotusToken.transfer(ab3, "50000000000000000000000");
@@ -303,8 +355,6 @@ contract("Market", ([ab1, ab2, ab3, ab4, dr1, dr2, dr3, notMember]) => {
     let nxmToken = await PlotusToken.deployed();
     let plotusToken = await PlotusToken.deployed();
 
-    marketIncentives = await MarketCreationRewards.at(await masterInstance.getLatestAddress(web3.utils.toHex("MC")));
-
     await plotusToken.transfer(ab2, "50000000000000000000000");
     await plotusToken.transfer(ab3, "50000000000000000000000");
     await plotusToken.transfer(ab4, "50000000000000000000000");
@@ -344,16 +394,17 @@ contract("Market", ([ab1, ab2, ab3, ab4, dr1, dr2, dr3, notMember]) => {
     await plotusToken.approve(dr.address, "100000000000000000000000",{from : ab2});
     await assertRevert(dr.submitVote(7, toWei(100), 1, {from:ab1}))  
     
-    let mcBalanceBefore = await plotusToken.balanceOf(marketIncentives.address);
+    let mcBalanceBefore = await plotusToken.balanceOf(masterInstance.address);
     await assertRevert(dr.burnLockedTokens(dr1, 7));
     await dr.declareResult(7);
-    let mcBalanceAfter = await plotusToken.balanceOf(marketIncentives.address);
+    let mcBalanceAfter = await plotusToken.balanceOf(masterInstance.address);
     await increaseTime(86401);
     let plotusContractBalanceAfter = await plotusToken.balanceOf(allMarkets.address);
     // assert.isAbove(plotusContractBalanceBefore/1, plotusContractBalanceAfter/1);
     //Incentives will be burnt: 500 tokens i.e 500000000000000000000
     // assert.equal((plotusContractBalanceAfter/1e18).toFixed(2), (plotusContractBalanceBefore/1e18).toFixed(2), "Tokens staked for dispute not burned");
-    assert.equal((mcBalanceAfter/1e18).toFixed(2) - 500, (mcBalanceBefore/1e18).toFixed(2), "Tokens staked for dispute not burned");
+    let votingReward = 500;
+    assert.equal((mcBalanceAfter/1e18).toFixed(2) - 500, (mcBalanceBefore/1e18).toFixed(2) -  votingReward/1, "Tokens staked for dispute not burned");
     let allMarketsBalanceAfter = await plotusToken.balanceOf(allMarkets.address);
     allMarketsBalanceAfter = allMarketsBalanceAfter.toString();
     allMarketsBalanceBefore = allMarketsBalanceBefore.toString();
