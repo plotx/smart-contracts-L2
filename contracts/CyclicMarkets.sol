@@ -185,6 +185,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
     * @param _marketStartTime Start time of first market to be created in this type
     * @param _marketCooldownTime Cool down time of the market after market is settled
     * @param _minTimePassed Minimum amount of time to be passed for the time factor to be kicked in while calculating option price
+    * @param _initialLiquidity Initial liquidity to be provided by the market creator for the market.
     */
     function addMarketType(uint32 _predictionTime, uint32 _optionRangePerc, uint32 _marketStartTime, uint32 _marketCooldownTime, uint32 _minTimePassed, uint64 _initialLiquidity) external onlyAuthorized {
       require(marketTypeArray[marketType[_predictionTime]].predictionTime != _predictionTime);
@@ -204,6 +205,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
     * @param _optionRangePerc Option range percent of neutral min, max options (raised by 2 decimals)
     * @param _marketCooldownTime Cool down time of the market after market is settled
     * @param _minTimePassed Minimum amount of time to be passed for the time factor to be kicked in while calculating option price
+    * @param _initialLiquidity Initial liquidity to be provided by the market creator for the market.
     */
     function _addMarketType(uint32 _predictionTime, uint32 _optionRangePerc, uint32 _marketCooldownTime, uint32 _minTimePassed, uint64 _initialLiquidity) internal returns(uint32) {
       uint32 index = uint32(marketTypeArray.length);
@@ -219,6 +221,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
     * @param _optionRangePerc Option range percent of neutral min, max options (raised by 2 decimals)
     * @param _marketCooldownTime Cool down time of the market after market is settled
     * @param _minTimePassed Minimum amount of time to be passed for the time factor to be kicked in while calculating option price
+    * @param _initialLiquidity Initial liquidity to be provided by the market creator for the market.
     */
     function updateMarketType(uint32 _marketType, uint32 _optionRangePerc, uint32 _marketCooldownTime, uint32 _minTimePassed, uint64 _initialLiquidity) external onlyAuthorized {
       require(_optionRangePerc > 0);
@@ -476,6 +479,9 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       _setRelayerFee(_relayer, _cummulativeFee, _daoFee, _referrerFee, _refereeFee, _marketCreatorFee);
     }
 
+    /**
+    * @dev Internal function to set the relayer fee earned in the prediction 
+    */
     function _setRelayerFee(address _relayer, uint _cummulativeFee, uint _daoFee, uint _referrerFee, uint _refereeFee, uint _marketCreatorFee) internal {
       relayerFeeEarned[_relayer] = relayerFeeEarned[_relayer].add(_cummulativeFee.sub(_daoFee).sub(_referrerFee).sub(_refereeFee).sub(_marketCreatorFee));
     }

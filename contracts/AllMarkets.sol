@@ -130,6 +130,9 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       defaultMaxRecords = 20;
     }
 
+    /**
+    * @dev Function to initialize the dependancies
+    */
     function initializeDependencies() external {
       IMaster ms = IMaster(masterAddress);
       disputeResolution = ms.getLatestAddress("DR");
@@ -155,18 +158,22 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
 
     /**
     * @dev Create the market.
+    * @param _marketTimes Array of params as mentioned below
+    * _marketTimes => [0] _startTime, [1] _predictionTIme, [2] _settlementTime, [3] _cooldownTime
+    * @param _optionRanges Array of params as mentioned below
+    * _optionRanges => For 3 options, the array will be like, First option will be the value less than zeroth index of this array, the next option will be the value less than first index of the array and the last option will be the value greater than the first index of array
+    * @param _marketCreator Address of the user who initiated the market creation
+    * @param _initialLiquidity Amount of tokens to be provided as initial liquidity to the market, to be split equally between all options. Can also be zero
     */
     function createMarket(uint32[] memory _marketTimes, uint64[] memory _optionRanges, address _marketCreator, uint64 _initialLiquidity) 
     public 
     returns(uint64 _marketIndex)
     {
-      // _marketTimes => [0] _startTime, [1] _predictionTIme, [2] _settlementTime, [3] _cooldownTime
-      // _optionRanges => For 3 options, the array will be like, First option will be the value less than zeroth index of this array, the next option will be the value less than first index of the array and the last option will be the value greater than the first index of array
       require(_marketCreator != address(0));
       require(authorizedMarketCreator[msg.sender]);
       require(!marketCreationPaused);
-      checkForValidMarketTimes(_marketTimes);
-      checkForValidOptionRanges(_optionRanges);
+      _checkForValidMarketTimes(_marketTimes);
+      _checkForValidOptionRanges(_optionRanges);
       _marketIndex = uint64(marketBasicData.length);
       marketBasicData.push(MarketBasicData(_marketTimes[0], _marketTimes[1], _marketTimes[2], _marketTimes[3]));
       marketDataExtended[_marketIndex].optionRanges = _optionRanges;
@@ -178,14 +185,20 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       return _marketIndex;
     }
 
-    function checkForValidMarketTimes(uint32[] memory _marketTimes) internal pure {
+    /**
+    * @dev Internal function to check for valid given market times.
+    */
+    function _checkForValidMarketTimes(uint32[] memory _marketTimes) internal pure {
       for(uint i=0;i<_marketTimes.length;i++) {
         require(_marketTimes[i] != 0);
       }
       require(_marketTimes[2] > _marketTimes[1]); // Settlement time should be greater than prediction time
     }
 
-    function checkForValidOptionRanges(uint64[] memory _optionRanges) internal pure {
+    /**
+    * @dev Internal function to check for valid given option ranges.
+    */
+    function _checkForValidOptionRanges(uint64[] memory _optionRanges) internal pure {
       for(uint i=0;i<_optionRanges.length;i++) {
         require(_optionRanges[i] != 0);
         if( i > 0) {
@@ -556,6 +569,11 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
        }
     }
 
+    /**
+    * @dev Get total options available in the given market id.
+    * @param _marketId Index of the market.
+    * @return Total number of options.
+    */
     function getTotalOptions(uint256 _marketId) external view returns(uint) {
       return marketDataExtended[_marketId].optionRanges.length + 1;
     }
@@ -742,10 +760,16 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
       return (_optionPricingParams,_marketBasicData.startTime);
     }
 
+    /**
+    * @dev Get total number of markets created till now.
+    */
     function getTotalMarketsLength() external view returns(uint64) {
       return uint64(marketBasicData.length);
     }
 
+    /**
+    * @dev Get total amount staked by the user in markets.
+    */
     function getTotalStakedByUser(address _user) external view returns(uint) {
       return userData[_user].totalStaked;
     }

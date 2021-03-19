@@ -179,6 +179,11 @@ contract DisputeResolution is IAuth, NativeMetaTransaction {
     emit DisputeResolved(_marketId, accepted);
   }
 
+  /**
+  * @dev Claim rewards earned by participating in the DR voting
+  * @param _user Address of the user
+  * @param _maxRecord Maximum number of records to claim reward for
+  */
   function claimReward(address _user, uint256 _maxRecord) external {
     uint _incentive;
     UserData storage _userData = userData[_user];
@@ -207,6 +212,11 @@ contract DisputeResolution is IAuth, NativeMetaTransaction {
     emit ClaimReward(_user, _incentive);
   }
 
+  /**
+  * @dev Get pending rewards earned by participating in the DR voting
+  * @param _user Address of the user
+  * @return Pending reward for the user
+  */
   function getPendingReward(address _user) external view returns(uint _pendingReward){
     UserData storage _userData = userData[_user];
     uint len = _userData.disputesParticipated.length;

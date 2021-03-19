@@ -63,6 +63,10 @@ contract UserLevels is IAuth, NativeMetaTransaction {
       }
     }
 
+    /**
+    * @dev Get level of the user and the corresponding multiplier fo the level
+    * @param _user Address of the user
+    */
     function getUserLevelAndMultiplier(address _user) external view returns(uint256 _userLevel, uint256 _multiplier) {
       return (userLevel[_user], levelMultiplier[userLevel[_user]]);
     }

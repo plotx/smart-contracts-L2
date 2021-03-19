@@ -117,7 +117,7 @@ contract Master is IAuth {
      * @dev To check if we use the particular contract.
      * @param _address The contract address to check if it is active or not.
      */
-function isInternal(address _address) public view returns (bool) {
+    function isInternal(address _address) public view returns (bool) {
         return contractsActive[_address];
     }
 
@@ -173,7 +173,7 @@ function isInternal(address _address) public view returns (bool) {
     }
     
     /**
-    * @dev Transfer `_amount` number of market registry assets contract to `_to` address
+    * @dev Transfer `_amount` number of DAO assets to Dispute resolution contract for voting rewards
     */
     function withdrawForDRVotingRewards(uint _amount) external {
       require(msg.sender == contractAddress["DR"]);
