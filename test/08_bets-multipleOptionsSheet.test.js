@@ -113,7 +113,9 @@ describe("Bets Multiple options sheet", () => {
             ];
 
             await increaseTime(8 * 60 * 60);
+            await assertRevert(allMarkets.postResultMock(0, marketId));
             await allMarkets.postResultMock(1, marketId);
+            await plotusToken.transfer(user3, toWei("400"));
             functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", toWei(400), marketId, plotusToken.address, to8Power("400"), 2);
             await assertRevert(signAndExecuteMetaTx(
               privateKeyList[2],

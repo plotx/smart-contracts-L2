@@ -138,7 +138,7 @@ contract("Market", ([ab1, ab2, ab3, ab4, dr1, dr2, dr3, notMember]) => {
     masterInstance = await OwnedUpgradeabilityProxy.deployed();
     masterInstance = await Master.at(masterInstance.address);
       
-    let allMarkets = await masterInstance.getLatestAddress(web3.utils.toHex("AM"));
+    allMarkets = await masterInstance.getLatestAddress(web3.utils.toHex("AM"));
     allMarkets = await AllMarkets.at(allMarkets);
     dr = await DisputeResolution.at(await masterInstance.getLatestAddress(toHex("DR")));
 
@@ -265,6 +265,7 @@ contract("Market", ([ab1, ab2, ab3, ab4, dr1, dr2, dr3, notMember]) => {
     let pendingReward = await dr.getPendingReward(dr2);
     assert.equal(pendingReward/1e18, 500);
     await dr.claimReward(dr2, 100);
+    await assertRevert(allMarkets.postMarketResult(8, 10000));
     await dr.declareResult(8);
     await dr.declareResult(10);
     pendingReward = await dr.getPendingReward(dr2);
