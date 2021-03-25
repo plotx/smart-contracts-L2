@@ -29,7 +29,7 @@ contract IMaster {
     function getLatestAddress(bytes2 _module) public view returns(address);
 }
 
-contract AllMarkets is IAuth, NativeMetaTransaction {
+contract AllPlotMarkets is IAuth, NativeMetaTransaction {
     using SafeMath32 for uint32;
     using SafeMath64 for uint64;
     using SafeMath128 for uint128;
