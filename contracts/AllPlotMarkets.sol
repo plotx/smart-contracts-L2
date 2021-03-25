@@ -161,7 +161,7 @@ contract AllPlotMarkets is IAuth, NativeMetaTransaction {
     * @param _marketTimes Array of params as mentioned below
     * _marketTimes => [0] _startTime, [1] _predictionTIme, [2] _settlementTime, [3] _cooldownTime
     * @param _optionRanges Array of params as mentioned below
-    * _optionRanges => For 3 options, the array will be like, First option will be the value less than zeroth index of this array, the next option will be the value less than first index of the array and the last option will be the value greater than the first index of array
+    * _optionRanges => For 3 options, the array will be with two values [a,b], First option will be the value less than zeroth index of this array, the next option will be the value less than first index of the array and the last option will be the value greater than the first index of array
     * @param _marketCreator Address of the user who initiated the market creation
     * @param _initialLiquidity Amount of tokens to be provided as initial liquidity to the market, to be split equally between all options. Can also be zero
     */
