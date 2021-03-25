@@ -1,4 +1,4 @@
-const BLOT = artifacts.require('BLOT');
+const BLOT = artifacts.require('BPLOT');
 const PLOT = artifacts.require('MockPLOT');
 const OwnedUpgradeabilityProxy = artifacts.require("OwnedUpgradeabilityProxy");
 const Master = artifacts.require("Master");

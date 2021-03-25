@@ -3,7 +3,6 @@ const { assert } = require("chai");
 const OwnedUpgradeabilityProxy = artifacts.require("OwnedUpgradeabilityProxy");
 const Master = artifacts.require("Master");
 const PlotusToken = artifacts.require("MockPLOT");
-const BLOT = artifacts.require("BLOT");
 const AllMarkets = artifacts.require("MockAllMarkets");
 const CyclicMarkets = artifacts.require("MockCyclicMarkets");
 const Referral = artifacts.require("Referral");
@@ -49,7 +48,6 @@ contract("Rewards-Market", async function(users) {
 			masterInstance = await OwnedUpgradeabilityProxy.deployed();
 			masterInstance = await Master.at(masterInstance.address);
 			plotusToken = await PlotusToken.deployed();
-			BLOTInstance = await BLOT.deployed();
 			timeNow = await latestTime();
 
 			allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
@@ -230,7 +228,6 @@ contract("Rewards-Market Stake less than 1 ether", async function(users) {
 			masterInstance = await OwnedUpgradeabilityProxy.deployed();
 			masterInstance = await Master.at(masterInstance.address);
 			plotusToken = await PlotusToken.deployed();
-			BLOTInstance = await BLOT.deployed();
 			timeNow = await latestTime();
 			
 			cyclicMarkets = await CyclicMarkets.at(await masterInstance.getLatestAddress(toHex("CM")));
@@ -335,7 +332,6 @@ contract("Rewards-Market Raise dispute and pass the proposal ", async function(u
 			masterInstance = await OwnedUpgradeabilityProxy.deployed();
 			masterInstance = await Master.at(masterInstance.address);
 			plotusToken = await PlotusToken.deployed();
-			BLOTInstance = await BLOT.deployed();
 			timeNow = await latestTime();
 
 			cyclicMarkets = await CyclicMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("CM")));

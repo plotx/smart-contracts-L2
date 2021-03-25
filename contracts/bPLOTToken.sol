@@ -18,7 +18,7 @@ import "./external/proxy/OwnedUpgradeabilityProxy.sol";
 import "./interfaces/IMaster.sol";
 import "./interfaces/Iupgradable.sol";
 
-contract BLOT is Iupgradable {
+contract BPLOT is Iupgradable {
     using SafeMath for uint256;
     using Roles for Roles.Role;
 

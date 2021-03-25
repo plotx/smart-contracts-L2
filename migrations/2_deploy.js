@@ -1,6 +1,6 @@
 const Master = artifacts.require('Master');
 const AllMarkets = artifacts.require('MockAllMarkets');
-const BLOT = artifacts.require('BLOT');
+const BPLOT = artifacts.require('BPLOT');
 const MockchainLink = artifacts.require('MockChainLinkAggregator');
 const OwnedUpgradeabilityProxy = artifacts.require('OwnedUpgradeabilityProxy');
 const DisputeResolution = artifacts.require('DisputeResolution');
@@ -18,7 +18,7 @@ module.exports = function(deployer, network, accounts){
       let mockchainLinkAggregaror = await deployer.deploy(MockchainLink);
       let ethChainlinkOracle = await deployer.deploy(EthChainlinkOracle, mockchainLinkAggregaror.address);
 
-      let blotToken = await deployer.deploy(BLOT);
+      let bPlotToken = await deployer.deploy(BPLOT);
       let masterProxy = await deployer.deploy(Master);
       let master = await deployer.deploy(OwnedUpgradeabilityProxy, masterProxy.address);
       let allMarkets = await deployer.deploy(AllMarkets);

@@ -5,7 +5,7 @@ const PlotusToken = artifacts.require("MockPLOT");
 const AllMarkets = artifacts.require("MockAllMarkets");
 const CyclicMarkets = artifacts.require("MockCyclicMarkets");
 const EthChainlinkOracle = artifacts.require('MockChainLinkAggregator');
-const BLOT = artifacts.require("BLOT");
+const BLOT = artifacts.require("BPLOT");
 const BigNumber = require("bignumber.js");
 
 const increaseTime = require("./utils/increaseTime.js").increaseTime;

@@ -1,7 +1,7 @@
 const Master = artifacts.require('Master');
 const AllMarkets = artifacts.require('MockAllMarkets');
 const PlotusToken = artifacts.require('MockPLOT');
-const BLOT = artifacts.require('BLOT');
+const BPLOT = artifacts.require('BPLOT');
 const MockchainLink = artifacts.require('MockChainLinkAggregator');
 const OwnedUpgradeabilityProxy = artifacts.require('OwnedUpgradeabilityProxy');
 const DisputeResolution = artifacts.require('DisputeResolution');
@@ -18,7 +18,7 @@ module.exports = function(deployer, network, accounts){
     let plotusToken = await PlotusToken.at(deployPlotusToken.address);
     
     let ethChainlinkOracle = await EthChainlinkOracle.deployed();
-    let blotToken = await BLOT.deployed();
+    let bPlotToken = await BPLOT.deployed();
     let masterProxy = await Master.deployed();
     let master = await OwnedUpgradeabilityProxy.deployed();
     let allMarkets = await AllMarkets.deployed();
@@ -27,7 +27,7 @@ module.exports = function(deployer, network, accounts){
     let rf = await Referral.deployed();
     let ul = await UserLevels.deployed();
     master = await Master.at(master.address);
-    let implementations = [allMarkets.address, blotToken.address, rf.address, ul.address, dr.address, cm.address];
+    let implementations = [allMarkets.address, bPlotToken.address, rf.address, ul.address, dr.address, cm.address];
     console.log(accounts[0])
     await master.initiateMaster(implementations, deployPlotusToken.address, accounts[0], accounts[0]);
     master = await OwnedUpgradeabilityProxy.at(master.address);

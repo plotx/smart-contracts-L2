@@ -7,7 +7,6 @@ const AllMarkets = artifacts.require("MockAllMarkets");
 const CyclicMarkets = artifacts.require("MockCyclicMarkets");
 const DisputeResolution = artifacts.require("DisputeResolution");
 const EthChainlinkOracle = artifacts.require('MockChainLinkAggregator');
-const BLOT = artifacts.require("BLOT");
 const MockChainLinkGasPriceAgg = artifacts.require("MockChainLinkGasPriceAgg");
 const gvProposal = require("./utils/gvProposal.js").gvProposalWithIncentiveViaTokenHolder;
 const increaseTime = require("./utils/increaseTime.js").increaseTime;

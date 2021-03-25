@@ -4,7 +4,6 @@ import "./external/openzeppelin-solidity/math/SafeMath.sol";
 import "./external/proxy/OwnedUpgradeabilityProxy.sol";
 import "./external/NativeMetaTransaction.sol";
 import "./interfaces/IToken.sol";
-import "./interfaces/IbLOTToken.sol";
 import "./interfaces/IAuth.sol";
 import "./interfaces/IAllMarkets.sol";
 import "./interfaces/IOracle.sol";

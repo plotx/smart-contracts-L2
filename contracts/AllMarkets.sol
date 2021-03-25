@@ -19,7 +19,7 @@ import "./external/openzeppelin-solidity/math/SafeMath.sol";
 import "./external/proxy/OwnedUpgradeabilityProxy.sol";
 import "./external/NativeMetaTransaction.sol";
 import "./interfaces/IToken.sol";
-import "./interfaces/IbLOTToken.sol";
+import "./interfaces/IbPLOTToken.sol";
 import "./interfaces/IAuth.sol";
 import "./interfaces/IOracle.sol";
 import "./interfaces/IMarket.sol";
@@ -96,7 +96,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
 
     address internal predictionToken;
 
-    IbLOTToken internal bPLOTInstance;
+    IbPLOTToken internal bPLOTInstance;
 
     uint internal predictionDecimalMultiplier;
     uint internal defaultMaxRecords;
@@ -136,7 +136,7 @@ contract AllMarkets is IAuth, NativeMetaTransaction {
     function initializeDependencies() external {
       IMaster ms = IMaster(masterAddress);
       disputeResolution = ms.getLatestAddress("DR");
-      bPLOTInstance = IbLOTToken(ms.getLatestAddress("BL"));
+      bPLOTInstance = IbPLOTToken(ms.getLatestAddress("BL"));
     }
 
     /**

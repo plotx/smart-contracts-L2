@@ -4,7 +4,6 @@ const OwnedUpgradeabilityProxy = artifacts.require("OwnedUpgradeabilityProxy");
 const Master = artifacts.require("Master");
 const PlotusToken = artifacts.require("MockPLOT");
 const MockchainLinkBTC = artifacts.require("MockChainLinkAggregator");
-const BLOT = artifacts.require("BLOT");
 const AllMarkets = artifacts.require("MockAllMarkets");
 const CyclicMarkets = artifacts.require("MockCyclicMarkets");
 const increaseTime = require("./utils/increaseTime.js").increaseTime;
@@ -16,7 +15,7 @@ let privateKeyList = ["fb437e3e01939d9d4fef43138249f23dc1d0852e69b0b5d1647c087f8
 const latestTime = require("./utils/latestTime.js").latestTime;
 
 truncNumber = (n) => Math.trunc(n * Math.pow(10, 2)) / Math.pow(10, 2);
-let masterInstance,plotusToken,BLOTInstance,MockchainLinkInstance,allMarkets;
+let masterInstance,plotusToken,MockchainLinkInstance,allMarkets;
 
 contract("Market", async function([user1, user2, user3, user4]) {
 
@@ -24,7 +23,6 @@ contract("Market", async function([user1, user2, user3, user4]) {
 	    masterInstance = await OwnedUpgradeabilityProxy.deployed();
 		masterInstance = await Master.at(masterInstance.address);
 		plotusToken = await PlotusToken.deployed();
-		BLOTInstance = await BLOT.deployed();
 		MockchainLinkInstance = await MockchainLinkBTC.deployed();
 		allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
 		cyclicMarkets = await CyclicMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("CM")));
