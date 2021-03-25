@@ -537,17 +537,17 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
     * @param _marketId Index of the market
     * @param _prediction Option predicted by the user
     * @param _user User Address
-    * @param multiplierApplied Flag defining if user had already availed multiplier
+    * @param _multiplierApplied Flag defining if user had already availed multiplier
     * @param _predictionStake Amount staked by the user
     */
-    function calculatePredictionPoints(uint _marketId, uint256 _prediction, address _user, bool multiplierApplied, uint _predictionStake) internal view returns(uint64 predictionPoints, bool isMultiplierApplied) {
+    function calculatePredictionPoints(uint _marketId, uint256 _prediction, address _user, bool _multiplierApplied, uint _predictionStake) internal view returns(uint64 predictionPoints, bool isMultiplierApplied) {
       uint _stakeValue = _predictionStake.mul(1e10);
       if(_stakeValue < minPredictionAmount || _stakeValue > maxPredictionAmount) {
         return (0, isMultiplierApplied);
       }
       uint64 _optionPrice = getOptionPrice(_marketId, _prediction);
       predictionPoints = uint64(_predictionStake).div(_optionPrice);
-      if(!multiplierApplied) {
+      if(!_multiplierApplied) {
         uint256 _predictionPoints = predictionPoints;
         if(address(userLevels) != address(0)) {
           (_predictionPoints, isMultiplierApplied) = checkMultiplier(_user,  predictionPoints);
