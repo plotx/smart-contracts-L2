@@ -2,7 +2,7 @@ const Master = artifacts.require('Master');
 const AllMarkets = artifacts.require('MockAllMarkets');
 const PlotusToken = artifacts.require('MockPLOT');
 const BLOT = artifacts.require('BLOT');
-const AcyclicMarkets = artifacts.require('AcyclicMarkets');
+const AcyclicMarkets = artifacts.require('MockAcyclicMarkets');
 const MockchainLink = artifacts.require('MockChainLinkAggregator');
 const OwnedUpgradeabilityProxy = artifacts.require('OwnedUpgradeabilityProxy');
 const ParticipationMining = artifacts.require('ParticipationMining');
@@ -45,6 +45,7 @@ module.exports = function(deployer, network, accounts){
 
     allMarkets = await AllMarkets.at(allMarketsProxy.address);
     cm = await CyclicMarkets.at(await master.getLatestAddress(web3.utils.toHex('CM')));
+    ac = await AllMarkets.at(await master.getLatestAddress(web3.utils.toHex('AC')));
     // await allMarkets.setAssetPlotConversionRate(plotusToken.address, 1);
 
     let participationMining = await deployer.deploy(ParticipationMining, allMarkets.address, accounts[0]);
@@ -52,6 +53,7 @@ module.exports = function(deployer, network, accounts){
 
     assert.equal(await master.isInternal(allMarkets.address), true);
     await allMarkets.addAuthorizedMarketCreator(cm.address);
+    await allMarkets.addAuthorizedMarketCreator(ac.address);
     await allMarkets.initializeDependencies();
     await plotusToken.approve(allMarkets.address, "1000000000000000000000000");
     await cm.addInitialMarketTypesAndStart(date, ethChainlinkOracle.address, ethChainlinkOracle.address);

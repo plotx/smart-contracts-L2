@@ -144,10 +144,15 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
     */
     function createMarket(string calldata _question, uint64[] calldata _optionRanges, uint32[] calldata _marketTimes) external {
       require(!paused);
-      require(_marketTimes[0] >= now);
-      uint64 _marketId = allMarkets.createMarket(_marketTimes, _optionRanges, _msgSender(), marketInitialLiquidity);
-      
+      uint32[] memory _timesArray = new uint32[](_marketTimes.length+1);
+      _timesArray[0] = uint32(now);
+      _timesArray[1] = _marketTimes[0];
+      _timesArray[2] = _marketTimes[1];
+      _timesArray[3] = _marketTimes[2];
+      uint64 _marketId = allMarkets.getTotalMarketsLength();
       marketData[_marketId].pricingData = PricingData(stakingFactorMinStake, stakingFactorWeightage, timeWeightage, minTimePassed);
+      allMarkets.createMarket(_timesArray, _optionRanges, _msgSender(), marketInitialLiquidity);
+      
       
       emit OptionPricingParams(_marketId, stakingFactorMinStake, minTimePassed);
       emit QuestionInfo(_question,_optionRanges,_marketTimes);
@@ -374,5 +379,78 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
         _optionPrices[i] = getOptionPrice(_marketId,i+1);
       }
 
+    }
+
+    /**
+    * @dev function to get integer parameters
+    * @param code Code of the parameter.
+    * @return codeVal Code of the parameter.
+    * @return value Value of the queried parameter.
+    */
+    function getUintParameters(bytes8 code) external view returns(bytes8 codeVal, uint256 value) {
+      codeVal = code;
+      if(code == "CPW") { // Acyclic contracts don't have Current price weighage but time weightage
+        value = timeWeightage;
+      } else if(code == "SFMS") { // Minimum amount for staking factor to apply
+        value = stakingFactorMinStake;
+      } else if(code == "MINP") { // Minimum prediction amount
+        value = minPredictionAmount;
+      } else if(code == "MAXP") { // Maximum prediction amount
+        value = maxPredictionAmount;
+      } else if(code == "CMFP") { // Cummulative fee percent
+        value = marketFeeParams.cummulativeFeePercent;
+      } else if(code == "DAOF") { // DAO Fee percent in Cummulative fee
+        value = marketFeeParams.daoCommissionPercent;
+      } else if(code == "RFRRF") { // Referrer fee percent in Cummulative fee
+        value = marketFeeParams.referrerFeePercent;
+      } else if(code == "RFREF") { // Referee fee percent in Cummulative fee
+        value = marketFeeParams.refereeFeePercent;
+      } else if(code == "MCF") { // Market Creator fee percent in Cummulative fee
+        value = marketFeeParams.marketCreatorFeePercent;
+      }
+    }
+
+    /**
+    * @dev function to update integer parameters
+    * @param code Code of the updating parameter.
+    * @param value Value to which the parameter should be updated
+    */
+    function updateUintParameters(bytes8 code, uint256 value) external onlyAuthorized {
+      if(code == "CPW") { // Acyclic contracts don't have Current price weighage but time weightage
+        require(value <= 100);
+        timeWeightage = uint32(value);
+        //Staking factor weightage% = 100% - timeWeightage%
+        stakingFactorWeightage = 100 - timeWeightage;
+      } else if(code == "SFMS") { // Minimum amount for staking factor to apply
+        stakingFactorMinStake = value;
+      } else if(code == "MINP") { // Minimum prediction amount
+        minPredictionAmount = value;
+      } else if(code == "MAXP") { // Maximum prediction amount
+        maxPredictionAmount = value;
+      } else {
+        MarketFeeParams storage _marketFeeParams = marketFeeParams;
+        require(value < 10000);
+        if(code == "CMFP") { // Cummulative fee percent
+          _marketFeeParams.cummulativeFeePercent = uint32(value);
+        } else {
+          if(code == "DAOF") { // DAO Fee percent in Cummulative fee
+            _marketFeeParams.daoCommissionPercent = uint32(value);
+          } else if(code == "RFRRF") { // Referrer fee percent in Cummulative fee
+            _marketFeeParams.referrerFeePercent = uint32(value);
+          } else if(code == "RFREF") { // Referee fee percent in Cummulative fee
+            _marketFeeParams.refereeFeePercent = uint32(value);
+          } else if(code == "MCF") { // Market Creator fee percent in Cummulative fee
+            _marketFeeParams.marketCreatorFeePercent = uint32(value);
+          } else {
+            revert("Invalid code");
+          } 
+          require(
+            _marketFeeParams.daoCommissionPercent + 
+            _marketFeeParams.referrerFeePercent + 
+            _marketFeeParams.refereeFeePercent + 
+            _marketFeeParams.marketCreatorFeePercent
+            < 10000);
+        }
+      }
     }
 }
