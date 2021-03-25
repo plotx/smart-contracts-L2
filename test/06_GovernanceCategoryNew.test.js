@@ -1,4 +1,4 @@
-const AllMarkets = artifacts.require('AllMarkets');
+const AllMarkets = artifacts.require('MockAllMarkets');
 const Master = artifacts.require('Master');
 const PlotusToken = artifacts.require("MockPLOT");
 const OwnedUpgradeabilityProxy = artifacts.require('OwnedUpgradeabilityProxy');

@@ -1,7 +1,5 @@
 const Master = artifacts.require('Master');
-const AllMarkets = artifacts.require("AllMarkets");
-const Referral = artifacts.require("Referral");
-const UserLevels = artifacts.require("UserLevels");
+const AllMarkets = artifacts.require("MockAllMarkets");
 const DisputeResolution = artifacts.require("DisputeResolution");
 const CyclicMarkets = artifacts.require("CyclicMarkets");
 const PlotusToken = artifacts.require("MockPLOT");
@@ -43,8 +41,6 @@ contract('Master', function(accounts) {
     ms = await OwnedUpgradeabilityProxy.deployed();
     ms = await Master.at(ms.address);
     allMarkets = await AllMarkets.at(await ms.getLatestAddress(toHex('AM')));
-    rf = await Referral.at(await ms.getLatestAddress(toHex("RF")));
-    ul = await UserLevels.at(await ms.getLatestAddress(toHex("UL")));
     dr = await DisputeResolution.at(await ms.getLatestAddress(toHex("DR")));
     cm = await CyclicMarkets.at(await ms.getLatestAddress(toHex("CM")));
   });
@@ -59,13 +55,13 @@ contract('Master', function(accounts) {
       actionHash = encode1(
         ['bytes2[]', 'address[]'],
         [
-          [toHex('UL')],
-          [ul.address, allMarkets.address]
+          [toHex('CM')],
+          [cm.address, allMarkets.address]
         ]
       );
 
-      await assertRevert(ms.upgradeMultipleImplementations([toHex('UL')],
-                [ul.address, allMarkets.address]));
+      await assertRevert(ms.upgradeMultipleImplementations([toHex('CM')],
+                [cm.address, allMarkets.address]));
       // await gvProp(
       //   6,
       //   actionHash,
@@ -112,7 +108,6 @@ contract('Master', function(accounts) {
       await assertRevert(
         mas.initiateMaster([mas.address, mas.address, mas.address, mas.address, mas.address, mas.address, mas.address], mas.address, mas.address, mas.address, {from: newOwner})
       );
-      await assertRevert(rf.setMasterAddress(mas.address, mas.address));
     });
     it('Should revert if caller is default address passed is null address', async function() {
       mas = await Master.new();
@@ -176,12 +171,6 @@ contract('Master', function(accounts) {
       oldDR = await DisputeResolution.at(
         await ms.getLatestAddress(toHex('DR'))
       );
-      oldRF = await Referral.at(
-        await ms.getLatestAddress(toHex('RF'))
-      );
-      oldUL = await UserLevels.at(
-        await ms.getLatestAddress(toHex('UL'))
-      );
       let plbalPlot = await plotTok.balanceOf(
         await ms.getLatestAddress(toHex('MC'))
       );
@@ -190,12 +179,10 @@ contract('Master', function(accounts) {
       await increaseTime(100);
       let newDR = await DisputeResolution.new();
       let newCM = await CyclicMarkets.new();
-      let newRF = await Referral.new();
-      let newUL = await UserLevels.new();
 
       await ms.upgradeMultipleImplementations(
-          [toHex('AM'), toHex("CM"), toHex("DR"), toHex("RF"), toHex("UL")],
-          [newAllMarkets.address, newCM.address, newDR.address, newRF.address, newUL.address]
+          [toHex('AM'), toHex("CM"), toHex("DR")],
+          [newAllMarkets.address, newCM.address, newDR.address]
       );
 
       let oldAMImpl = await OwnedUpgradeabilityProxy.at(
@@ -207,18 +194,10 @@ contract('Master', function(accounts) {
       let oldDRImpl = await OwnedUpgradeabilityProxy.at(
         await ms.getLatestAddress(toHex('DR'))
       );
-      let oldRFImpl = await OwnedUpgradeabilityProxy.at(
-        await ms.getLatestAddress(toHex('RF'))
-      );
-      let oldULImpl = await OwnedUpgradeabilityProxy.at(
-        await ms.getLatestAddress(toHex('UL'))
-      );
 
       // Checking Upgraded Contract addresses
       assert.equal(newDR.address, await oldDRImpl.implementation());
       assert.equal(newCM.address, await oldCMImpl.implementation());
-      assert.equal(newRF.address, await oldRFImpl.implementation());
-      assert.equal(newUL.address, await oldULImpl.implementation());
       assert.equal(newAllMarkets.address, await oldAMImpl.implementation());
       
       // Checking Master address in upgraded Contracts

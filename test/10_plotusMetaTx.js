@@ -70,7 +70,11 @@ contract("Rewards-Market", async function(users) {
             await assertRevert(allMarkets.setMasterAddress(users[0], users[0]));
             await assertRevert(allMarkets.setMarketStatus(6, 1));
 	        await assertRevert(cyclicMarkets.setReferralContract(users[0]));
-		  // await marketIncentives.claimCreationReward(100,{from:users[11]});
+			var date = Date.now();
+			date = Math.round(date/1000);
+    		await assertRevert(cyclicMarkets.addInitialMarketTypesAndStart(date, users[0], users[0], {from:users[10]}));
+    		await assertRevert(cyclicMarkets.handleFee(100, 1, users[0], users[0], {from:users[10]}));
+			// await marketIncentives.claimCreationReward(100,{from:users[11]});
 		});
 
 		it("Scenario 1: Few user wins", async () => {

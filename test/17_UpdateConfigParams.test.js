@@ -1,5 +1,5 @@
 const Master = artifacts.require('Master');
-const AllMarkets = artifacts.require('AllMarkets');
+const AllMarkets = artifacts.require('MockAllMarkets');
 const CyclicMarkets = artifacts.require('CyclicMarkets');
 const PlotusToken = artifacts.require("MockPLOT");
 const MockchainLink = artifacts.require('MockChainLinkAggregator');

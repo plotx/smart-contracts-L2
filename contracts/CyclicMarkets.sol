@@ -403,7 +403,6 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       marketPricingData[_marketIndex] = PricingData(stakingFactorMinStake, stakingFactorWeightage, currentPriceWeightage, _marketType.minTimePassed);
       allMarkets.createMarket(_marketTimes, _optionRanges, _msgSenderAddress, _marketType.initialLiquidity);
       marketData[_marketIndex] = MarketData(_marketTypeIndex, _marketCurrencyIndex, _msgSenderAddress);
-      // uint64 _marketIndex;
       (_marketCreationData.penultimateMarket, _marketCreationData.latestMarket) =
        (_marketCreationData.latestMarket, _marketIndex);
       
@@ -446,7 +445,6 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
         uint64 penultimateMarket = _marketCreationData.penultimateMarket;
         if(penultimateMarket > 0 && now >= allMarkets.marketSettleTime(penultimateMarket)) {
           settleMarket(penultimateMarket, _roundId);
-          // _settleMarket(penultimateMarket, _settlementPrice);
         }
       }
     }
@@ -493,7 +491,6 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
      */
     function handleFee(uint _marketId, uint64 _cummulativeFee, address _msgSenderAddress, address _relayer) external onlyAllMarkets {
       MarketFeeParams storage _marketFeeParams = marketFeeParams;
-      // _fee = _calculateAmulBdivC(_marketFeeParams.cummulativeFeePercent, _amount, 10000);
       uint64 _referrerFee = _calculateAmulBdivC(_marketFeeParams.referrerFeePercent, _cummulativeFee, 10000);
       uint64 _refereeFee = _calculateAmulBdivC(_marketFeeParams.refereeFeePercent, _cummulativeFee, 10000);
       bool _isEligibleForReferralReward;
@@ -658,7 +655,6 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
      * @return  option price
      **/
     function getOptionPrice(uint _marketId, uint256 _prediction) public view returns(uint64) {
-      // MarketBasicData storage _marketBasicData = marketBasicData[_marketId];
       (uint[] memory _optionPricingParams, uint32 _startTime) = allMarkets.getMarketOptionPricingParams(_marketId,_prediction);
       PricingData storage _marketPricingData = marketPricingData[_marketId];
       (,,uint _predictionTime,,) = allMarkets.getMarketData(_marketId);

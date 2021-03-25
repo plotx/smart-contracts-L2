@@ -178,7 +178,7 @@ contract Master is IAuth {
     }
 
     /**
-    * @dev Transfer `_amount` number of market registry assets contract to `_to` address
+    * @dev Transfer `_amount` of DAO assets to `_to` address
     */
     function transferAssets(address _asset, address payable _to, uint _amount) external onlyAuthorized {
       _transferAsset(_asset, _to, _amount);

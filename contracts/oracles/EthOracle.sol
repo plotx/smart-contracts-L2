@@ -21,10 +21,17 @@ import "../interfaces/IChainLinkOracle.sol";
 contract EthChainlinkOracle is IOracle {
 
   IChainLinkOracle internal aggregator;
+
+  /**
+  * @param _aggregator Chainlink aggregator address to fetch the price from 
+  */
   constructor(address _aggregator) public {
     aggregator = IChainLinkOracle(_aggregator);
   }
 
+  /**
+  * @dev Get price of the asset at given time and nearest roundId
+  */
   function getSettlementPrice(uint256 _marketSettleTime, uint80 _roundId) external view returns(uint256 _value, uint256 roundId) {
     uint80 roundIdToCheck;
     uint256 currentRoundTime;
@@ -47,6 +54,9 @@ contract EthChainlinkOracle is IOracle {
         (uint256(currentRoundAnswer), roundIdToCheck);
   }
 
+  /**
+  * @dev Get the latest price of currency
+  */
   function getLatestPrice() external view returns(uint256 _value) {
     return uint256(aggregator.latestAnswer());
   }

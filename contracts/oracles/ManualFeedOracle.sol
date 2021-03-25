@@ -28,26 +28,39 @@ contract ManualFeedOracle is IOracle {
     uint256 postedOn;
   }
 
-  FeedData[] internal feedData;
+  FeedData[] public feedData;
 
   modifier OnlyAuthorized() {
     require(msg.sender == authorizedAddres);
     _;
   }
 
+  /**
+  * @param _authorized Authorized address to post prices 
+  */
   constructor(address _authorized) public {
     authorizedAddres = _authorized;
   }
 
+  /**
+  * @dev Update authorized address to post price
+  */
   function changeAuthorizedAddress(address _newAuth) external OnlyAuthorized {
+    require(_newAuth != address(0));
     authorizedAddres = _newAuth;
   }
 
+  /**
+  * @dev Post the latest price of currency
+  */
   function postPrice(uint256 _price) external OnlyAuthorized {
     feedData.push(FeedData(_price, now));
     emit PriceUpdated(feedData.length - 1, _price, now);
   }
 
+  /**
+  * @dev Get price of the asset at given time and nearest roundId
+  */
   function getSettlementPrice(uint256 _marketSettleTime, uint80 _roundId) external view returns(uint256 _value, uint256 roundId) {
     uint256 roundIdToCheck = feedData.length - 1;
     uint256 currentRoundTime = feedData[roundIdToCheck].postedOn;
@@ -73,8 +86,19 @@ contract ManualFeedOracle is IOracle {
         (uint256(currentRoundAnswer), roundIdToCheck);
   }
 
+  /**
+  * @dev Get the latest price of currency
+  */
   function getLatestPrice() external view returns(uint256 _value) {
     return feedData[feedData.length - 1].price;
+  }
+
+  /**
+  * @dev Get the latest round data
+  */
+  function getLatestRoundData() external view returns(uint256 _roundId, uint256 _postedOn, uint256 _price) {
+    _roundId = feedData.length - 1;
+    return (_roundId, feedData[_roundId].postedOn, feedData[_roundId].price);
   }
 
 }
