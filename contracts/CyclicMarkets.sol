@@ -136,8 +136,6 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       address _plotToken = ms.dAppToken();
       plotToken = _plotToken;
       allMarkets = IAllMarkets(ms.getLatestAddress("AM"));
-      referral = IReferral(IMaster(masterAddress).getLatestAddress("RF"));
-      userLevels = IUserLevels(IMaster(masterAddress).getLatestAddress("UL"));
       authorizedAddress = _defaultAuthorizedAddress;
       authorized = _authorizedMultiSig;
       _initializeEIP712("CM");
@@ -158,6 +156,23 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
     function removeReferralContract() external onlyAuthorized {
       require(address(referral) != address(0));
       delete referral;
+    }
+
+    /**
+    * @dev Set the User levels contract address, to handle user multiplier.
+    * @param _userLevelsContract Address of the referral contract
+    */
+    function setUserLevelsContract(address _userLevelsContract) external onlyAuthorized {
+      require(address(userLevels) == address(0));
+      userLevels = IUserLevels(_userLevelsContract);
+    }
+
+    /**
+    * @dev Unset the User levels contract address
+    */
+    function removeUserLevelsContract() external onlyAuthorized {
+      require(address(userLevels) != address(0));
+      delete userLevels;
     }
     
     /**
@@ -536,8 +551,10 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       uint64 _optionPrice = getOptionPrice(_marketId, _prediction);
       predictionPoints = uint64(_predictionStake).div(_optionPrice);
       if(!multiplierApplied) {
-        uint256 _predictionPoints;
-        (_predictionPoints, isMultiplierApplied) = checkMultiplier(_user,  predictionPoints);
+        uint256 _predictionPoints = predictionPoints;
+        if(address(userLevels) != address(0)) {
+          (_predictionPoints, isMultiplierApplied) = checkMultiplier(_user,  predictionPoints);
+        }
         predictionPoints = uint64(_predictionPoints);
       }
     }

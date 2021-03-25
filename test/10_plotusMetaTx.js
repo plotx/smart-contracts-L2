@@ -69,7 +69,8 @@ contract("Rewards-Market", async function(users) {
             // await assertRevert(marketIncentives.setMasterAddress(users[0], users[0]));
             await assertRevert(allMarkets.setMasterAddress(users[0], users[0]));
             await assertRevert(allMarkets.setMarketStatus(6, 1));
-            // await marketIncentives.claimCreationReward(100,{from:users[11]});
+	        await assertRevert(cyclicMarkets.setReferralContract(users[0]));
+		  // await marketIncentives.claimCreationReward(100,{from:users[11]});
 		});
 
 		it("Scenario 1: Few user wins", async () => {

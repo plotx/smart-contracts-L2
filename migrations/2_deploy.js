@@ -5,7 +5,6 @@ const MockchainLink = artifacts.require('MockChainLinkAggregator');
 const OwnedUpgradeabilityProxy = artifacts.require('OwnedUpgradeabilityProxy');
 const DisputeResolution = artifacts.require('DisputeResolution');
 const CyclicMarkets = artifacts.require('MockCyclicMarkets');
-const UserLevels = artifacts.require('UserLevels');
 const EthChainlinkOracle = artifacts.require('EthChainlinkOracle');
 const { assert } = require("chai");
 const encode1 = require('../test/utils/encoder.js').encode1;
@@ -23,6 +22,5 @@ module.exports = function(deployer, network, accounts){
       let allMarkets = await deployer.deploy(AllMarkets);
       let dr = await deployer.deploy(DisputeResolution);
       let cm = await deployer.deploy(CyclicMarkets);
-      let ul = await deployer.deploy(UserLevels);
   });
 };

@@ -53,7 +53,6 @@ contract Master is IAuth {
         //Initial contract names
         allContractNames.push("AM");
         allContractNames.push("BL");
-        allContractNames.push("UL");
         allContractNames.push("DR");
         allContractNames.push("CM");
 

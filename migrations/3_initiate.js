@@ -24,9 +24,8 @@ module.exports = function(deployer, network, accounts){
     let allMarkets = await AllMarkets.deployed();
     let dr = await DisputeResolution.deployed();
     let cm = await CyclicMarkets.deployed();
-    let ul = await UserLevels.deployed();
     master = await Master.at(master.address);
-    let implementations = [allMarkets.address, bPlotToken.address, ul.address, dr.address, cm.address];
+    let implementations = [allMarkets.address, bPlotToken.address, dr.address, cm.address];
     console.log(accounts[0])
     await master.initiateMaster(implementations, deployPlotusToken.address, accounts[0], accounts[0]);
     master = await OwnedUpgradeabilityProxy.at(master.address);
@@ -49,6 +48,8 @@ module.exports = function(deployer, network, accounts){
     await plotusToken.approve(allMarkets.address, "1000000000000000000000000");
     await cm.addInitialMarketTypesAndStart(date, ethChainlinkOracle.address, ethChainlinkOracle.address);
     let rf = await deployer.deploy(Referral, master.address);
+    let ul = await deployer.deploy(UserLevels, master.address);
     await cm.setReferralContract(rf.address);
+    await cm.setUserLevelsContract(ul.address);
   });
 };

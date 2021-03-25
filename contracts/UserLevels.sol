@@ -17,13 +17,12 @@ pragma solidity 0.5.7;
 
 import "./external/openzeppelin-solidity/math/SafeMath.sol";
 import "./external/proxy/OwnedUpgradeabilityProxy.sol";
-import "./external/NativeMetaTransaction.sol";
 import "./interfaces/IMaster.sol";
 import "./interfaces/IAllMarkets.sol";
 import "./interfaces/IToken.sol";
 import "./interfaces/IAuth.sol";
 
-contract UserLevels is IAuth, NativeMetaTransaction {
+contract UserLevels is IAuth {
 
     address public masterAddress;
 
@@ -31,15 +30,13 @@ contract UserLevels is IAuth, NativeMetaTransaction {
     mapping(uint256 => uint256) public levelMultiplier;
 
     /**
-     * @dev Changes the master address and update it's instance
-     * @param _authorizedMultiSig Authorized address to execute critical functions in the protocol.
-     * @param _defaultAuthorizedAddress Authorized address to trigger initial functions by passing required external values.
+     * @dev Initialize the dependencies
+     * @param _masterAddress Master address of the PLOT platform.
      */
-    function setMasterAddress(address _authorizedMultiSig, address _defaultAuthorizedAddress) public {
-      OwnedUpgradeabilityProxy proxy =  OwnedUpgradeabilityProxy(address(uint160(address(this))));
-      require(msg.sender == proxy.proxyOwner());
-      authorized = _authorizedMultiSig;
-      masterAddress = msg.sender;
+    constructor(address _masterAddress) public {
+      IMaster ms = IMaster(_masterAddress);
+      authorized = ms.authorized();
+      masterAddress = _masterAddress;
     }
 
     /**

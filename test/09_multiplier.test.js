@@ -33,8 +33,8 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
             masterInstance = await Master.at(masterInstance.address);
             plotusToken = await PlotusToken.deployed();
             allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
-            userLevels = await UserLevels.at(await masterInstance.getLatestAddress(web3.utils.toHex("UL")));
             cyclicMarkets = await CyclicMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("CM")));
+            userLevels = await UserLevels.deployed();
             marketId = 6;
             await increaseTime(4 * 60 * 60 + 1);
             await plotusToken.transfer(userMarketCreator, toWei(1000));
@@ -42,7 +42,35 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
             await cyclicMarkets.createMarket(0, 0, 0, { from: userMarketCreator });
             marketId++;
         });
+        it("1.0 Set user levels", async () => {
+
+          let userLevelsArray = [];
+          let multipliers = [];
+          for(let i = 1; i <= 25; i++) {
+              userLevelsArray.push(i);
+              multipliers.push(5*i);
+          }
+          let actionHash = encode1(
+            ['uint256[]', 'uint256[]'],
+            [
+              userLevelsArray,
+              multipliers
+            ]
+          );
+
+          await userLevels.setMultiplierLevels(userLevelsArray, multipliers);
+          await assertRevert(userLevels.setMultiplierLevels(userLevelsArray, multipliers, { from: user2 }));
+          await assertRevert(userLevels.setMultiplierLevels([1,2,3], [1,2]));
+          
+          await userLevels.setUserLevel(user1, 1);
+          await userLevels.setUserLevel(user2, 2);
+          await userLevels.setUserLevel(user3, 5);
+          await userLevels.setUserLevel(user4, 10);
+          await userLevels.setUserLevel(user5, 22);
+        })
         it("1.1 Position without User levels", async () => {
+            await cyclicMarkets.removeUserLevelsContract();
+            await assertRevert(cyclicMarkets.removeUserLevelsContract());
             await plotusToken.transfer(user1, toWei("100"));
             await plotusToken.transfer(user2, toWei("400"));
             await plotusToken.transfer(user3, toWei("100"));
@@ -150,36 +178,19 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
             assert.equal(~~(balanceAfter/1e15), balanceBefore/1e15  + creationReward*1e3);
         });
 
+        it("Set User levels contract to activate multiplier", async () => {
+          await cyclicMarkets.setUserLevelsContract(userLevels.address);
+          await assertRevert(cyclicMarkets.setUserLevelsContract(user1));
+        })
+
         it("1.2 Positions After increasing user levels", async () => {
             await increaseTime(4 * 60 * 60 + 1);
 
-            let userLevelsArray = [];
-            let multipliers = [];
-            for(let i = 1; i <= 25; i++) {
-                userLevelsArray.push(i);
-                multipliers.push(5*i);
-            }
-            let actionHash = encode1(
-              ['uint256[]', 'uint256[]'],
-              [
-                userLevelsArray,
-                multipliers
-              ]
-            );
-
-            await userLevels.setMultiplierLevels(userLevelsArray, multipliers);
-            await assertRevert(userLevels.setMultiplierLevels(userLevelsArray, multipliers, { from: user2 }));
-            await assertRevert(userLevels.setMultiplierLevels([1,2,3], [1,2]));
-            
             await cyclicMarkets.createMarket(0, 0, 0, { from: userMarketCreator })
             marketId++;
             
             await assertRevert(userLevels.setUserLevel(user1, 1, {from:user2}));
-            await userLevels.setUserLevel(user1, 1);
-            await userLevels.setUserLevel(user2, 2);
-            await userLevels.setUserLevel(user3, 5);
-            await userLevels.setUserLevel(user4, 10);
-            await userLevels.setUserLevel(user5, 22);
+
             await plotusToken.transfer(user1, toWei("100"));
             await plotusToken.transfer(user2, toWei("400"));
             await plotusToken.transfer(user3, toWei("100"));
