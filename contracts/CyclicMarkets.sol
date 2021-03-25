@@ -86,8 +86,8 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
     address internal masterAddress;
     address internal plotToken;
     IAllMarkets internal allMarkets;
-    IReferral internal referral;
-    IUserLevels internal userLevels;
+    IReferral public referral;
+    IUserLevels public userLevels;
 
     MarketCurrency[] internal marketCurrencies;
     MarketTypeData[] internal marketTypeArray;
@@ -141,6 +141,23 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       authorizedAddress = _defaultAuthorizedAddress;
       authorized = _authorizedMultiSig;
       _initializeEIP712("CM");
+    }
+
+    /**
+    * @dev Set the referral contract address, to handle referrals and their fees.
+    * @param _referralContract Address of the referral contract
+    */
+    function setReferralContract(address _referralContract) external onlyAuthorized {
+      require(address(referral) == address(0));
+      referral = IReferral(_referralContract);
+    }
+
+    /**
+    * @dev Unset the referral contract address
+    */
+    function removeReferralContract() external onlyAuthorized {
+      require(address(referral) != address(0));
+      delete referral;
     }
     
     /**
@@ -464,7 +481,10 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       // _fee = _calculateAmulBdivC(_marketFeeParams.cummulativeFeePercent, _amount, 10000);
       uint64 _referrerFee = _calculateAmulBdivC(_marketFeeParams.referrerFeePercent, _cummulativeFee, 10000);
       uint64 _refereeFee = _calculateAmulBdivC(_marketFeeParams.refereeFeePercent, _cummulativeFee, 10000);
-      bool _isEligibleForReferralReward = referral.setReferralRewardData(_msgSenderAddress, plotToken, _referrerFee, _refereeFee);
+      bool _isEligibleForReferralReward;
+      if(address(referral) != address(0)) {
+      _isEligibleForReferralReward = referral.setReferralRewardData(_msgSenderAddress, plotToken, _referrerFee, _refereeFee);
+      }
       if(_isEligibleForReferralReward){
         _transferAsset(plotToken, address(referral), (10**predictionDecimalMultiplier).mul(_referrerFee.add(_refereeFee)));
       } else {

@@ -47,17 +47,14 @@ contract Referral is IAuth, NativeMetaTransaction {
     }
 
     /**
-     * @dev Changes the master address and update it's instance
-     * @param _authorizedMultiSig Authorized address to execute critical functions in the protocol.
-     * @param _defaultAuthorizedAddress Authorized address to trigger initial functions by passing required external values.
+     * @dev Initialize the dependencies
+     * @param _masterAddress Master address of the PLOT platform.
      */
-    function setMasterAddress(address _authorizedMultiSig, address _defaultAuthorizedAddress) public {
-      OwnedUpgradeabilityProxy proxy =  OwnedUpgradeabilityProxy(address(uint160(address(this))));
-      require(msg.sender == proxy.proxyOwner());
-      IMaster ms = IMaster(msg.sender);
-      masterAddress = msg.sender;
+    constructor(address _masterAddress) public {
+      IMaster ms = IMaster(_masterAddress);
+      authorized = ms.authorized();
+      masterAddress = _masterAddress;
       allMarkets = IAllMarkets(ms.getLatestAddress("AM"));
-      authorized = _authorizedMultiSig;
       predictionDecimalMultiplier = 10;
       _initializeEIP712("RF");
     }

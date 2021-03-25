@@ -52,7 +52,7 @@ contract("Rewards-Market", async function(users) {
 
 			allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
 			cyclicMarkets = await CyclicMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("CM")));
-			referral = await Referral.at(await masterInstance.getLatestAddress(web3.utils.toHex("RF")));
+			referral = await Referral.deployed();
 			disputeResolution = await DisputeResolution.at(await masterInstance.getLatestAddress(web3.utils.toHex("DR")));
             await increaseTime(5 * 3600);
             await plotusToken.transfer(users[12],toWei(100000));
@@ -85,6 +85,10 @@ contract("Rewards-Market", async function(users) {
 					await referral.setReferrer(users[1], users[i]);
 					//SHould not add referrer if already set
 					await assertRevert(referral.setReferrer(users[1], users[i]));
+				}
+				if(i == 10) {
+					await cyclicMarkets.removeReferralContract();
+					await assertRevert(cyclicMarkets.removeReferralContract());
 				}
 				await plotusToken.transfer(users[i], toWei(2000));
 			    await plotusToken.approve(allMarkets.address, toWei(1000000), { from: users[i] });
@@ -195,7 +199,7 @@ contract("Rewards-Market", async function(users) {
 		});
 
 		it("Check referral fee", async () => {
-			let referralRewardPlot = [10.532, 0.8, 0.42, 0.246, 1, 1.4, 0.4, 0.1, 0.6, 0.3];
+			let referralRewardPlot = [9.932, 0.8, 0.42, 0.246, 1, 1.4, 0.4, 0.1, 0.6, 0];
 
 			for(i=1;i<11;i++)
 			{
