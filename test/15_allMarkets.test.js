@@ -171,7 +171,7 @@ contract("PlotX", ([ab1, ab2, ab3, ab4, mem1, mem2, mem3, mem4, mem5, mem6, mem7
 		await allMarkets.depositAndPlacePrediction("100000000000000000000", 7, plotusToken.address, 100*1e8, 1);
 		// await allMarkets.placePrediction(plotusToken.address, "1000000000000000000000", 1, 1);
 		let totalStaked = await allMarkets.getUserFlags(7, ab1);
-		assert.equal(totalStaked[0], false);
+		assert.equal(totalStaked, false);
     	await allMarkets.depositAndPlacePrediction("8000000000000000000000", 7, plotusToken.address, 8000*1e8, 2);
     	await allMarkets.depositAndPlacePrediction("8000000000000000000000", 7, plotusToken.address, 8000*1e8, 3);
 		// await assertRevert(marketInstance.placePrediction("0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE", "10000000000000000000", 1, 1, { value: 1000 }));

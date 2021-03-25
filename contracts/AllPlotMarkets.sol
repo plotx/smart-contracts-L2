@@ -58,7 +58,6 @@ contract AllPlotMarkets is IAuth, NativeMetaTransaction {
     
     struct UserMarketData {
       bool predictedWithBlot;
-      bool multiplierApplied;
       mapping(uint => PredictionData) predictionData;
     }
 
@@ -710,10 +709,9 @@ contract AllPlotMarkets is IAuth, NativeMetaTransaction {
     * @return Flag defining if user had predicted with bPLOT
     * @return Flag defining if user had availed multiplier
     */
-    function getUserFlags(uint256 _marketId, address _user) external view returns(bool, bool) {
+    function getUserFlags(uint256 _marketId, address _user) external view returns(bool) {
       return (
-              userData[_user].userMarketData[_marketId].predictedWithBlot,
-              userData[_user].userMarketData[_marketId].multiplierApplied
+              userData[_user].userMarketData[_marketId].predictedWithBlot
       );
     }
 
