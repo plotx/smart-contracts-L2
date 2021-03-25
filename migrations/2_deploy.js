@@ -3,7 +3,6 @@ const AllMarkets = artifacts.require('MockAllMarkets');
 const BLOT = artifacts.require('BLOT');
 const MockchainLink = artifacts.require('MockChainLinkAggregator');
 const OwnedUpgradeabilityProxy = artifacts.require('OwnedUpgradeabilityProxy');
-const ParticipationMining = artifacts.require('ParticipationMining');
 const DisputeResolution = artifacts.require('DisputeResolution');
 const CyclicMarkets = artifacts.require('MockCyclicMarkets');
 const AcyclicMarkets = artifacts.require('MockAcyclicMarkets');

@@ -5,7 +5,6 @@ const BLOT = artifacts.require('BLOT');
 const AcyclicMarkets = artifacts.require('MockAcyclicMarkets');
 const MockchainLink = artifacts.require('MockChainLinkAggregator');
 const OwnedUpgradeabilityProxy = artifacts.require('OwnedUpgradeabilityProxy');
-const ParticipationMining = artifacts.require('ParticipationMining');
 const DisputeResolution = artifacts.require('DisputeResolution');
 const Referral = artifacts.require('Referral');
 const UserLevels = artifacts.require('UserLevels');
@@ -47,9 +46,6 @@ module.exports = function(deployer, network, accounts){
     cm = await CyclicMarkets.at(await master.getLatestAddress(web3.utils.toHex('CM')));
     ac = await AllMarkets.at(await master.getLatestAddress(web3.utils.toHex('AC')));
     // await allMarkets.setAssetPlotConversionRate(plotusToken.address, 1);
-
-    let participationMining = await deployer.deploy(ParticipationMining, allMarkets.address, accounts[0]);
-
 
     assert.equal(await master.isInternal(allMarkets.address), true);
     await allMarkets.addAuthorizedMarketCreator(cm.address);
