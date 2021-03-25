@@ -299,5 +299,59 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
             assert.equal(~~(balanceAfter/1e15), ~~((balanceBefore/1e14  + creationReward*1e4)/10));
 
         });
+
+
+        it("1.3 Positions After increasing user levels, should not give multiplier twice", async () => {
+          await increaseTime(4 * 60 * 60 + 1);
+
+          await cyclicMarkets.createMarket(0, 0, 0, { from: userMarketCreator })
+          marketId++;
+
+          await plotusToken.transfer(user1, toWei("200"));
+
+          await plotusToken.approve(allMarkets.address, toWei("100000"), { from: user1 });
+          
+          // await allMarkets.deposit(toWei(100), { from: user1 });
+          // await allMarkets.deposit(toWei(400), { from: user2 });
+          // await allMarkets.deposit(toWei(100), { from: user3 });
+          // await allMarkets.deposit(toWei(100), { from: user4 });
+          // await allMarkets.deposit(toWei(10), { from: user5 });
+
+          await cyclicMarkets.setNextOptionPrice(18);
+          // assert.equal((await allMarkets.getMarketData(marketId))._optionPrice[0] / 1, 9);
+          // await allMarkets.depositAndPlacePrediction(toWei(100), marketId, plotusToken.address, to8Power("100"), 1, { from: user3 });
+          let functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", toWei(100), marketId, plotusToken.address, to8Power("100"), 1);
+          await signAndExecuteMetaTx(
+            privateKeyList[1],
+            user1,
+            functionSignature,
+            allMarkets,
+            "AM"
+          );
+          predictionPointsBeforeUser1 = (await allMarkets.getUserPredictionPoints(user1, marketId, 1)) / 1e5;
+
+          await cyclicMarkets.setNextOptionPrice(18);
+          functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", toWei(100), marketId, plotusToken.address, to8Power("100"), 1);
+          await signAndExecuteMetaTx(
+            privateKeyList[1],
+            user1,
+            functionSignature,
+            allMarkets,
+            "AM"
+          );
+          
+          predictionPointsUser1SecondTime = (await allMarkets.getUserPredictionPoints(user1, marketId, 1)) / 1e5;
+          // console.log( //     predictionPointsBeforeUser1, //     predictionPointsBeforeUser2, //     predictionPointsBeforeUser3, //     predictionPointsBeforeUser4, //     predictionPointsBeforeUser5 // );
+          predictionPointsUser1SecondTime = predictionPointsUser1SecondTime/1 - predictionPointsBeforeUser1/1;
+          const expectedPredictionPoints = [5716.66666, 5444.44444];
+          const predictionPointArray = [
+              predictionPointsBeforeUser1/1,
+              predictionPointsUser1SecondTime/1
+          ];
+          for (let i = 0; i < 2; i++) {
+              assert.equal(expectedPredictionPoints[i], predictionPointArray[i]);
+          }
+
+      });
     });
 });
