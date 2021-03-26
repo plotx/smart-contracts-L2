@@ -476,9 +476,8 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       if(allMarkets.marketStatus(_marketId) >= IAllMarkets.PredictionStatus.InSettlement) {
         _transferAsset(plotToken, masterAddress, (10**predictionDecimalMultiplier).mul(marketFeeParams.daoFee[_marketId]));
         delete marketFeeParams.daoFee[_marketId];
-
-    	  marketCreationReward[marketData[_marketId].marketCreator] = (10**predictionDecimalMultiplier).mul(marketFeeParams.marketCreatorFee[_marketId]);
-        emit MarketCreatorReward(marketData[_marketId].marketCreator, _marketId, (10**predictionDecimalMultiplier).mul(marketFeeParams.marketCreatorFee[_marketId]));
+        marketCreationReward[marketData[_marketId].marketCreator] = marketCreationReward[marketData[_marketId].marketCreator].add((10**predictionDecimalMultiplier).mul(marketFeeParams.marketCreatorFee[_marketId]));
+    	emit MarketCreatorReward(marketData[_marketId].marketCreator, _marketId, (10**predictionDecimalMultiplier).mul(marketFeeParams.marketCreatorFee[_marketId]));
         delete marketFeeParams.marketCreatorFee[_marketId];
       }
     }
