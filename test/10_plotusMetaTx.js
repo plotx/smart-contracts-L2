@@ -146,6 +146,10 @@ contract("Rewards-Market", async function(users) {
 			let daoBalanceAfter = await plotusToken.balanceOf(masterInstance.address);
 			assert.equal((daoBalanceAfter/1e18).toFixed(2), (daoBalanceBefore/1e18 + daoFee).toFixed(2));
 			
+			
+			let marketCreatorReward = await cyclicMarkets.getPendingMarketCreationRewards(users[11]);
+			assert.equal(226640000,Math.round(marketCreatorReward/1e11));
+
 			// let creationReward = 14.3999;
 			let marketCreatoFee = 22.664;
             let balanceBefore = await plotusToken.balanceOf(users[11]);
@@ -182,9 +186,6 @@ contract("Rewards-Market", async function(users) {
 				let plotBalAfter = await plotusToken.balanceOf(users[i]);
 				assert.equal(Math.round((plotBalAfter-plotBalBefore)/1e18),Math.round((totalDepositedPlot/1e18-predictionVal[i])/1+reward/1e8));
 			}
-
-			let marketCreatorReward = await cyclicMarkets.getPendingMarketCreationRewards(users[11]);
-			assert.equal(226640000,Math.round(marketCreatorReward/1e11));
 
 			// let plotBalBeforeCreator = await plotusToken.balanceOf(users[11]);
 			// functionSignature = encode3("claimCreationReward()");
