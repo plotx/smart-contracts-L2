@@ -602,6 +602,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
     function claimCreationReward() external {
       address payable _msgSenderAddress = _msgSender();
       uint256 rewardEarned = marketCreationReward[_msgSenderAddress];
+      delete marketCreationReward[_msgSenderAddress];
       require(rewardEarned > 0, "No pending");
       _transferAsset(plotToken, _msgSenderAddress, rewardEarned);
       emit ClaimedMarketCreationReward(_msgSenderAddress, rewardEarned, plotToken);
