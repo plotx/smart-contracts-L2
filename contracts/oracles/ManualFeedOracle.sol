@@ -22,11 +22,14 @@ contract ManualFeedOracle is IOracle {
   event PriceUpdated(uint256 index, uint256 price, uint256 updatedOn);
 
   address public authorizedAddres;
+  address public multiSigWallet;
 
   struct FeedData {
     uint256 price;
     uint256 postedOn;
   }
+
+  mapping(uint256 => uint256) public settlementPrice; // Settlement time to price
 
   FeedData[] public feedData;
 
@@ -38,8 +41,9 @@ contract ManualFeedOracle is IOracle {
   /**
   * @param _authorized Authorized address to post prices 
   */
-  constructor(address _authorized) public {
+  constructor(address _authorized, address _multiSigWallet) public {
     authorizedAddres = _authorized;
+    multiSigWallet = _multiSigWallet;
   }
 
   /**
@@ -59,31 +63,20 @@ contract ManualFeedOracle is IOracle {
   }
 
   /**
+  * @dev Post the settlement price of currency
+  */
+  function postSettlementPrice(uint256 _marketSettleTime, uint256 _price) external OnlyAuthorized {
+    require(_marketSettleTime > 0 && _price > 0);
+    settlementPrice[_marketSettleTime] = _price;
+    emit PriceUpdated(0, _price, _marketSettleTime);
+  }
+
+  /**
   * @dev Get price of the asset at given time and nearest roundId
   */
   function getSettlementPrice(uint256 _marketSettleTime, uint80 _roundId) external view returns(uint256 _value, uint256 roundId) {
-    uint256 roundIdToCheck = feedData.length - 1;
-    uint256 currentRoundTime = feedData[roundIdToCheck].postedOn;
-    uint256 currentRoundAnswer = feedData[roundIdToCheck].price;
-    
-    if(roundIdToCheck == _roundId) {
-      if(currentRoundTime <= _marketSettleTime) {
-        return (uint256(currentRoundAnswer), roundIdToCheck);
-      }
-    } else {
-      roundIdToCheck = _roundId + 1;
-      currentRoundTime = feedData[roundIdToCheck].postedOn;
-      currentRoundAnswer = feedData[roundIdToCheck].price;
-      require(currentRoundTime > _marketSettleTime);
-      roundIdToCheck = _roundId + 1;
-    }
-    while(currentRoundTime > _marketSettleTime) {
-        roundIdToCheck--;
-        currentRoundTime = feedData[roundIdToCheck].postedOn;
-        currentRoundAnswer = feedData[roundIdToCheck].price;
-    }
-    return
-        (uint256(currentRoundAnswer), roundIdToCheck);
+    require(settlementPrice[_marketSettleTime] > 0, "Price not yet posted for settlement");
+    return (settlementPrice[_marketSettleTime], 0);
   }
 
   /**
