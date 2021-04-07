@@ -32,7 +32,7 @@ contract("Market", async function([user1, user2, user3, user4]) {
 	  });
 
 	it("Add market currency with manual feed", async() => {
-		feedOracle = await ManualFeedOracle.new(user1);
+		feedOracle = await ManualFeedOracle.new(user1, user1);
 		let startTime = (await latestTime()) / 1;
 
 		await cyclicMarkets.addMarketCurrency(toHex("ETH/PLOT"), feedOracle.address, 8, 1, startTime);
@@ -143,6 +143,8 @@ contract("Market", async function([user1, user2, user3, user4]) {
 
 		await assertRevert(allMarkets.postMarketResult(7, 10000000000, {from:user4}));
 		// await allMarkets.postResultMock(7, 10000000000);
+		let settleTime = await allMarkets.marketSettleTime(7);
+		await feedOracle.postSettlementPrice(settleTime/1, 1195000000000);
 		await cyclicMarkets.createMarket(2, 0, 0);
 
 
@@ -192,6 +194,8 @@ contract("Market", async function([user1, user2, user3, user4]) {
 
 		await increaseTime(14400 + expireT[3]/1 - await latestTime());
 
+		let settleTime = await allMarkets.marketSettleTime(8);
+		await feedOracle.postSettlementPrice(settleTime/1, 1195000000000);
 		await cyclicMarkets.createMarket(2, 0, 0);
 
 		await plotusToken.transfer(user2, toWei(10000));
