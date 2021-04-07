@@ -751,4 +751,9 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
         return b.sub(a);
       }
     }
+
+    function getInitialLiquidity(uint _marketType) external view returns(uint) {
+      MarketTypeData storage _marketTypeArray = marketTypeArray[_marketType];
+      return _marketTypeArray.initialLiquidity;
+    }
 }

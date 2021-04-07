@@ -7,11 +7,7 @@ import "./external/proxy/OwnedUpgradeabilityProxy.sol";
 contract ICyclicMarkets {
   function createMarket(uint32 _marketCurrencyIndex,uint32 _marketTypeIndex, uint80 _roundId) public;
   function claimCreationReward() external;
-}
-
-contract IAcyclicMarkets {
-  function createMarket(string calldata _question, uint64[] calldata _optionRanges, uint32[] calldata _marketTimes) external;
-  function claimCreationReward() external;
+  function getInitialLiquidity(uint _marketType) external view returns(uint);
 }
 
 contract IMaster {
@@ -28,8 +24,6 @@ contract IToken {
     function totalSupply() public view returns (uint256);
     function mint(address account, uint256 amount) public;
     function burnFrom(address account, uint256 amount) public;
-
-
 }
 
 contract PooledMarketCreation is NativeMetaTransaction {
@@ -41,25 +35,18 @@ contract PooledMarketCreation is NativeMetaTransaction {
   IMaster ms;
   address authorized;
   uint public minLiquidity;
+  uint32 public currencyType;
 
-
-  function setMasterAddress(address _authorizedMultiSig, address _defaultAuthorizedAddress) public {
-      OwnedUpgradeabilityProxy proxy =  OwnedUpgradeabilityProxy(address(uint160(address(this))));
-      require(msg.sender == proxy.proxyOwner());
-      ms = IMaster(msg.sender);
-      plotToken = IToken(ms.dAppToken());
-      authorized = _authorizedMultiSig;
-      _initializeEIP712("PC");
-  }
-
-  function initializeLPToken(address _lpToken) external {
+  constructor(address _masterAdd, address _lpToken, address _authorized, uint32 _currencyType) public {
+    require(_masterAdd!=address(0));
     require(_lpToken!=address(0));
-    require(address(lpToken)==address(0));
-    require(IToken(_lpToken).totalSupply() == 0);
-    require(msg.sender == authorized);
-
+    require(_authorized!=address(0));
+    ms = IMaster(_masterAdd);
+    plotToken = IToken(ms.dAppToken());
     lpToken = IToken(_lpToken);
-    
+    minLiquidity = 100 ether;
+    authorized = _authorized;
+    currencyType = _currencyType;
   }
 
   function stake(uint _stakePlotAmount) public {
@@ -89,27 +76,20 @@ contract PooledMarketCreation is NativeMetaTransaction {
 
   }
 
-  function createMarket(uint32 _marketCurrencyIndex,uint32 _marketTypeIndex, uint80 _roundId) public {
-    //Add check for liquidity in contract
-    ICyclicMarkets(ms.getLatestAddress("CM")).createMarket(_marketCurrencyIndex,_marketTypeIndex,_roundId);
-  }
-
-  function createMarket(string calldata _question, uint64[] calldata _optionRanges, uint32[] calldata _marketTimes) external {
-    //Add check for liquidity in contract
-    IAcyclicMarkets(ms.getLatestAddress("AC")).createMarket(_question,_optionRanges,_marketTimes);
+  function createMarket(uint32 _marketTypeIndex, uint80 _roundId) public {
+    ICyclicMarkets cm = ICyclicMarkets(ms.getLatestAddress("CM"));
+    uint initialLiquidity = cm.getInitialLiquidity(_marketTypeIndex);
+    require(plotToken.balanceOf(address(this)).sub(initialLiquidity) >= minLiquidity);
+    cm.createMarket(currencyType,_marketTypeIndex,_roundId);
   }
 
   function approveToAllMarkets(uint _amount) public {
-
     require(msg.sender == authorized);
     plotToken.approve(ms.getLatestAddress("AM"),_amount);
   }
 
   function claimCreationReward() external {
-      IAcyclicMarkets(ms.getLatestAddress("CM")).claimCreationReward();
-      IAcyclicMarkets(ms.getLatestAddress("AC")).claimCreationReward();
+      ICyclicMarkets(ms.getLatestAddress("CM")).claimCreationReward();
   }
-  
-
 
 }
