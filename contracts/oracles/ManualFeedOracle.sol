@@ -66,7 +66,8 @@ contract ManualFeedOracle is IOracle {
   * @dev Post the settlement price of currency
   */
   function postSettlementPrice(uint256 _marketSettleTime, uint256 _price) external OnlyAuthorized {
-    require(_marketSettleTime > 0 && _price > 0);
+    require(_marketSettleTime > 0 && _price > 0, "Invalid arguments");
+    require(_marketSettleTime >= now);
     settlementPrice[_marketSettleTime] = _price;
     emit PriceUpdated(0, _price, _marketSettleTime);
   }
