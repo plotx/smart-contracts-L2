@@ -443,7 +443,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       if(currentMarket != 0) {
         require(uint(allMarkets.marketStatus(currentMarket)) >= uint(PredictionStatus.InSettlement));
         uint64 penultimateMarket = _marketCreationData.penultimateMarket;
-        if(penultimateMarket > 0 && now >= allMarkets.marketSettleTime(penultimateMarket)) {
+        if(penultimateMarket > 0 && now >= allMarkets.marketSettleTime(penultimateMarket) && uint(allMarkets.marketStatus(penultimateMarket)) < uint(PredictionStatus.Cooling)) {
           settleMarket(penultimateMarket, _roundId);
         }
       }
