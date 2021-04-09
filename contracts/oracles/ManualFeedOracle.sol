@@ -23,6 +23,7 @@ contract ManualFeedOracle is IOracle {
 
   address public authorizedAddres;
   address public multiSigWallet;
+  string public currencyName;
 
   struct FeedData {
     uint256 price;
@@ -41,9 +42,10 @@ contract ManualFeedOracle is IOracle {
   /**
   * @param _authorized Authorized address to post prices 
   */
-  constructor(address _authorized, address _multiSigWallet) public {
+  constructor(address _authorized, address _multiSigWallet, string memory _currencyName) public {
     authorizedAddres = _authorized;
     multiSigWallet = _multiSigWallet;
+    currencyName = _currencyName;
   }
 
   /**
@@ -65,9 +67,10 @@ contract ManualFeedOracle is IOracle {
   /**
   * @dev Post the settlement price of currency
   */
-  function postSettlementPrice(uint256 _marketSettleTime, uint256 _price) external OnlyAuthorized {
+  function postSettlementPrice(uint256 _marketSettleTime, uint256 _price) external {
+    require(msg.sender == multiSigWallet);
     require(_marketSettleTime > 0 && _price > 0, "Invalid arguments");
-    require(_marketSettleTime >= now);
+    require(now >= _marketSettleTime);
     settlementPrice[_marketSettleTime] = _price;
     emit PriceUpdated(0, _price, _marketSettleTime);
   }
