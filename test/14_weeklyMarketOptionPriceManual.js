@@ -34,7 +34,7 @@ contract("Market", async function([user1, user2, user3, user4]) {
 	  });
 
 	it("Add market currency with manual fee", async() => {
-		feedOracle = await ManualFeedOracle.new(user1, user1);
+		feedOracle = await ManualFeedOracle.new(user1, user1, "ETH/PLOT");
 		let startTime = (await latestTime()) / 1 + 604800;
 
 		await cyclicMarkets.addMarketCurrency(toHex("ETH/PLOT"), feedOracle.address, 8, 1, startTime);
