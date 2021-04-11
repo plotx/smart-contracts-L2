@@ -3,6 +3,7 @@ pragma solidity 0.5.7;
 import "./external/openzeppelin-solidity/math/SafeMath.sol";
 import "./external/NativeMetaTransaction.sol";
 import "./external/proxy/OwnedUpgradeabilityProxy.sol";
+import "./LPToken.sol";
 
 contract ICyclicMarkets {
   function createMarket(uint32 _marketCurrencyIndex,uint32 _marketTypeIndex, uint80 _roundId) public;
@@ -31,22 +32,22 @@ contract PooledMarketCreation is NativeMetaTransaction {
   using SafeMath for uint;
 
   IToken plotToken;
-  IToken lpToken;
+  LPToken public lpToken;
   IMaster ms;
   address authorized;
   uint public minLiquidity;
   uint32 public currencyType;
 
-  constructor(address _masterAdd, address _lpToken, address _authorized, uint32 _currencyType) public {
+  constructor(address _masterAdd, address _authorized, uint32 _currencyType) public {
     require(_masterAdd!=address(0));
-    require(_lpToken!=address(0));
     require(_authorized!=address(0));
     ms = IMaster(_masterAdd);
     plotToken = IToken(ms.dAppToken());
-    lpToken = IToken(_lpToken);
+    lpToken = new LPToken("LP","LP",18);
     minLiquidity = 100 ether;
     authorized = _authorized;
     currencyType = _currencyType;
+    _initializeEIP712("PMC");
   }
 
   function stake(uint _stakePlotAmount) public {
@@ -56,7 +57,7 @@ contract PooledMarketCreation is NativeMetaTransaction {
     plotToken.transferFrom(_msgSender, address(this), _stakePlotAmount);
     uint mintAmount = _stakePlotAmount;
     uint lpSupply = lpToken.totalSupply();
-    if(plotBalance > 0) {
+    if(lpSupply > 0) {
       mintAmount = _stakePlotAmount.mul(lpSupply).div(plotBalance);
     }
     lpToken.mint(_msgSender, mintAmount);
