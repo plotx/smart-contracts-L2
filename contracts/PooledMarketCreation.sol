@@ -16,6 +16,12 @@ contract IMaster {
     function getLatestAddress(bytes2 _module) public view returns(address);
 }
 
+contract IAllPlotMarkets {
+  function withdraw(uint _token, uint _maxRecords) public;
+
+  function getUserUnusedBalance(address _user) public view returns(uint256, uint256);
+}
+
 contract IToken {
 
     function balanceOf(address account) public view returns (uint256);
@@ -89,8 +95,12 @@ contract PooledMarketCreation is NativeMetaTransaction {
     plotToken.approve(ms.getLatestAddress("AM"),_amount);
   }
 
-  function claimCreationReward() external {
-      ICyclicMarkets(ms.getLatestAddress("CM")).claimCreationReward();
+  function claimCreationAndParticipationReward(uint _maxRecords) external {
+    IAllPlotMarkets allMarkets = IAllPlotMarkets(ms.getLatestAddress("AM"));
+    ICyclicMarkets(ms.getLatestAddress("CM")).claimCreationReward();
+    (uint _tokenLeft, uint _tokenReward) = allMarkets.getUserUnusedBalance(address(this));
+    allMarkets.withdraw(_tokenLeft.add(_tokenReward),_maxRecords);
+
   }
 
 }
