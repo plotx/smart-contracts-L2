@@ -191,6 +191,9 @@ contract("Pooled Market Creation", async function(users) {
 
 		it("Create Market with liquidity of 300 Plot", async () => {
 			console.log((await plotusToken.balanceOf(PMC.address))/1);
+			// await cyclicMarkets.createMarket(0,0,0);
+			let ethChainlinkOracle = await EthChainlinkOracle.deployed();
+            await ethChainlinkOracle.setLatestAnswer(10000000000);
 			await PMC.createMarket(0,0);
 		});
 
