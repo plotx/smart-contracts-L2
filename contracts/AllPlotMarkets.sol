@@ -47,6 +47,7 @@ contract AllPlotMarkets is IAuth, NativeMetaTransaction {
     event Withdrawn(address indexed user, uint256 amount, uint256 timeStamp);
     event MarketQuestion(uint256 indexed marketIndex, uint256 startTime, uint256 predictionTime, uint256 coolDownTime, uint256 setlementTime, uint64[] optionRanges, address marketCreatorContract);
     event MarketResult(uint256 indexed marketIndex, uint256 totalReward, uint256 winningOption, uint256 closeValue);
+    event MarketSettled(uint256 indexed marketIndex);
     // event MarketResult(uint256 indexed marketIndex, uint256 totalReward, uint256 winningOption, uint256 closeValue, uint256 roundId, uint256 daoFee, uint256 marketCreatorFee);
     event ReturnClaimed(address indexed user, uint256 amount);
     event PlacePrediction(address indexed user,uint256 value, uint256 predictionPoints, address predictionAsset,uint256 prediction,uint256 indexed marketIndex);
@@ -108,6 +109,8 @@ contract AllPlotMarkets is IAuth, NativeMetaTransaction {
     mapping(address => UserData) internal userData;
 
     mapping(uint =>mapping(uint=>PredictionData)) internal marketOptionsAvailable;
+
+    mapping(uint => bool) internal marketSettleEventEmitted;
 
     /**
      * @dev Changes the master address and update it's instance
@@ -438,6 +441,26 @@ contract AllPlotMarkets is IAuth, NativeMetaTransaction {
       require(msg.sender == disputeResolution);
       _postResult(_marketSettleValue, _marketId);
     }
+
+    /**
+    * @dev Function to emit MarketSettled event of given market.
+    * @param _marketId Index of market
+    */
+    function emitMarketSettledEvent(uint256 _marketId) external {
+      require(!marketSettleEventEmitted[_marketId]);
+      require(marketStatus(_marketId) == PredictionStatus.Settled);
+      marketSettleEventEmitted[_marketId] = true;
+      emit MarketSettled(_marketId);
+    }
+
+    // function TEMP_emitMarketSettledEvent(uint256 _fromMarketId, uint256 _toMarketId) external {
+    //   for(uint i = _fromMarketId; i<= _toMarketId; i++) {
+    //     require(!marketSettleEventEmitted[i]);
+    //     require(marketStatus(i) == PredictionStatus.Settled);
+    //     marketSettleEventEmitted[i] = true;
+    //     emit MarketSettled(i);
+    //   }
+    // }
 
     /**
     * @dev Calculate the result of market.
