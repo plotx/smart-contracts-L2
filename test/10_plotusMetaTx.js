@@ -7,10 +7,13 @@ const AllMarkets = artifacts.require("MockAllMarkets");
 const CyclicMarkets = artifacts.require("MockCyclicMarkets");
 const Referral = artifacts.require("Referral");
 const DisputeResolution = artifacts.require('DisputeResolution');
+const EthChainlinkOracle = artifacts.require('EthChainlinkOracle');
+const BPLOT = artifacts.require('BPLOT');
 const BigNumber = require("bignumber.js");
 const { increaseTimeTo } = require("./utils/increaseTime.js");
 const encode1 = require('./utils/encoder.js').encode1;
 const encode3 = require("./utils/encoder.js").encode3;
+const UserLevels = artifacts.require('UserLevels');
 const signAndExecuteMetaTx = require("./utils/signAndExecuteMetaTx.js").signAndExecuteMetaTx;
 const BN = require('bn.js');
 
@@ -50,10 +53,41 @@ contract("Rewards-Market", async function(users) {
 			plotusToken = await PlotusToken.deployed();
 			timeNow = await latestTime();
 
+			allMarkets = await AllMarkets.deployed();
+			cyclicMarkets = await CyclicMarkets.deployed();
+			disputeResolution = await DisputeResolution.deployed();
+
+			await masterInstance.addNewContract(web3.utils.toHex("AM"),allMarkets.address);
+			await masterInstance.addNewContract(web3.utils.toHex("DR"),disputeResolution.address);
+			await masterInstance.addNewContract(web3.utils.toHex("CM"),cyclicMarkets.address);
+
+
 			allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
 			cyclicMarkets = await CyclicMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("CM")));
-			referral = await Referral.deployed();
+			// referral = await Referral.deployed();
 			disputeResolution = await DisputeResolution.at(await masterInstance.getLatestAddress(web3.utils.toHex("DR")));
+
+
+			let bplot = await BPLOT.at(await masterInstance.getLatestAddress(web3.utils.toHex("BL")));
+		    await bplot.initializeDependencies();
+			//===================================//
+			assert.equal(await masterInstance.isInternal(allMarkets.address), true);
+		    await allMarkets.addAuthorizedMarketCreator(cyclicMarkets.address);
+		    await allMarkets.initializeDependencies();
+		    await plotusToken.approve(allMarkets.address, "1000000000000000000000000");
+		    var date = Date.now();
+    		date = Math.round(date/1000);
+    		let ethChainlinkOracle = await EthChainlinkOracle.deployed();
+		    await cyclicMarkets.addInitialMarketTypesAndStart(date, ethChainlinkOracle.address, ethChainlinkOracle.address);
+
+		    referral = await Referral.new(masterInstance.address);
+		    let ul = await UserLevels.new(masterInstance.address);
+		    await cyclicMarkets.setReferralContract(referral.address);
+		    await cyclicMarkets.setUserLevelsContract(ul.address);
+		    
+
+
+		    //======================================================//
             await increaseTime(5 * 3600);
             await plotusToken.transfer(users[12],toWei(100000));
             await plotusToken.transfer(users[11],toWei(100000));
@@ -70,7 +104,7 @@ contract("Rewards-Market", async function(users) {
             await assertRevert(allMarkets.setMasterAddress(users[0], users[0]));
             await assertRevert(allMarkets.setMarketStatus(6, 1));
 	        await assertRevert(cyclicMarkets.setReferralContract(users[0]));
-			var date = Date.now();
+			date = Date.now();
 			date = Math.round(date/1000);
     		await assertRevert(cyclicMarkets.addInitialMarketTypesAndStart(date, users[0], users[0], {from:users[10]}));
     		await assertRevert(cyclicMarkets.handleFee(100, 1, users[0], users[0], {from:users[10]}));
@@ -239,6 +273,42 @@ contract("Rewards-Market Stake less than 1 ether", async function(users) {
 			masterInstance = await Master.at(masterInstance.address);
 			plotusToken = await PlotusToken.deployed();
 			timeNow = await latestTime();
+
+			allMarkets = await AllMarkets.deployed();
+			cyclicMarkets = await CyclicMarkets.deployed();
+			disputeResolution = await DisputeResolution.deployed();
+
+			await masterInstance.addNewContract(web3.utils.toHex("AM"),allMarkets.address);
+			await masterInstance.addNewContract(web3.utils.toHex("DR"),disputeResolution.address);
+			await masterInstance.addNewContract(web3.utils.toHex("CM"),cyclicMarkets.address);
+
+
+			allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
+			cyclicMarkets = await CyclicMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("CM")));
+			// referral = await Referral.deployed();
+			disputeResolution = await DisputeResolution.at(await masterInstance.getLatestAddress(web3.utils.toHex("DR")));
+
+
+			let bplot = await BPLOT.at(await masterInstance.getLatestAddress(web3.utils.toHex("BL")));
+		    await bplot.initializeDependencies();
+			//===================================//
+			assert.equal(await masterInstance.isInternal(allMarkets.address), true);
+		    await allMarkets.addAuthorizedMarketCreator(cyclicMarkets.address);
+		    await allMarkets.initializeDependencies();
+		    await plotusToken.approve(allMarkets.address, "1000000000000000000000000");
+		    var date = Date.now();
+    		date = Math.round(date/1000);
+    		let ethChainlinkOracle = await EthChainlinkOracle.deployed();
+		    await cyclicMarkets.addInitialMarketTypesAndStart(date, ethChainlinkOracle.address, ethChainlinkOracle.address);
+
+		    referral = await Referral.new(masterInstance.address);
+		    let ul = await UserLevels.new(masterInstance.address);
+		    await cyclicMarkets.setReferralContract(referral.address);
+		    await cyclicMarkets.setUserLevelsContract(ul.address);
+		    
+
+
+		    //======================================================//
 			
 			cyclicMarkets = await CyclicMarkets.at(await masterInstance.getLatestAddress(toHex("CM")));
 			allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
@@ -343,6 +413,42 @@ contract("Rewards-Market Raise dispute and pass the proposal ", async function(u
 			masterInstance = await Master.at(masterInstance.address);
 			plotusToken = await PlotusToken.deployed();
 			timeNow = await latestTime();
+
+			allMarkets = await AllMarkets.deployed();
+			cyclicMarkets = await CyclicMarkets.deployed();
+			disputeResolution = await DisputeResolution.deployed();
+
+			await masterInstance.addNewContract(web3.utils.toHex("AM"),allMarkets.address);
+			await masterInstance.addNewContract(web3.utils.toHex("DR"),disputeResolution.address);
+			await masterInstance.addNewContract(web3.utils.toHex("CM"),cyclicMarkets.address);
+
+
+			allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
+			cyclicMarkets = await CyclicMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("CM")));
+			// referral = await Referral.deployed();
+			disputeResolution = await DisputeResolution.at(await masterInstance.getLatestAddress(web3.utils.toHex("DR")));
+
+
+			let bplot = await BPLOT.at(await masterInstance.getLatestAddress(web3.utils.toHex("BL")));
+		    await bplot.initializeDependencies();
+			//===================================//
+			assert.equal(await masterInstance.isInternal(allMarkets.address), true);
+		    await allMarkets.addAuthorizedMarketCreator(cyclicMarkets.address);
+		    await allMarkets.initializeDependencies();
+		    await plotusToken.approve(allMarkets.address, "1000000000000000000000000");
+		    var date = Date.now();
+    		date = Math.round(date/1000);
+    		let ethChainlinkOracle = await EthChainlinkOracle.deployed();
+		    await cyclicMarkets.addInitialMarketTypesAndStart(date, ethChainlinkOracle.address, ethChainlinkOracle.address);
+
+		    referral = await Referral.new(masterInstance.address);
+		    let ul = await UserLevels.new(masterInstance.address);
+		    await cyclicMarkets.setReferralContract(referral.address);
+		    await cyclicMarkets.setUserLevelsContract(ul.address);
+		    
+
+
+		    //======================================================//
 
 			cyclicMarkets = await CyclicMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("CM")));
 			allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
