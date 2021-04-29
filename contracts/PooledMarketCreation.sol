@@ -56,6 +56,12 @@ contract PooledMarketCreation is NativeMetaTransaction {
     _initializeEIP712("PMC");
   }
 
+  event Staked(address _user, uint _plotAmountStaked, uint lpTokensMinted);
+  event Unstaked(address _user, uint _lpAmountUnstaked, uint plotTokensTransferred);
+  event MarketCreated(uint _currencyType, uint _marketType, uint _initialLiquidity);
+  event Claimed(uint _amountClaimed, uint _maxRecordProcessed);
+  
+
   function stake(uint _stakePlotAmount) public {
     require(_stakePlotAmount>0);
     address payable _msgSender = _msgSender();
@@ -67,6 +73,8 @@ contract PooledMarketCreation is NativeMetaTransaction {
       mintAmount = _stakePlotAmount.mul(lpSupply).div(plotBalance);
     }
     lpToken.mint(_msgSender, mintAmount);
+
+    emit Staked(_msgSender, _stakePlotAmount, mintAmount);
 
   }
 
@@ -81,6 +89,8 @@ contract PooledMarketCreation is NativeMetaTransaction {
     uint returnToken = _unStakeLP.mul(plotBalance).div(lpSupply);
     plotToken.transfer(_msgSender,returnToken);
 
+    emit Unstaked(_msgSender, _unStakeLP, returnToken);
+
   }
 
   function createMarket(uint32 _marketTypeIndex, uint80 _roundId) public {
@@ -88,6 +98,8 @@ contract PooledMarketCreation is NativeMetaTransaction {
     uint initialLiquidity = cm.getInitialLiquidity(_marketTypeIndex);
     require(plotToken.balanceOf(address(this)).sub(initialLiquidity) >= minLiquidity);
     cm.createMarket(currencyType,_marketTypeIndex,_roundId);
+
+    emit MarketCreated(currencyType,_marketTypeIndex,initialLiquidity);
   }
 
   function approveToAllMarkets(uint _amount) public {
@@ -100,6 +112,8 @@ contract PooledMarketCreation is NativeMetaTransaction {
     ICyclicMarkets(ms.getLatestAddress("CM")).claimCreationReward();
     (uint _tokenLeft, uint _tokenReward) = allMarkets.getUserUnusedBalance(address(this));
     allMarkets.withdraw(_tokenLeft.add(_tokenReward),_maxRecords);
+
+    emit Claimed(_tokenLeft.add(_tokenReward),_maxRecords);
 
   }
 
