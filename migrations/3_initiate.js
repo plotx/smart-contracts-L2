@@ -33,15 +33,16 @@ module.exports = function(deployer, network, accounts){
     master = await OwnedUpgradeabilityProxy.at(master.address);
     await master.transferProxyOwnership(accounts[0]);
     master = await Master.at(master.address);
+    
+    let allMarketsProxy = await OwnedUpgradeabilityProxy.at(
+      await master.getLatestAddress(web3.utils.toHex('AM'))
+      );
     var date = Date.now();
     date = Math.round(date/1000);
 
-    let allMarketsProxy = await OwnedUpgradeabilityProxy.at(
-      await master.getLatestAddress(web3.utils.toHex('AM'))
-    );
-
     allMarkets = await AllMarkets.at(allMarketsProxy.address);
     cm = await CyclicMarkets.at(await master.getLatestAddress(web3.utils.toHex('CM')));
+    ac = await AcyclicMarkets.at(await master.getLatestAddress(web3.utils.toHex('AC')));
     // await allMarkets.setAssetPlotConversionRate(plotusToken.address, 1);
 
     assert.equal(await master.isInternal(allMarkets.address), true);
