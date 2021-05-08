@@ -42,19 +42,22 @@ contract PooledMarketCreation is NativeMetaTransaction {
   IMaster ms;
   address authorized;
   uint public minLiquidity;
-  uint32 public currencyType;
+  uint internal predictionDecimalMultiplier;
+  uint public unstakeRestrictTime;
+  mapping(address => uint) public userLastStaked;
 
-  constructor(address _masterAdd, address _authorized, uint32 _currencyType) public {
-    require(_masterAdd!=address(0));
-    require(_authorized!=address(0));
-    ms = IMaster(_masterAdd);
-    plotToken = IToken(ms.dAppToken());
-    lpToken = new LPToken("LP","LP",18);
-    minLiquidity = 100 ether;
-    authorized = _authorized;
-    currencyType = _currencyType;
-    _initializeEIP712("PMC");
-  }
+  function setMasterAddress(address _authorizedMultiSig, address _defaultAuthorizedAddress) public {
+      OwnedUpgradeabilityProxy proxy =  OwnedUpgradeabilityProxy(address(uint160(address(this))));
+      require(msg.sender == proxy.proxyOwner());
+      ms = IMaster(msg.sender);
+      plotToken = IToken(ms.dAppToken());
+      lpToken = new LPToken("LP","LP",18);
+      minLiquidity = 100 ether;
+      authorized = _authorizedMultiSig;
+      predictionDecimalMultiplier = 10;
+      unstakeRestrictTime = 1 days;
+      _initializeEIP712("PMC");
+    }
 
   event Staked(address _user, uint _plotAmountStaked, uint lpTokensMinted);
   event Unstaked(address _user, uint _lpAmountUnstaked, uint plotTokensTransferred);
@@ -65,6 +68,7 @@ contract PooledMarketCreation is NativeMetaTransaction {
   function stake(uint _stakePlotAmount) public {
     require(_stakePlotAmount>0);
     address payable _msgSender = _msgSender();
+    userLastStaked[_msgSender] = now;
     uint plotBalance = (plotToken.balanceOf(address(this)));
     plotToken.transferFrom(_msgSender, address(this), _stakePlotAmount);
     uint mintAmount = _stakePlotAmount;
@@ -81,8 +85,8 @@ contract PooledMarketCreation is NativeMetaTransaction {
   function unstake(uint _unStakeLP) public {
 
     require(_unStakeLP>0);
-    
     address payable _msgSender = _msgSender();
+    require(userLastStaked[_msgSender].add(unstakeRestrictTime) < now);
     uint lpSupply = lpToken.totalSupply();
     lpToken.burnFrom(_msgSender, _unStakeLP);
     uint plotBalance = (plotToken.balanceOf(address(this)));
@@ -93,13 +97,13 @@ contract PooledMarketCreation is NativeMetaTransaction {
 
   }
 
-  function createMarket(uint32 _marketTypeIndex, uint80 _roundId) public {
+  function createMarket(uint32 _currencyTypeIndex, uint32 _marketTypeIndex, uint80 _roundId) public {
     ICyclicMarkets cm = ICyclicMarkets(ms.getLatestAddress("CM"));
     uint initialLiquidity = cm.getInitialLiquidity(_marketTypeIndex);
-    require(plotToken.balanceOf(address(this)).sub(initialLiquidity) >= minLiquidity);
-    cm.createMarket(currencyType,_marketTypeIndex,_roundId);
+    require(plotToken.balanceOf(address(this)).sub(initialLiquidity.mul(10**predictionDecimalMultiplier)) >= minLiquidity);
+    cm.createMarket(_currencyTypeIndex,_marketTypeIndex,_roundId);
 
-    emit MarketCreated(currencyType,_marketTypeIndex,initialLiquidity);
+    emit MarketCreated(_currencyTypeIndex,_marketTypeIndex,initialLiquidity);
   }
 
   function approveToAllMarkets(uint _amount) public {
@@ -115,6 +119,12 @@ contract PooledMarketCreation is NativeMetaTransaction {
 
     emit Claimed(_tokenLeft.add(_tokenReward),_maxRecords);
 
+  }
+
+  function updateUnstakeRestrictTime(uint _val) external {
+    require(msg.sender == authorized);
+    require(_val > 0);
+    unstakeRestrictTime = _val;
   }
 
 }
