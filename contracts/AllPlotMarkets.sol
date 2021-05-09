@@ -217,8 +217,9 @@ contract AllPlotMarkets is IAuth, NativeMetaTransaction {
     function _placeInitialPrediction(uint64 _marketId, address _msgSenderAddress, uint64 _initialLiquidity, uint64 _totalOptions) internal {
       uint256 _defaultAmount = (10**predictionDecimalMultiplier).mul(_initialLiquidity);
       (uint _tokenLeft, uint _tokenReward) = getUserUnusedBalance(_msgSenderAddress);
-      if(_tokenLeft.add(_tokenReward) < _defaultAmount) {
-        _deposit(_defaultAmount, _msgSenderAddress);
+      uint _balanceAvailable = _tokenLeft.add(_tokenReward);
+      if(_balanceAvailable < _defaultAmount) {
+        _deposit(_defaultAmount.sub(_balanceAvailable), _msgSenderAddress);
       }
       address _predictionToken = predictionToken;
       uint64 _predictionAmount = _initialLiquidity/ _totalOptions;
