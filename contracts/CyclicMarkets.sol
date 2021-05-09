@@ -379,11 +379,19 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       }
     }
 
+    /**
+    * @dev Whitelist an address to create market
+    * @param _marketCreator Address to whitelist
+    */
     function whitelistMarketCreator(address _marketCreator) external onlyAuthorized {
       require(!isAuthorizedCreator[_marketCreator]);
       isAuthorizedCreator[_marketCreator] = true;
     }
 
+    /**
+    * @dev De-Whitelist an existing address to create market
+    * @param _marketCreator Address to remove from whitelist
+    */
     function deWhitelistMarketCreator(address _marketCreator) external onlyAuthorized {
       require(isAuthorizedCreator[_marketCreator]);
       delete isAuthorizedCreator[_marketCreator];
