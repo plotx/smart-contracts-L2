@@ -210,7 +210,7 @@ contract("Market", ([ab1, ab2, ab3, ab4, dr1, dr2, dr3, notMember]) => {
     assert.equal((await dr.getUserVoteValue(dr2, 7))/1, toWei(2000));
     await dr.submitVote(7, toWei(2000), 1, {from:dr3});
     assert.equal((await dr.getUserVoteValue(dr3, 7))/1, toWei(2000));
-    await increaseTime(604800);
+    await increaseTime(2*604800);
     await dr.declareResult(7);
     await assertRevert(dr.declareResult(7));
 
@@ -262,6 +262,7 @@ contract("Market", ([ab1, ab2, ab3, ab4, dr1, dr2, dr3, notMember]) => {
     await dr.submitVote(10, toWei(2000), 1, {from:dr2});
     await increaseTime(86500*3);
     await dr.declareResult(9);
+    await increaseTime(86500*7);
     let pendingReward = await dr.getPendingReward(dr2);
     assert.equal(pendingReward/1e18, 500);
     await dr.claimReward(dr2, 100);
