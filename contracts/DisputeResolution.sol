@@ -194,7 +194,7 @@ contract DisputeResolution is IAuth, NativeMetaTransaction {
     for(uint i = _userData.lastClaimedIndex; i < len && count < _maxRecord; i++) {
       _marketId = _userData.disputesParticipated[i];
       DisputeData storage _marketDisputeData = marketDisputeData[_marketId];
-      if(_marketDisputeData.closed) {
+      if(_marketDisputeData.closed && now > _marketDisputeData.tokensLockedUntill) {
         if(!_userData.claimedReward[_marketId]) {
           _incentive = _incentive.add((_marketDisputeData.rewardForVoting.mul(_marketDisputeData.userVoteValue[_user])).div(_marketDisputeData.totalVoteValue));
           _userData.claimedReward[_marketId] = true;
@@ -224,7 +224,7 @@ contract DisputeResolution is IAuth, NativeMetaTransaction {
     for(uint i = _userData.lastClaimedIndex; i < len; i++) {
       _marketId = _userData.disputesParticipated[i];
       DisputeData storage _marketDisputeData = marketDisputeData[_userData.disputesParticipated[i]];
-      if(!_userData.claimedReward[_marketId] && _marketDisputeData.closed) {
+      if(!_userData.claimedReward[_marketId] && _marketDisputeData.closed && now > _marketDisputeData.tokensLockedUntill) {
         _pendingReward = _pendingReward.add((_marketDisputeData.rewardForVoting.mul(_marketDisputeData.userVoteValue[_user])).div(_marketDisputeData.totalVoteValue));
       }
     }
@@ -237,7 +237,7 @@ contract DisputeResolution is IAuth, NativeMetaTransaction {
   function withdrawLockedTokens(uint256 _marketId) external {
     address payable _msgSenderAddress = _msgSender();
     DisputeData storage _marketDisputeData = marketDisputeData[_marketId];
-    require(now > _marketDisputeData.tokensLockedUntill);
+    require(_marketDisputeData.closed && now > _marketDisputeData.tokensLockedUntill);
     uint256 _tokensToTransfer = _marketDisputeData.userVoteValue[_msgSenderAddress];
     require(_tokensToTransfer > 0);
     delete _marketDisputeData.userVoteValue[_msgSenderAddress];
