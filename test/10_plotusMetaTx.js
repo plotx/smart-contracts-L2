@@ -84,6 +84,8 @@ contract("Rewards-Market", async function(users) {
 			let predictionVal  = [0,100, 400, 210, 123, 500, 700, 200, 50, 300, 150];
 			let options=[0,2,2,2,3,1,1,2,3,3,2,1];
 			let daoCommissions = [0, 1.8, 6.4, 3.36, 1.968, 8, 11.2, 3.2, 0.8, 4.8, 2.4];
+			let nullAddress = "0x0000000000000000000000000000";
+			await assertRevert(referral.setReferrer(nullAddress, nullAddress));
 			for(i=1; i<11;i++){
 				if(i>1) {
 					//Should not allow unauthorized address to set referrer

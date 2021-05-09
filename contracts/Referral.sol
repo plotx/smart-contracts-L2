@@ -63,9 +63,9 @@ contract Referral is IAuth, NativeMetaTransaction {
     * @dev Set referrer address of a user, can be set only by the authorized users
     * @param _referrer User who is referring new user
     * @param _referee User who is referring new user
-    * @return _referee User who is getting referred
     */
     function setReferrer(address _referrer, address _referee) external onlyAuthorized {
+      require(_referrer != address(0) && _referee != address(0));
       UserData storage _userData = userData[_referee];
       require(allMarkets.getTotalStakedByUser(_referee) == 0);
       require(_userData.referrer == address(0));
@@ -74,8 +74,12 @@ contract Referral is IAuth, NativeMetaTransaction {
     }
 
     /**
-    * @dev Set referrer address of a user, can be set only by the authorized users
+    * @dev Set referral reward data
     * @param _referee User who is referring new user
+    * @param _token Address of token in which reward is issued
+    * @param _referrerFee Fees earned by referring other users
+    * @param _refereeFee Fees earned if referred by some one
+    * @return _isEligible Defines if the given user is eligible for the reward
     */
     function setReferralRewardData(address _referee, address _token, uint _referrerFee, uint _refereeFee) external onlyInternal returns(bool _isEligible) {
       UserData storage _userData = userData[_referee];
