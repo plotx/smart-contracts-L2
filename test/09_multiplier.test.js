@@ -39,6 +39,7 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
             await increaseTime(4 * 60 * 60 + 1);
             await plotusToken.transfer(userMarketCreator, toWei(1000));
             await plotusToken.approve(allMarkets.address, toWei(1000), { from: userMarketCreator });
+            await cyclicMarkets.whitelistMarketCreator(userMarketCreator);
             await cyclicMarkets.createMarket(0, 0, 0, { from: userMarketCreator });
             marketId++;
         });

@@ -41,6 +41,7 @@ describe("newPlotusWithBlot", () => {
             await plotusToken.transfer(users[11],toWei(1000));
             await plotusToken.approve(allMarkets.address, toWei(10000), {from:users[11]});
             await cyclicMarkets.setNextOptionPrice(18);
+            await cyclicMarkets.whitelistMarketCreator(users[11]);
             await cyclicMarkets.createMarket(0, 0, 0,{from: users[11]});
             // await marketIncentives.claimCreationReward(100,{from:users[11]});
             BLOTInstance = await BLOT.at(await masterInstance.getLatestAddress(web3.utils.toHex("BL")));

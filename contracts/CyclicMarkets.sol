@@ -396,6 +396,8 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
     * @param _roundId Round Id to settle previous market (If applicable, else pass 0)
     */
     function createMarket(uint32 _marketCurrencyIndex,uint32 _marketTypeIndex, uint80 _roundId) public {
+      address _msgSenderAddress = _msgSender();
+      require(isAuthorizedCreator[_msgSenderAddress], "Not authorized");
       MarketTypeData storage _marketType = marketTypeArray[_marketTypeIndex];
       MarketCurrency storage _marketCurrency = marketCurrencies[_marketCurrencyIndex];
       MarketCreationData storage _marketCreationData = marketCreationData[_marketTypeIndex][_marketCurrencyIndex];
@@ -410,7 +412,6 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       _marketTimes[2] = _marketType.predictionTime*2;
       _marketTimes[3] = _marketType.cooldownTime;
       uint64 _marketIndex = allMarkets.getTotalMarketsLength();
-      address _msgSenderAddress = _msgSender();
       marketPricingData[_marketIndex] = PricingData(stakingFactorMinStake, stakingFactorWeightage, currentPriceWeightage, _marketType.minTimePassed);
       marketData[_marketIndex] = MarketData(_marketTypeIndex, _marketCurrencyIndex, _msgSenderAddress);
       allMarkets.createMarket(_marketTimes, _optionRanges, _msgSenderAddress, _marketType.initialLiquidity);

@@ -150,6 +150,7 @@ contract("Market", ([ab1, ab2, ab3, ab4, dr1, dr2, dr3, notMember]) => {
     await plotusToken.approve(allMarkets.address, "30000000000000000000000", {from:dr1});
     // await plotusToken.transfer(masterInstance.address, "100000000000000000000");
     let masterInstanceBalanceBefore = await plotusToken.balanceOf(masterInstance.address);
+    await cyclicMarkets.whitelistMarketCreator(dr1);
     await cyclicMarkets.createMarket(0,0, 0,{from:dr1});
    
     await plotusToken.transfer(ab2, "50000000000000000000000");

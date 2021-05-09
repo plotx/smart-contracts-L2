@@ -65,6 +65,7 @@ contract("Rewards-Market", async function(users) {
             await plotusToken.approve(allMarkets.address,toWei(200000),{from:users[11]});
 			await cyclicMarkets.setNextOptionPrice(18);
 			await cyclicMarkets.claimRelayerRewards();
+            await cyclicMarkets.whitelistMarketCreator(users[11]);
             await cyclicMarkets.createMarket(0, 0, 0,{from:users[11],gasPrice:500000});
             // await assertRevert(marketIncentives.setMasterAddress(users[0], users[0]));
             await assertRevert(allMarkets.setMasterAddress(users[0], users[0]));
@@ -253,6 +254,7 @@ contract("Rewards-Market Stake less than 1 ether", async function(users) {
             await plotusToken.approve(allMarkets.address,toWei(200000),{from:users[11]});
 			await cyclicMarkets.setNextOptionPrice(18);
 			await cyclicMarkets.claimRelayerRewards();
+            await cyclicMarkets.whitelistMarketCreator(users[11]);
             await cyclicMarkets.createMarket(0, 0, 0,{from:users[11],gasPrice:500000});
             // await marketIncentives.claimCreationReward(100,{from:users[11]});
 		});
@@ -358,6 +360,7 @@ contract("Rewards-Market Raise dispute and pass the proposal ", async function(u
             await plotusToken.approve(allMarkets.address,toWei(200000),{from:users[11]});
 			await cyclicMarkets.setNextOptionPrice(18);
 			await cyclicMarkets.claimRelayerRewards();
+            await cyclicMarkets.whitelistMarketCreator(users[11]);
             await cyclicMarkets.createMarket(0, 0, 0,{from:users[11],gasPrice:500000});
             await assertRevert(cyclicMarkets.claimCreationReward({from:users[11]}));
 		});
