@@ -54,7 +54,7 @@ contract("Rewards-Market", async function(users) {
 
 			allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
 			acyclicMarkets = await AcyclicMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AC")));
-			referral = await Referral.at(await masterInstance.getLatestAddress(web3.utils.toHex("RF")));
+			referral = await Referral.deployed();
 			disputeResolution = await DisputeResolution.at(await masterInstance.getLatestAddress(web3.utils.toHex("DR")));
             await increaseTime(5 * 3600);
             await plotusToken.transfer(users[12],toWei(100000));

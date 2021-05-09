@@ -55,5 +55,7 @@ module.exports = function(deployer, network, accounts){
     let ul = await deployer.deploy(UserLevels, master.address);
     await cm.setReferralContract(rf.address);
     await cm.setUserLevelsContract(ul.address);
+    await ac.setReferralContract(rf.address);
+    await ac.setUserLevelsContract(ul.address);
   });
 };

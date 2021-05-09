@@ -33,7 +33,7 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
             masterInstance = await Master.at(masterInstance.address);
             plotusToken = await PlotusToken.deployed();
             allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
-            userLevels = await UserLevels.at(await masterInstance.getLatestAddress(web3.utils.toHex("UL")));
+            userLevels = await UserLevels.deployed();
             acyclicMarkets = await AcyclicMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AC")));
             marketId = 6;
             await increaseTime(4 * 60 * 60 + 1);

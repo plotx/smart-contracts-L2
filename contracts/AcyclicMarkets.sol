@@ -103,8 +103,6 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
       plotToken = _plotToken;
       predictionToken = _plotToken;
       allMarkets = IAllMarkets(ms.getLatestAddress("AM"));
-      referral = IReferral(ms.getLatestAddress("RF"));
-      userLevels = IUserLevels(IMaster(masterAddress).getLatestAddress("UL"));
       authorized = _authorizedMultiSig;
       stakingFactorMinStake = uint(20000).mul(10**8);
       stakingFactorWeightage = 40;
@@ -121,6 +119,40 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
       predictionDecimalMultiplier = 10;
       marketInitialLiquidity = 100 * 1e8;
       _initializeEIP712("AC");
+    }
+
+    /**
+    * @dev Set the referral contract address, to handle referrals and their fees.
+    * @param _referralContract Address of the referral contract
+    */
+    function setReferralContract(address _referralContract) external onlyAuthorized {
+      require(address(referral) == address(0));
+      referral = IReferral(_referralContract);
+    }
+
+    /**
+    * @dev Unset the referral contract address
+    */
+    function removeReferralContract() external onlyAuthorized {
+      require(address(referral) != address(0));
+      delete referral;
+    }
+
+    /**
+    * @dev Set the User levels contract address, to handle user multiplier.
+    * @param _userLevelsContract Address of the referral contract
+    */
+    function setUserLevelsContract(address _userLevelsContract) external onlyAuthorized {
+      require(address(userLevels) == address(0));
+      userLevels = IUserLevels(_userLevelsContract);
+    }
+
+    /**
+    * @dev Unset the User levels contract address
+    */
+    function removeUserLevelsContract() external onlyAuthorized {
+      require(address(userLevels) != address(0));
+      delete userLevels;
     }
 
     /**

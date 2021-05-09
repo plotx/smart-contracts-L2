@@ -102,6 +102,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
 
     mapping(address => uint256) public marketCreationReward;
     mapping (address => uint256) public relayerFeeEarned;
+    mapping(address => bool) public isAuthorizedCreator; // Check if address is authorized to create markets
 
     mapping(address => mapping(uint256 => bool)) public multiplierApplied;
 
@@ -376,6 +377,16 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
           createMarket(0, i, 0);
           createMarket(1, i, 0);
       }
+    }
+
+    function whitelistMarketCreator(address _marketCreator) external onlyAuthorized {
+      require(!isAuthorizedCreator[_marketCreator]);
+      isAuthorizedCreator[_marketCreator] = true;
+    }
+
+    function deWhitelistMarketCreator(address _marketCreator) external onlyAuthorized {
+      require(isAuthorizedCreator[_marketCreator]);
+      delete isAuthorizedCreator[_marketCreator];
     }
 
     /**
