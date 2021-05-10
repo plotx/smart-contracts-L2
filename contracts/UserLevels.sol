@@ -45,6 +45,8 @@ contract UserLevels is IAuth {
     * @param _level user level indicator
     */
     function setUserLevel(address _user, uint256 _level) public onlyAuthorized {
+      // Can set level to zero or a level that has multiplier set
+      require(_level ==0 || levelMultiplier[_level] > 0);
       userLevel[_user] = _level;
     }
 
