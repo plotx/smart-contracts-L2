@@ -17,9 +17,9 @@ import "./interfaces/IbPLOTToken.sol";
 
 contract bPLOTMigration {
     
-    address public constant bPLOTToken = 0x7a86d5eB74C84C3C094404D20c1c0A68dE84b9Fb;
-    address public constant authController = 0x6f9f333de6eCFa67365916cF95873a4DC480217a;
-    address public constant migrationController = 0x3A6D2faBDf51Af157F3fC79bb50346a615c08BF6;
+    address public bPLOTToken; //0x7a86d5eB74C84C3C094404D20c1c0A68dE84b9Fb;
+    address public authController; //0x6f9f333de6eCFa67365916cF95873a4DC480217a;
+    address public migrationController; //0x3A6D2faBDf51Af157F3fC79bb50346a615c08BF6;
     
     /**
      * @dev Checks if msg.sender is authController.
@@ -37,6 +37,12 @@ contract bPLOTMigration {
 
     event MigrationAuthorised(bytes hash);
     event MigrationCompleted(bytes hash);
+
+    constructor(address _bPLOTToken, address _authController, address _migrationController) public {
+        bPLOTToken = _bPLOTToken;
+        authController = _authController;
+        migrationController = _migrationController;
+    }
     
     /**
      * @dev Returns the hash of given params
