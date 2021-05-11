@@ -100,25 +100,30 @@ contract('bLOTToken', function([user1,user2,user3,user4]){
         await assertRevert(bPLOTMigration.migrate(hash,user1,user2,timestamp,"1000000000000000000000",{from:user4}));
     });
 
-    it('11. Should migrate tokens as authorised when called from migrationController', async function() {
+    it('12. Should migrate tokens as authorised when called from migrationController', async function() {
         await BLOTInstance.mint(bPLOTMigration.address,"10000000000000000000000")
         await (bPLOTMigration.migrate(hash,user1,user2,timestamp,"1000000000000000000000",{from:user4}));
     });
 
-    it('12.Should not migrate tokens if the authorised txn is already migrated', async function() {
+    it('13.Should not migrate tokens if the authorised txn is already migrated', async function() {
         await assertRevert(bPLOTMigration.migrate(hash,user1,user2,timestamp,"1000000000000000000000",{from:user4}));
     });
 
-    it('13.Should not migrate tokens if the txn is not authorised', async function() {
+    it('14.Should not migrate tokens if the txn is not authorised', async function() {
         await assertRevert(bPLOTMigration.migrate(hash,user1,user2,timestamp,"2000000000000000000000",{from:user4}));
     });
 
-    it('14.Should revert when not called from authController', async function() {
+    it('15.Should revert when not called from authController', async function() {
         await assertRevert(bPLOTMigration.whitelistMigration(hash,user1,user2,timestamp,"2000000000000000000000",{from:user2}));
     });
 
-    it('15.Should revert when not called from migrationController', async function() {
+    it('16.Should revert when not called from migrationController', async function() {
         await assertRevert(bPLOTMigration.migrate(hash,user1,user2,timestamp,"2000000000000000000000",{from:user2}));
+    });
+
+    it('17.Should be able to renounce as minter', async function() {
+        await bPLOTMigration.renounceMinterRole({from:user3});
+        assert.equal(await BLOTInstance.isMinter(bPLOTMigration.address), false);
     });
 
 })
