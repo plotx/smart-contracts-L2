@@ -30,6 +30,7 @@ contract bPLOTMigration {
     }
     
     mapping(bytes32 => MigrationStatus) public migrationStatus;
+    
     struct MigrationStatus{
         bool initiated;
         bool completed;
