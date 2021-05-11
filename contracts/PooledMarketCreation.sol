@@ -5,6 +5,7 @@ import "./external/openzeppelin-solidity/token/ERC20/ERC20.sol";
 import "./external/NativeMetaTransaction.sol";
 import "./external/openzeppelin-solidity/access/AccessControlMixin.sol";
 import "./external/proxy/OwnedUpgradeabilityProxy.sol";
+import "./interfaces/IAuth.sol";
 
 contract ICyclicMarkets {
   function createMarket(uint32 _marketCurrencyIndex,uint32 _marketTypeIndex, uint80 _roundId) public;
@@ -26,6 +27,7 @@ contract IAllPlotMarkets {
 
 contract PooledMarketCreation is
     ERC20,
+    IAuth,
     NativeMetaTransaction
 {
 
@@ -33,7 +35,6 @@ contract PooledMarketCreation is
 
     ERC20 plotToken;
     IMaster ms;
-    address authorized;
     uint public minLiquidity;
     uint internal predictionDecimalMultiplier;
     uint public unstakeRestrictTime;
@@ -115,8 +116,7 @@ contract PooledMarketCreation is
         emit MarketCreated(_currencyTypeIndex,_marketTypeIndex,initialLiquidity);
     }
 
-    function approveToAllMarkets(uint _amount) public {
-        require(msg.sender == authorized);
+    function approveToAllMarkets(uint _amount) external onlyAuthorized {
         plotToken.approve(ms.getLatestAddress("AM"),_amount);
     }
 
@@ -134,23 +134,20 @@ contract PooledMarketCreation is
 
     }
 
-    function updateUnstakeRestrictTime(uint _val) external {
-        require(msg.sender == authorized);
+    function updateUnstakeRestrictTime(uint _val) external onlyAuthorized {
         require(_val > 0);
         unstakeRestrictTime = _val;
     }
 
-    function updateMinLiquidity(uint _val) external {
-        require(msg.sender == authorized);
+    function updateMinLiquidity(uint _val) external onlyAuthorized {
         require(_val > 0);
         minLiquidity = _val;
     }
 
-    function addAdditionalReward(address _user, uint _val) public {
-
-        require(_user != address(0));
+    function addAdditionalReward(uint _val) external {
         require(_val != 0);
-        require(plotToken.transferFrom(_user, address(this), _val));
-        emit AddedAdditionalReward(_user, _val);
+        address payable _msgSender = _msgSender();
+        require(plotToken.transferFrom(_msgSender, address(this), _val));
+        emit AddedAdditionalReward(_msgSender, _val);
     }
 }
