@@ -11,6 +11,7 @@ contract ICyclicMarkets {
   function createMarket(uint32 _marketCurrencyIndex,uint32 _marketTypeIndex, uint80 _roundId) public;
   function claimCreationReward() external;
   function getInitialLiquidity(uint _marketType) external view returns(uint);
+  function getPendingMarketCreationRewards(address _user) external view returns(uint256 tokenIncentive);
 }
 
 contract IMaster {
@@ -122,15 +123,18 @@ contract PooledMarketCreation is
 
     function claimCreationAndParticipationReward(uint _maxRecords) public {
         IAllPlotMarkets allMarkets = IAllPlotMarkets(ms.getLatestAddress("AM"));
-        ICyclicMarkets(ms.getLatestAddress("CM")).claimCreationReward();
-        (uint _tokenLeft, uint _tokenReward) = allMarkets.getUserUnusedBalance(address(this));
-        if(_tokenLeft.add(_tokenReward) == 0)
-        {
-            return;
+        ICyclicMarkets cyclicMarket = ICyclicMarkets(ms.getLatestAddress("CM"));
+        uint marketcCreationReward = cyclicMarket.getPendingMarketCreationRewards(address(this));
+        if(marketcCreationReward>0){
+            cyclicMarket.claimCreationReward();
         }
-        allMarkets.withdraw(_tokenLeft.add(_tokenReward),_maxRecords);
+        (uint _tokenLeft, uint _tokenReward) = allMarkets.getUserUnusedBalance(address(this));
+        if(_tokenLeft.add(_tokenReward) > 0)
+        {
+            allMarkets.withdraw(_tokenLeft.add(_tokenReward),_maxRecords);
+        }
 
-        emit Claimed(_tokenLeft.add(_tokenReward),_maxRecords);
+        emit Claimed(marketcCreationReward.add(_tokenLeft).add(_tokenReward),_maxRecords);
 
     }
 
