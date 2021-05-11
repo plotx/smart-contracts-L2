@@ -55,7 +55,7 @@ contract bPLOTMigration {
         uint256 _timestamp,
         uint256 _amount
     ) public onlyAuthorized returns (bytes32) {
-        require(migrationStatus[ migrationHash(_hash, _from, _to, _timestamp, _amount)].initiated == false, "Migration is already initiated");
+        require(migrationStatus[ migrationHash(_hash, _from, _to, _timestamp, _amount)].initiated == false, "Migration already initiated");
         
         migrationStatus[ migrationHash(_hash, _from, _to, _timestamp, _amount)].initiated = true;
         emit MigrationAuthorised(_hash);
@@ -74,10 +74,10 @@ contract bPLOTMigration {
         uint256 _timestamp,
         uint256 _amount
     ) public returns (bool){
-        require(msg.sender == migrationController, "msg.sender is not migration controller");
-        require(migrationStatus[ migrationHash(_hash, _from, _to, _timestamp, _amount)].initiated == true, "Migration is already initiated");
-        require(migrationStatus[ migrationHash(_hash, _from, _to, _timestamp, _amount)].completed == false, "Migration has been already completed");
-        
+        require(msg.sender == migrationController, "sender is not migration controller");
+        require(migrationStatus[ migrationHash(_hash, _from, _to, _timestamp, _amount)].initiated == true, "Migration not initiated");
+        require(migrationStatus[ migrationHash(_hash, _from, _to, _timestamp, _amount)].completed == false, "Migration already completed");
+
         IbPLOTToken(bPLOTToken).transfer( _to, _amount);
         migrationStatus[ migrationHash(_hash, _from, _to, _timestamp, _amount)].completed = true;
         emit MigrationCompleted(_hash);
