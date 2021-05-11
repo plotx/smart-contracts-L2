@@ -59,8 +59,6 @@ module.exports = function(deployer, network, accounts){
     let allMarketsProxy = await OwnedUpgradeabilityProxy.at(
       await master.getLatestAddress(web3.utils.toHex('AM'))
       );
-    var date = Date.now();
-    date = Math.round(date/1000);
 
     allMarkets = await AllMarkets.at(allMarketsProxy.address);
     cm = await CyclicMarkets.at(await master.getLatestAddress(web3.utils.toHex('CM')));
@@ -73,6 +71,9 @@ module.exports = function(deployer, network, accounts){
     await allMarkets.initializeDependencies();
     await plotusToken.approve(allMarkets.address, "1000000000000000000000000");
     await cm.whitelistMarketCreator(accounts[0]);
+    var date = Date.now();
+    date = Math.round(date/1000);
+
     await cm.addInitialMarketTypesAndStart(date, ethChainlinkOracle.address, ethChainlinkOracle.address);
     let rf = await deployer.deploy(Referral, master.address);
     let ul = await deployer.deploy(UserLevels, master.address);
