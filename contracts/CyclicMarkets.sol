@@ -102,6 +102,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
 
     mapping(address => uint256) public marketCreationReward;
     mapping (address => uint256) public relayerFeeEarned;
+    mapping(address => bool) public isAuthorizedCreator; // Check if address is authorized to create markets
 
     mapping(address => mapping(uint256 => bool)) public multiplierApplied;
 
@@ -379,12 +380,32 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
     }
 
     /**
+    * @dev Whitelist an address to create market
+    * @param _marketCreator Address to whitelist
+    */
+    function whitelistMarketCreator(address _marketCreator) external onlyAuthorized {
+      require(!isAuthorizedCreator[_marketCreator]);
+      isAuthorizedCreator[_marketCreator] = true;
+    }
+
+    /**
+    * @dev De-Whitelist an existing address to create market
+    * @param _marketCreator Address to remove from whitelist
+    */
+    function deWhitelistMarketCreator(address _marketCreator) external onlyAuthorized {
+      require(isAuthorizedCreator[_marketCreator]);
+      delete isAuthorizedCreator[_marketCreator];
+    }
+
+    /**
     * @dev Create the market.
     * @param _marketCurrencyIndex The index of market currency feed
     * @param _marketTypeIndex The time duration of market.
     * @param _roundId Round Id to settle previous market (If applicable, else pass 0)
     */
     function createMarket(uint32 _marketCurrencyIndex,uint32 _marketTypeIndex, uint80 _roundId) public {
+      address _msgSenderAddress = _msgSender();
+      require(isAuthorizedCreator[_msgSenderAddress], "Not authorized");
       MarketTypeData storage _marketType = marketTypeArray[_marketTypeIndex];
       MarketCurrency storage _marketCurrency = marketCurrencies[_marketCurrencyIndex];
       MarketCreationData storage _marketCreationData = marketCreationData[_marketTypeIndex][_marketCurrencyIndex];
@@ -399,10 +420,10 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       _marketTimes[2] = _marketType.predictionTime*2;
       _marketTimes[3] = _marketType.cooldownTime;
       uint64 _marketIndex = allMarkets.getTotalMarketsLength();
-      address _msgSenderAddress = _msgSender();
       marketPricingData[_marketIndex] = PricingData(stakingFactorMinStake, stakingFactorWeightage, currentPriceWeightage, _marketType.minTimePassed);
-      allMarkets.createMarket(_marketTimes, _optionRanges, _msgSenderAddress, _marketType.initialLiquidity);
       marketData[_marketIndex] = MarketData(_marketTypeIndex, _marketCurrencyIndex, _msgSenderAddress);
+      allMarkets.createMarket(_marketTimes, _optionRanges, _msgSenderAddress, _marketType.initialLiquidity);
+      
       (_marketCreationData.penultimateMarket, _marketCreationData.latestMarket) =
        (_marketCreationData.latestMarket, _marketIndex);
       
@@ -443,7 +464,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       if(currentMarket != 0) {
         require(uint(allMarkets.marketStatus(currentMarket)) >= uint(PredictionStatus.InSettlement));
         uint64 penultimateMarket = _marketCreationData.penultimateMarket;
-        if(penultimateMarket > 0 && now >= allMarkets.marketSettleTime(penultimateMarket)) {
+        if(penultimateMarket > 0 && now >= allMarkets.marketSettleTime(penultimateMarket) && uint(allMarkets.marketStatus(penultimateMarket)) < uint(PredictionStatus.Cooling)) {
           settleMarket(penultimateMarket, _roundId);
         }
       }

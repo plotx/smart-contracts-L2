@@ -43,9 +43,21 @@ describe("Bets Multiple options sheet", () => {
             await plotusToken.transfer(userMarketCreator, toWei(100000));
             await plotusToken.approve(allMarkets.address, toWei(100000), {from: userMarketCreator});
             await cyclicMarkets.setNextOptionPrice(90);
+        });
+        
+        it("Only whitelisted addresses can created market", async () => {
+            await assertRevert(cyclicMarkets.whitelistMarketCreator(user1));
+            await assertRevert(cyclicMarkets.createMarket(0, 0, 0, { from: userMarketCreator }));
+            await cyclicMarkets.whitelistMarketCreator(userMarketCreator);
             await cyclicMarkets.createMarket(0, 0, 0, { from: userMarketCreator });
             marketId++;
+        })
+        
+        it("Should be able to de-whitelist market creators", async () => {
+            await cyclicMarkets.deWhitelistMarketCreator(user1);
+            await assertRevert(cyclicMarkets.deWhitelistMarketCreator(user1));
         });
+
         it("3.1 Scenario 1: player purchase 2 position in same option, in same currency and wins", async () => {
             await plotusToken.transfer(user2, toWei("400"));
             await plotusToken.transfer(user3, toWei("400"));

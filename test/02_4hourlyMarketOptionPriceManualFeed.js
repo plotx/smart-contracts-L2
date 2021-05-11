@@ -73,7 +73,7 @@ contract("Market", async function([user1, user2, user3, user4]) {
 	  });
 
 	it("Add market currency with manual feed", async() => {
-		feedOracle = await ManualFeedOracle.new(user1);
+		feedOracle = await ManualFeedOracle.new(user1, user1, "ETH/PLOT");
 		let startTime = (await latestTime()) / 1;
 
 		await cyclicMarkets.addMarketCurrency(toHex("ETH/PLOT"), feedOracle.address, 8, 1, startTime);
@@ -184,6 +184,8 @@ contract("Market", async function([user1, user2, user3, user4]) {
 
 		await assertRevert(allMarkets.postMarketResult(7, 10000000000, {from:user4}));
 		// await allMarkets.postResultMock(7, 10000000000);
+		let settleTime = await allMarkets.marketSettleTime(7);
+		await feedOracle.postSettlementPrice(settleTime/1, 1195000000000);
 		await cyclicMarkets.createMarket(2, 0, 0);
 
 
@@ -228,10 +230,28 @@ contract("Market", async function([user1, user2, user3, user4]) {
 		assert.equal(truncNumber((await cyclicMarkets.getOptionPrice(9,3))/1e5), 0.63);
 	});
 
-	it("4.Scenario 4 - Stake > minstakes and time passed > min time passed max distance = 2", async () => {
+	it("Should not create market if penultimate market is not settled", async () => {
 		let expireT = await allMarkets.getMarketData(9);
 
 		await increaseTime(14400 + expireT[3]/1 - await latestTime());
+
+		await assertRevert(cyclicMarkets.createMarket(2, 0, 0));
+	});
+
+	it("Should not settle penultimate market if price is not posted in the feed", async () => {
+		await assertRevert(cyclicMarkets.settleMarket(8, 0));
+	});
+
+	it("Should be able to settle penultimate market after price is posted in the feed", async () => {
+		
+		let settleTime = await allMarkets.marketSettleTime(8);
+		await feedOracle.postSettlementPrice(settleTime/1, 1195000000000);
+		await cyclicMarkets.settleMarket(8, 0);
+		await assertRevert(cyclicMarkets.settleMarket(8, 0));
+
+	});
+
+	it("4.Scenario 4 - Stake > minstakes and time passed > min time passed max distance = 2", async () => {
 
 		await cyclicMarkets.createMarket(2, 0, 0);
 

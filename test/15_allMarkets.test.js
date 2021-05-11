@@ -151,6 +151,7 @@ contract("PlotX", ([ab1, ab2, ab3, ab4, mem1, mem2, mem3, mem4, mem5, mem6, mem7
 		// await plotusToken.approve(allMarkets.address, toWei(1000000), {from:user14});
 		await increaseTime(604810);
 		await plotusToken.approve(allMarkets.address, toWei(1000),{from:user14});
+		await cyclicMarkets.whitelistMarketCreator(user14);
 		await cyclicMarkets.createMarket(2,0,0,{from:user14});
 	});
 

@@ -3,17 +3,15 @@ const { assert } = require("chai");
 const OwnedUpgradeabilityProxy = artifacts.require("OwnedUpgradeabilityProxy");
 const Master = artifacts.require("Master");
 const PlotusToken = artifacts.require("MockPLOT");
+const BLOT = artifacts.require("BPLOT");
 const AllMarkets = artifacts.require("MockAllMarkets");
-const CyclicMarkets = artifacts.require("MockCyclicMarkets");
+const AcyclicMarkets = artifacts.require("MockAcyclicMarkets");
 const Referral = artifacts.require("Referral");
 const DisputeResolution = artifacts.require('DisputeResolution');
-const EthChainlinkOracle = artifacts.require('EthChainlinkOracle');
-const BPLOT = artifacts.require('BPLOT');
 const BigNumber = require("bignumber.js");
 const { increaseTimeTo } = require("./utils/increaseTime.js");
 const encode1 = require('./utils/encoder.js').encode1;
 const encode3 = require("./utils/encoder.js").encode3;
-const UserLevels = artifacts.require('UserLevels');
 const signAndExecuteMetaTx = require("./utils/signAndExecuteMetaTx.js").signAndExecuteMetaTx;
 const BN = require('bn.js');
 
@@ -51,43 +49,13 @@ contract("Rewards-Market", async function(users) {
 			masterInstance = await OwnedUpgradeabilityProxy.deployed();
 			masterInstance = await Master.at(masterInstance.address);
 			plotusToken = await PlotusToken.deployed();
+			BLOTInstance = await BLOT.deployed();
 			timeNow = await latestTime();
 
-			allMarkets = await AllMarkets.deployed();
-			cyclicMarkets = await CyclicMarkets.deployed();
-			disputeResolution = await DisputeResolution.deployed();
-
-			await masterInstance.addNewContract(web3.utils.toHex("AM"),allMarkets.address);
-			await masterInstance.addNewContract(web3.utils.toHex("DR"),disputeResolution.address);
-			await masterInstance.addNewContract(web3.utils.toHex("CM"),cyclicMarkets.address);
-
-
 			allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
-			cyclicMarkets = await CyclicMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("CM")));
-			// referral = await Referral.deployed();
+			acyclicMarkets = await AcyclicMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AC")));
+			referral = await Referral.deployed();
 			disputeResolution = await DisputeResolution.at(await masterInstance.getLatestAddress(web3.utils.toHex("DR")));
-
-
-			let bplot = await BPLOT.at(await masterInstance.getLatestAddress(web3.utils.toHex("BL")));
-		    await bplot.initializeDependencies();
-			//===================================//
-			assert.equal(await masterInstance.isInternal(allMarkets.address), true);
-		    await allMarkets.addAuthorizedMarketCreator(cyclicMarkets.address);
-		    await allMarkets.initializeDependencies();
-		    await plotusToken.approve(allMarkets.address, "1000000000000000000000000");
-		    var date = Date.now();
-    		date = Math.round(date/1000);
-    		let ethChainlinkOracle = await EthChainlinkOracle.deployed();
-		    await cyclicMarkets.addInitialMarketTypesAndStart(date, ethChainlinkOracle.address, ethChainlinkOracle.address);
-
-		    referral = await Referral.new(masterInstance.address);
-		    let ul = await UserLevels.new(masterInstance.address);
-		    await cyclicMarkets.setReferralContract(referral.address);
-		    await cyclicMarkets.setUserLevelsContract(ul.address);
-		    
-
-
-		    //======================================================//
             await increaseTime(5 * 3600);
             await plotusToken.transfer(users[12],toWei(100000));
             await plotusToken.transfer(users[11],toWei(100000));
@@ -97,19 +65,16 @@ contract("Rewards-Market", async function(users) {
          
             await plotusToken.transfer(users[11],toWei(100));
             await plotusToken.approve(allMarkets.address,toWei(200000),{from:users[11]});
-			await cyclicMarkets.setNextOptionPrice(18);
-			await cyclicMarkets.claimRelayerRewards();
-            await cyclicMarkets.whitelistMarketCreator(users[11]);
-            await cyclicMarkets.createMarket(0, 0, 0,{from:users[11],gasPrice:500000});
+			await acyclicMarkets.setNextOptionPrice(18);
+			// await acyclicMarkets.claimRelayerRewards();
+			timeNow = await latestTime();
+            await acyclicMarkets.createMarket("Question1", [100,400], [timeNow/1+4*3600,timeNow/1+8*3600,3600],toHex("NFT"),toHex("PLOT"),{from:users[11],gasPrice:500000});
+            
+
             // await assertRevert(marketIncentives.setMasterAddress(users[0], users[0]));
-            await assertRevert(allMarkets.setMasterAddress(users[0], users[0]));
-            await assertRevert(allMarkets.setMarketStatus(6, 1));
-	        await assertRevert(cyclicMarkets.setReferralContract(users[0]));
-			date = Date.now();
-			date = Math.round(date/1000);
-    		await assertRevert(cyclicMarkets.addInitialMarketTypesAndStart(date, users[0], users[0], {from:users[10]}));
-    		await assertRevert(cyclicMarkets.handleFee(100, 1, users[0], users[0], {from:users[10]}));
-			// await marketIncentives.claimCreationReward(100,{from:users[11]});
+            await assertRevert(acyclicMarkets.handleFee(1, 1, users[11], users[11]));
+            await assertRevert(acyclicMarkets.setMasterAddress(users[11], users[11]));
+            // await marketIncentives.claimCreationReward(100,{from:users[11]});
 		});
 
 		it("Scenario 1: Few user wins", async () => {
@@ -118,8 +83,6 @@ contract("Rewards-Market", async function(users) {
 			let predictionVal  = [0,100, 400, 210, 123, 500, 700, 200, 50, 300, 150];
 			let options=[0,2,2,2,3,1,1,2,3,3,2,1];
 			let daoCommissions = [0, 1.8, 6.4, 3.36, 1.968, 8, 11.2, 3.2, 0.8, 4.8, 2.4];
-			const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
-			await assertRevert(referral.setReferrer(ZERO_ADDRESS, ZERO_ADDRESS));
 			for(i=1; i<11;i++){
 				if(i>1) {
 					//Should not allow unauthorized address to set referrer
@@ -128,16 +91,12 @@ contract("Rewards-Market", async function(users) {
 					//SHould not add referrer if already set
 					await assertRevert(referral.setReferrer(users[1], users[i]));
 				}
-				if(i == 10) {
-					await cyclicMarkets.removeReferralContract();
-					await assertRevert(cyclicMarkets.removeReferralContract());
-				}
 				await plotusToken.transfer(users[i], toWei(2000));
 			    await plotusToken.approve(allMarkets.address, toWei(1000000), { from: users[i] });
-			    let functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", totalDepositedPlot, 7, plotusToken.address, predictionVal[i]*1e8, options[i]);
-				await cyclicMarkets.setNextOptionPrice(options[i]*9);
+				await acyclicMarkets.setNextOptionPrice(options[i]*9);
 				// let daoBalanceBefore = await plotusToken.balanceOf(marketIncentives.address);
 				// await allMarkets.depositAndPlacePrediction(totalDepositedPlot, 7, plotusToken.address, predictionVal[i]*1e8, options[i]);
+			    let functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", totalDepositedPlot, 7, plotusToken.address, predictionVal[i]*1e8, options[i]);
 				await signAndExecuteMetaTx(
 			      privateKeyList[i],
 			      users[i],
@@ -147,13 +106,22 @@ contract("Rewards-Market", async function(users) {
 			      );
 			}
 
+			let functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", totalDepositedPlot, 7, plotusToken.address, 1e7, 1);
+			await assertRevert(signAndExecuteMetaTx(
+			  privateKeyList[10],
+			  users[10],
+			  functionSignature,
+			  allMarkets,
+				 "AM"
+			  ));
+
 			//SHould not add referrer if already placed prediction
 			await assertRevert(referral.setReferrer(users[1], users[2]));
 			let relayerBalBefore = await plotusToken.balanceOf(users[0]);
-			await cyclicMarkets.claimRelayerRewards();
+			await acyclicMarkets.claimRelayerRewards();
 			let relayerBalAfter = await plotusToken.balanceOf(users[0]);
 
-			// assert.equal(Math.round((relayerBalAfter-relayerBalBefore)/1e15),11.532*1e3);
+			assert.equal(Math.round((relayerBalAfter-relayerBalBefore)/1e15),11.532*1e3);
 
 
 			let betpoints = [0,5444.44444, 21777.77777, 11433.33333, 4464.44444, 54444.44444, 76222.22222, 10888.88888, 1814.81481, 10888.88888, 8166.66666, 1814.81481, 1814.81481, 1814.81481];
@@ -174,23 +142,22 @@ contract("Rewards-Market", async function(users) {
 				assert.equal(totalDepositedPlot/1e18-unusedBal[0]/1e18,predictionVal[i]);
 			}
 
-			await cyclicMarkets.settleMarket(7,0);
+			let daoBalanceBefore = await plotusToken.balanceOf(masterInstance.address);
+			await acyclicMarkets.settleMarket(7,0);
 			await increaseTime(8*60*60);
 
-			let daoBalanceBefore = await plotusToken.balanceOf(masterInstance.address);
-			await cyclicMarkets.settleMarket(7,0);
+			await acyclicMarkets.settleMarket(7,1);
 			let daoFee = 5.666;
 			let daoBalanceAfter = await plotusToken.balanceOf(masterInstance.address);
 			assert.equal((daoBalanceAfter/1e18).toFixed(2), (daoBalanceBefore/1e18 + daoFee).toFixed(2));
 			
-			
-			let marketCreatorReward = await cyclicMarkets.getPendingMarketCreationRewards(users[11]);
+			let marketCreatorReward = await acyclicMarkets.getPendingMarketCreationRewards(users[11]);
 			assert.equal(226640000,Math.round(marketCreatorReward/1e11));
 
 			// let creationReward = 14.3999;
 			let marketCreatoFee = 22.664;
             let balanceBefore = await plotusToken.balanceOf(users[11]);
-            await cyclicMarkets.claimCreationReward({ from: users[11] });
+            await acyclicMarkets.claimCreationReward({ from: users[11] });
             let balanceAfter = await plotusToken.balanceOf(users[11]);
             assert.equal(~~(balanceAfter/1e15), ~~((balanceBefore/1e14  + marketCreatoFee*1e4)/10));
 
@@ -242,7 +209,7 @@ contract("Rewards-Market", async function(users) {
 		});
 
 		it("Check referral fee", async () => {
-			let referralRewardPlot = [9.932, 0.8, 0.42, 0.246, 1, 1.4, 0.4, 0.1, 0.6, 0];
+			let referralRewardPlot = [10.532, 0.8, 0.42, 0.246, 1, 1.4, 0.4, 0.1, 0.6, 0.3];
 
 			for(i=1;i<11;i++)
 			{
@@ -266,6 +233,22 @@ contract("Rewards-Market", async function(users) {
 				assert.equal(Math.round((plotBalAfter/1e13-plotBalBefore/1e13)),reward/1e3);
 			}
 		})
+
+		it("Should be able to pause market creation", async() => {
+			await acyclicMarkets.toggleMarketCreation(true);
+			await assertRevert(acyclicMarkets.toggleMarketCreation(true));
+			assert.equal(await acyclicMarkets.paused(), true);
+			timeNow = await latestTime();
+            await assertRevert(acyclicMarkets.createMarket("Question1", [100,400], [timeNow/1+4*3600,timeNow/1+8*3600,3600],toHex("NFT"),toHex("PLOT"),{from:users[11]}));
+		});
+
+		it("Should be able to resume market creation", async() => {
+			await acyclicMarkets.toggleMarketCreation(false);
+			await assertRevert(acyclicMarkets.toggleMarketCreation(false));
+			assert.equal(await acyclicMarkets.paused(), false);
+			timeNow = await latestTime();
+            await acyclicMarkets.createMarket("Question1", [100,400], [timeNow/1+4*3600,timeNow/1+8*3600,3600],toHex("NFT"),toHex("PLOT"),{from:users[11]});
+		});
 	});
 });
 
@@ -275,45 +258,10 @@ contract("Rewards-Market Stake less than 1 ether", async function(users) {
 			masterInstance = await OwnedUpgradeabilityProxy.deployed();
 			masterInstance = await Master.at(masterInstance.address);
 			plotusToken = await PlotusToken.deployed();
+			BLOTInstance = await BLOT.deployed();
 			timeNow = await latestTime();
-
-			allMarkets = await AllMarkets.deployed();
-			cyclicMarkets = await CyclicMarkets.deployed();
-			disputeResolution = await DisputeResolution.deployed();
-
-			await masterInstance.addNewContract(web3.utils.toHex("AM"),allMarkets.address);
-			await masterInstance.addNewContract(web3.utils.toHex("DR"),disputeResolution.address);
-			await masterInstance.addNewContract(web3.utils.toHex("CM"),cyclicMarkets.address);
-
-
-			allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
-			cyclicMarkets = await CyclicMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("CM")));
-			// referral = await Referral.deployed();
-			disputeResolution = await DisputeResolution.at(await masterInstance.getLatestAddress(web3.utils.toHex("DR")));
-
-
-			let bplot = await BPLOT.at(await masterInstance.getLatestAddress(web3.utils.toHex("BL")));
-		    await bplot.initializeDependencies();
-			//===================================//
-			assert.equal(await masterInstance.isInternal(allMarkets.address), true);
-		    await allMarkets.addAuthorizedMarketCreator(cyclicMarkets.address);
-		    await allMarkets.initializeDependencies();
-		    await plotusToken.approve(allMarkets.address, "1000000000000000000000000");
-		    var date = Date.now();
-    		date = Math.round(date/1000);
-    		let ethChainlinkOracle = await EthChainlinkOracle.deployed();
-		    await cyclicMarkets.addInitialMarketTypesAndStart(date, ethChainlinkOracle.address, ethChainlinkOracle.address);
-
-		    referral = await Referral.new(masterInstance.address);
-		    let ul = await UserLevels.new(masterInstance.address);
-		    await cyclicMarkets.setReferralContract(referral.address);
-		    await cyclicMarkets.setUserLevelsContract(ul.address);
-		    
-
-
-		    //======================================================//
 			
-			cyclicMarkets = await CyclicMarkets.at(await masterInstance.getLatestAddress(toHex("CM")));
+			acyclicMarkets = await AcyclicMarkets.at(await masterInstance.getLatestAddress(toHex("AC")));
 			allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
 			await increaseTime(5 * 3600);
             await plotusToken.transfer(users[12],toWei(100000));
@@ -324,10 +272,10 @@ contract("Rewards-Market Stake less than 1 ether", async function(users) {
          
             await plotusToken.transfer(users[11],toWei(100));
             await plotusToken.approve(allMarkets.address,toWei(200000),{from:users[11]});
-			await cyclicMarkets.setNextOptionPrice(18);
-			await cyclicMarkets.claimRelayerRewards();
-            await cyclicMarkets.whitelistMarketCreator(users[11]);
-            await cyclicMarkets.createMarket(0, 0, 0,{from:users[11],gasPrice:500000});
+			await acyclicMarkets.setNextOptionPrice(18);
+			// await acyclicMarkets.claimRelayerRewards();
+			timeNow = await latestTime();
+            await acyclicMarkets.createMarket("Question1", [100,400], [timeNow/1+4*3600,timeNow/1+8*3600,3600],toHex("NFT"),toHex("PLOT"),{from:users[11],gasPrice:500000});
             // await marketIncentives.claimCreationReward(100,{from:users[11]});
 		});
 
@@ -338,13 +286,13 @@ contract("Rewards-Market Stake less than 1 ether", async function(users) {
 			let options=[1, 2, 3];
 
 			let relayerBalBefore = await plotusToken.balanceOf(users[0]);
-			await assertRevert(cyclicMarkets.claimRelayerRewards());
+			await assertRevert(acyclicMarkets.claimRelayerRewards());
 			let relayerBalAfter = await plotusToken.balanceOf(users[0]);
 
 			assert.equal(((relayerBalAfter-relayerBalBefore)/1e18),0);
 
 			relayerBalBefore = await plotusToken.balanceOf(users[11]);
-			await cyclicMarkets.claimRelayerRewards({from:users[11]});
+			await acyclicMarkets.claimRelayerRewards({from:users[11]});
 			relayerBalAfter = await plotusToken.balanceOf(users[11]);
 
 			assert.equal(~~((relayerBalAfter-relayerBalBefore)/1e10),100000002);
@@ -363,7 +311,7 @@ contract("Rewards-Market Stake less than 1 ether", async function(users) {
 
 			await increaseTime(8*60*60);
 
-			await cyclicMarkets.settleMarket(7, 0);
+			await acyclicMarkets.settleMarket(7, 1);
 			await plotusToken.transfer(users[12], "700000000000000000000");
 			await plotusToken.approve(allMarkets.address, "500000000000000000000", {
 				from: users[12],
@@ -386,7 +334,7 @@ contract("Rewards-Market Stake less than 1 ether", async function(users) {
 		      );
 			let plotBalAfter = await plotusToken.balanceOf(users[11]);
 			assert.equal(Math.round((plotBalAfter-plotBalBefore)/1e18),Math.round(reward/1e8));
-			let marketCreatorReward = await cyclicMarkets.getPendingMarketCreationRewards(users[11]);
+			let marketCreatorReward = await acyclicMarkets.getPendingMarketCreationRewards(users[11]);
 			assert.equal(8000000,Math.round(marketCreatorReward/1e11));
 
 			let plotBalBeforeCreator = await plotusToken.balanceOf(users[11]);
@@ -396,8 +344,8 @@ contract("Rewards-Market Stake less than 1 ether", async function(users) {
                 privateKeyList[11],
                 users[11],
                 functionSignature,
-                cyclicMarkets,
-              	"CM"
+                acyclicMarkets,
+              	"AC"
                 );
 
 			let plotBalAfterCreator = await plotusToken.balanceOf(users[11]);
@@ -416,45 +364,10 @@ contract("Rewards-Market Raise dispute and pass the proposal ", async function(u
 			masterInstance = await OwnedUpgradeabilityProxy.deployed();
 			masterInstance = await Master.at(masterInstance.address);
 			plotusToken = await PlotusToken.deployed();
+			BLOTInstance = await BLOT.deployed();
 			timeNow = await latestTime();
 
-			allMarkets = await AllMarkets.deployed();
-			cyclicMarkets = await CyclicMarkets.deployed();
-			disputeResolution = await DisputeResolution.deployed();
-
-			await masterInstance.addNewContract(web3.utils.toHex("AM"),allMarkets.address);
-			await masterInstance.addNewContract(web3.utils.toHex("DR"),disputeResolution.address);
-			await masterInstance.addNewContract(web3.utils.toHex("CM"),cyclicMarkets.address);
-
-
-			allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
-			cyclicMarkets = await CyclicMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("CM")));
-			// referral = await Referral.deployed();
-			disputeResolution = await DisputeResolution.at(await masterInstance.getLatestAddress(web3.utils.toHex("DR")));
-
-
-			let bplot = await BPLOT.at(await masterInstance.getLatestAddress(web3.utils.toHex("BL")));
-		    await bplot.initializeDependencies();
-			//===================================//
-			assert.equal(await masterInstance.isInternal(allMarkets.address), true);
-		    await allMarkets.addAuthorizedMarketCreator(cyclicMarkets.address);
-		    await allMarkets.initializeDependencies();
-		    await plotusToken.approve(allMarkets.address, "1000000000000000000000000");
-		    var date = Date.now();
-    		date = Math.round(date/1000);
-    		let ethChainlinkOracle = await EthChainlinkOracle.deployed();
-		    await cyclicMarkets.addInitialMarketTypesAndStart(date, ethChainlinkOracle.address, ethChainlinkOracle.address);
-
-		    referral = await Referral.new(masterInstance.address);
-		    let ul = await UserLevels.new(masterInstance.address);
-		    await cyclicMarkets.setReferralContract(referral.address);
-		    await cyclicMarkets.setUserLevelsContract(ul.address);
-		    
-
-
-		    //======================================================//
-
-			cyclicMarkets = await CyclicMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("CM")));
+			acyclicMarkets = await AcyclicMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AC")));
 			allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
 			disputeResolution = await DisputeResolution.at(await masterInstance.getLatestAddress(web3.utils.toHex("DR")));
             await increaseTime(5 * 3600);
@@ -466,11 +379,11 @@ contract("Rewards-Market Raise dispute and pass the proposal ", async function(u
          
             await plotusToken.transfer(users[11],toWei(100));
             await plotusToken.approve(allMarkets.address,toWei(200000),{from:users[11]});
-			await cyclicMarkets.setNextOptionPrice(18);
-			await cyclicMarkets.claimRelayerRewards();
-            await cyclicMarkets.whitelistMarketCreator(users[11]);
-            await cyclicMarkets.createMarket(0, 0, 0,{from:users[11],gasPrice:500000});
-            await assertRevert(cyclicMarkets.claimCreationReward({from:users[11]}));
+			await acyclicMarkets.setNextOptionPrice(18);
+			// await acyclicMarkets.claimRelayerRewards();
+			timeNow = await latestTime();
+            await acyclicMarkets.createMarket("Question1", [100,400], [timeNow/1+4*3600,timeNow/1+8*3600,3600],toHex("NFT"),toHex("PLOT"),{from:users[11],gasPrice:500000});
+            await assertRevert(acyclicMarkets.claimCreationReward({from:users[11]}));
 		});
 
 		it("Scenario 1: Few user wins", async () => {
@@ -488,7 +401,7 @@ contract("Rewards-Market Raise dispute and pass the proposal ", async function(u
 				await plotusToken.transfer(users[i], toWei(2000));
 			    await plotusToken.approve(allMarkets.address, toWei(1000000), { from: users[i] });
 			    let functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", totalDepositedPlot, 7, plotusToken.address, predictionVal[i]*1e8, options[i]);
-				await cyclicMarkets.setNextOptionPrice(options[i]*9);
+				await acyclicMarkets.setNextOptionPrice(options[i]*9);
 				// let daoBalanceBefore = await plotusToken.balanceOf(masterInstance.address);
 				// await allMarkets.depositAndPlacePrediction(totalDepositedPlot, 7, plotusToken.address, predictionVal[i]*1e8, options[i]);
 				await signAndExecuteMetaTx(
@@ -505,7 +418,7 @@ contract("Rewards-Market Raise dispute and pass the proposal ", async function(u
 			//SHould not add referrer if already placed prediction
 			await assertRevert(referral.setReferrer(users[1], users[2]));
 			let relayerBalBefore = await plotusToken.balanceOf(users[0]);
-			await cyclicMarkets.claimRelayerRewards();
+			await acyclicMarkets.claimRelayerRewards();
 			let relayerBalAfter = await plotusToken.balanceOf(users[0]);
 
 			assert.equal(Math.round((relayerBalAfter-relayerBalBefore)/1e15),11.532*1e3);
@@ -531,7 +444,7 @@ contract("Rewards-Market Raise dispute and pass the proposal ", async function(u
 
 			await increaseTime(8*60*60);
 
-			await cyclicMarkets.settleMarket(7, 0);
+			await acyclicMarkets.settleMarket(7, 1);
 			await plotusToken.transfer(users[12], "700000000000000000000");
 			await plotusToken.approve(disputeResolution.address, "500000000000000000000", {
 				from: users[12],
@@ -582,7 +495,7 @@ contract("Rewards-Market Raise dispute and pass the proposal ", async function(u
 				assert.equal(Math.round((plotBalAfter-plotBalBefore)/1e18),Math.round((totalDepositedPlot/1e18-predictionVal[i])/1+reward/1e8));
 			}
 
-			let marketCreatorReward = await cyclicMarkets.getPendingMarketCreationRewards(users[11]);
+			let marketCreatorReward = await acyclicMarkets.getPendingMarketCreationRewards(users[11]);
 			assert.equal(226640000,Math.round(marketCreatorReward/1e11));
 
 			let plotBalBeforeCreator = await plotusToken.balanceOf(users[11]);
@@ -592,8 +505,8 @@ contract("Rewards-Market Raise dispute and pass the proposal ", async function(u
                 privateKeyList[11],
                 users[11],
                 functionSignature,
-                cyclicMarkets,
-                "CM"
+                acyclicMarkets,
+                "AC"
                 );
 
 			let plotBalAfterCreator = await plotusToken.balanceOf(users[11]);

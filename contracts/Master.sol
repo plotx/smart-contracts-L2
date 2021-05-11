@@ -46,6 +46,7 @@ contract Master is IAuth {
         );
         require(!masterInitialised);
         require(msg.sender == proxy.proxyOwner(), "Sender is not proxy owner.");
+        require(_token != address(0));
         require(_defaultAddress != address(0));
         require(_authMultiSig != address(0));
         masterInitialised = true;
@@ -55,6 +56,7 @@ contract Master is IAuth {
         allContractNames.push("BL");
         // allContractNames.push("DR");
         // allContractNames.push("CM");
+        // allContractNames.push("AC");
 
         require(
             allContractNames.length == _implementations.length,

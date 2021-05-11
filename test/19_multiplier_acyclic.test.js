@@ -4,7 +4,7 @@ const Master = artifacts.require("Master");
 const PlotusToken = artifacts.require("MockPLOT");
 const AllMarkets = artifacts.require("MockAllMarkets");
 const UserLevels = artifacts.require("UserLevels");
-const CyclicMarkets = artifacts.require('MockCyclicMarkets');
+const AcyclicMarkets = artifacts.require("MockAcyclicMarkets");
 
 const ethAddress = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
 const signAndExecuteMetaTx = require("./utils/signAndExecuteMetaTx.js").signAndExecuteMetaTx;
@@ -33,45 +33,17 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
             masterInstance = await Master.at(masterInstance.address);
             plotusToken = await PlotusToken.deployed();
             allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
-            cyclicMarkets = await CyclicMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("CM")));
             userLevels = await UserLevels.deployed();
+            acyclicMarkets = await AcyclicMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AC")));
             marketId = 6;
             await increaseTime(4 * 60 * 60 + 1);
             await plotusToken.transfer(userMarketCreator, toWei(1000));
             await plotusToken.approve(allMarkets.address, toWei(1000), { from: userMarketCreator });
-            await cyclicMarkets.whitelistMarketCreator(userMarketCreator);
-            await cyclicMarkets.createMarket(0, 0, 0, { from: userMarketCreator });
+            timeNow = await latestTime();
+            await acyclicMarkets.createMarket("Question1", [100,400], [timeNow/1+4*3600,timeNow/1+8*3600,3600],toHex("NFT"),toHex("PLOT"), { from: userMarketCreator });
             marketId++;
         });
-        it("1.0 Set user levels", async () => {
-
-          let userLevelsArray = [];
-          let multipliers = [];
-          for(let i = 1; i <= 25; i++) {
-              userLevelsArray.push(i);
-              multipliers.push(5*i);
-          }
-          let actionHash = encode1(
-            ['uint256[]', 'uint256[]'],
-            [
-              userLevelsArray,
-              multipliers
-            ]
-          );
-
-          await userLevels.setMultiplierLevels(userLevelsArray, multipliers);
-          await assertRevert(userLevels.setMultiplierLevels(userLevelsArray, multipliers, { from: user2 }));
-          await assertRevert(userLevels.setMultiplierLevels([1,2,3], [1,2]));
-          
-          await userLevels.setUserLevel(user1, 1);
-          await userLevels.setUserLevel(user2, 2);
-          await userLevels.setUserLevel(user3, 5);
-          await userLevels.setUserLevel(user4, 10);
-          await userLevels.setUserLevel(user5, 22);
-        })
         it("1.1 Position without User levels", async () => {
-            await cyclicMarkets.removeUserLevelsContract();
-            await assertRevert(cyclicMarkets.removeUserLevelsContract());
             await plotusToken.transfer(user1, toWei("100"));
             await plotusToken.transfer(user2, toWei("400"));
             await plotusToken.transfer(user3, toWei("100"));
@@ -90,8 +62,8 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
             // await allMarkets.deposit(toWei(100), { from: user4 });
             // await allMarkets.deposit(toWei(10), { from: user5 });
 
-            await cyclicMarkets.setNextOptionPrice(9);
-            assert.equal((await cyclicMarkets.getOptionPrice(marketId, 1)) / 1, 9);
+            await acyclicMarkets.setNextOptionPrice(9);
+            assert.equal((await acyclicMarkets.getOptionPrice(marketId, 1)) / 1, 9);
             // await allMarkets.depositAndPlacePrediction(toWei(100), marketId, plotusToken.address, to8Power("100"), 1, { from: user3 });
             let functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", toWei(100), marketId, plotusToken.address, to8Power("100"), 1);
             await signAndExecuteMetaTx(
@@ -101,8 +73,8 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
               allMarkets,
               "AM"
             );
-            await cyclicMarkets.setNextOptionPrice(18);
-            assert.equal((await cyclicMarkets.getOptionPrice(marketId, 2)) / 1, 18);
+            await acyclicMarkets.setNextOptionPrice(18);
+            assert.equal((await acyclicMarkets.getOptionPrice(marketId, 2)) / 1, 18);
             // assert.equal((await allMarkets.getMarketData(marketId))._optionPrice[1] / 1, 18);
             // await allMarkets.depositAndPlacePrediction(toWei(100), marketId, plotusToken.address, to8Power("100"), 2, { from: user1 });
             functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", toWei(100), marketId, plotusToken.address, to8Power("100"), 2);
@@ -122,8 +94,8 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
               allMarkets,
               "AM"
             );
-            await cyclicMarkets.setNextOptionPrice(27);
-            assert.equal((await cyclicMarkets.getOptionPrice(marketId, 3)) / 1, 27);
+            await acyclicMarkets.setNextOptionPrice(27);
+            assert.equal((await acyclicMarkets.getOptionPrice(marketId, 3)) / 1, 27);
             // assert.equal((await allMarkets.getMarketData(marketId))._optionPrice[2] / 1, 27);
             // await allMarkets.depositAndPlacePrediction(toWei(100), marketId, plotusToken.address, to8Power("100"), 3, { from: user4 });
             functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", toWei(100), marketId, plotusToken.address, to8Power("100"), 3);
@@ -165,7 +137,7 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
             await increaseTime(8 * 60 * 60);
             let daobalanceBefore = await plotusToken.balanceOf(masterInstance.address);
             daobalanceBefore = daobalanceBefore*1;
-            await cyclicMarkets.settleMarket(7, 0);
+            await acyclicMarkets.settleMarket(7, 1);
             await increaseTime(8 * 60 * 60);
             let daobalanceAfter = await plotusToken.balanceOf(masterInstance.address);
             daobalanceAfter = daobalanceAfter*1;
@@ -174,24 +146,41 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
             assert.equal(~~(daobalanceAfter/1e15), daobalanceBefore/1e15  + daoCommission*1e3);
             let creationReward = 14.399;
             let balanceBefore = await plotusToken.balanceOf(userMarketCreator);
-            await cyclicMarkets.claimCreationReward({ from: userMarketCreator });
+            await acyclicMarkets.claimCreationReward({ from: userMarketCreator });
             let balanceAfter = await plotusToken.balanceOf(userMarketCreator);
             assert.equal(~~(balanceAfter/1e15), balanceBefore/1e15  + creationReward*1e3);
         });
 
-        it("Set User levels contract to activate multiplier", async () => {
-          await cyclicMarkets.setUserLevelsContract(userLevels.address);
-          await assertRevert(cyclicMarkets.setUserLevelsContract(user1));
-        })
-
         it("1.2 Positions After increasing user levels", async () => {
             await increaseTime(4 * 60 * 60 + 1);
 
-            await cyclicMarkets.createMarket(0, 0, 0, { from: userMarketCreator })
+            let userLevelsArray = [];
+            let multipliers = [];
+            for(let i = 1; i <= 25; i++) {
+                userLevelsArray.push(i);
+                multipliers.push(5*i);
+            }
+            let actionHash = encode1(
+              ['uint256[]', 'uint256[]'],
+              [
+                userLevelsArray,
+                multipliers
+              ]
+            );
+
+            await userLevels.setMultiplierLevels(userLevelsArray, multipliers);
+            await assertRevert(userLevels.setMultiplierLevels(userLevelsArray, multipliers, { from: user2 }));
+            await assertRevert(userLevels.setMultiplierLevels([1,2,3], [1,2]));
+            timeNow = await latestTime();
+            await acyclicMarkets.createMarket("Question2", [100,400], [timeNow/1+4*3600,timeNow/1+8*3600,3600],toHex("NFT"),toHex("PLOT"), { from: userMarketCreator })
             marketId++;
             
             await assertRevert(userLevels.setUserLevel(user1, 1, {from:user2}));
-
+            await userLevels.setUserLevel(user1, 1);
+            await userLevels.setUserLevel(user2, 2);
+            await userLevels.setUserLevel(user3, 5);
+            await userLevels.setUserLevel(user4, 10);
+            await userLevels.setUserLevel(user5, 22);
             await plotusToken.transfer(user1, toWei("100"));
             await plotusToken.transfer(user2, toWei("400"));
             await plotusToken.transfer(user3, toWei("100"));
@@ -210,8 +199,8 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
             // await allMarkets.deposit(toWei(100), { from: user4 });
             // await allMarkets.deposit(toWei(10), { from: user5 });
 
-            await cyclicMarkets.setNextOptionPrice(9);
-            assert.equal((await cyclicMarkets.getOptionPrice(marketId, 1)) / 1, 9);
+            await acyclicMarkets.setNextOptionPrice(9);
+            assert.equal((await acyclicMarkets.getOptionPrice(marketId, 1)) / 1, 9);
             // assert.equal((await allMarkets.getMarketData(marketId))._optionPrice[0] / 1, 9);
             // await allMarkets.depositAndPlacePrediction(toWei(100), marketId, plotusToken.address, to8Power("100"), 1, { from: user3 });
             let functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", toWei(100), marketId, plotusToken.address, to8Power("100"), 1);
@@ -222,8 +211,8 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
               allMarkets,
               "AM"
             );
-            await cyclicMarkets.setNextOptionPrice(18);
-            assert.equal((await cyclicMarkets.getOptionPrice(marketId, 2)) / 1, 18);
+            await acyclicMarkets.setNextOptionPrice(18);
+            assert.equal((await acyclicMarkets.getOptionPrice(marketId, 2)) / 1, 18);
             // assert.equal((await allMarkets.getMarketData(marketId))._optionPrice[1] / 1, 18);
             // await allMarkets.depositAndPlacePrediction(toWei(100), marketId, plotusToken.address, to8Power("100"), 2, { from: user1 });
             functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", toWei(100), marketId, plotusToken.address, to8Power("100"), 2);
@@ -243,8 +232,8 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
               allMarkets,
               "AM"
             );
-            await cyclicMarkets.setNextOptionPrice(27);
-            assert.equal((await cyclicMarkets.getOptionPrice(marketId, 3)) / 1, 27);
+            await acyclicMarkets.setNextOptionPrice(27);
+            assert.equal((await acyclicMarkets.getOptionPrice(marketId, 3)) / 1, 27);
             // assert.equal((await allMarkets.getMarketData(marketId))._optionPrice[2] / 1, 27);
             // await allMarkets.depositAndPlacePrediction(toWei(100), marketId, plotusToken.address, to8Power("100"), 3, { from: user4 });
             functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", toWei(100), marketId, plotusToken.address, to8Power("100"), 3);
@@ -286,7 +275,7 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
             await increaseTime(8 * 60 * 60);
             let daobalanceBefore = await plotusToken.balanceOf(masterInstance.address);
             daobalanceBefore = daobalanceBefore*1;
-            await cyclicMarkets.settleMarket(marketId, 0);
+            await acyclicMarkets.settleMarket(marketId, 1);
             await increaseTime(8 * 60 * 60);
             let daobalanceAfter = await plotusToken.balanceOf(masterInstance.address);
             daobalanceAfter = daobalanceAfter*1;
@@ -295,17 +284,16 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
             assert.equal(~~(daobalanceAfter/1e15), ~~((((daobalanceBefore/1e14))  + daoCommission*1e4)/10));
             let creationReward = 14.3999;
             let balanceBefore = await plotusToken.balanceOf(userMarketCreator);
-            await cyclicMarkets.claimCreationReward({ from: userMarketCreator });
+            await acyclicMarkets.claimCreationReward({ from: userMarketCreator });
             let balanceAfter = await plotusToken.balanceOf(userMarketCreator);
             assert.equal(~~(balanceAfter/1e15), ~~((balanceBefore/1e14  + creationReward*1e4)/10));
 
         });
 
-
         it("1.3 Positions After increasing user levels, should not give multiplier twice", async () => {
           await increaseTime(4 * 60 * 60 + 1);
-
-          await cyclicMarkets.createMarket(0, 0, 0, { from: userMarketCreator })
+          timeNow = await latestTime();
+          await acyclicMarkets.createMarket("Question3", [100,400], [timeNow/1+4*3600,timeNow/1+8*3600,3600],toHex("NFT"),toHex("PLOT"), { from: userMarketCreator })
           marketId++;
 
           await plotusToken.transfer(user1, toWei("200"));
@@ -318,7 +306,7 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
           // await allMarkets.deposit(toWei(100), { from: user4 });
           // await allMarkets.deposit(toWei(10), { from: user5 });
 
-          await cyclicMarkets.setNextOptionPrice(18);
+          await acyclicMarkets.setNextOptionPrice(18);
           // assert.equal((await allMarkets.getMarketData(marketId))._optionPrice[0] / 1, 9);
           // await allMarkets.depositAndPlacePrediction(toWei(100), marketId, plotusToken.address, to8Power("100"), 1, { from: user3 });
           let functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", toWei(100), marketId, plotusToken.address, to8Power("100"), 1);
@@ -331,7 +319,7 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
           );
           predictionPointsBeforeUser1 = (await allMarkets.getUserPredictionPoints(user1, marketId, 1)) / 1e5;
 
-          await cyclicMarkets.setNextOptionPrice(18);
+          await acyclicMarkets.setNextOptionPrice(18);
           functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", toWei(100), marketId, plotusToken.address, to8Power("100"), 1);
           await signAndExecuteMetaTx(
             privateKeyList[1],
@@ -353,6 +341,6 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
               assert.equal(expectedPredictionPoints[i], predictionPointArray[i]);
           }
 
-      });
+        });
     });
 });
