@@ -18,45 +18,48 @@ module.exports = function(deployer, network, accounts){
     deployPlotusToken.mint(accounts[0],"30000000000000000000000000");
     let plotusToken = await PlotusToken.at(deployPlotusToken.address);
     
-    let ethChainlinkOracle = await EthChainlinkOracle.deployed();
+    // let ethChainlinkOracle = await EthChainlinkOracle.deployed();
     let bPlotToken = await BPLOT.deployed();
     let masterProxy = await Master.deployed();
     let master = await OwnedUpgradeabilityProxy.deployed();
-    let allMarkets = await AllMarkets.deployed();
-    let dr = await DisputeResolution.deployed();
-    let cm = await CyclicMarkets.deployed();
-    let ac = await AcyclicMarkets.deployed();
+
+//     let allMarkets = await AllMarkets.deployed();
+//     let dr = await DisputeResolution.deployed();
+//     let cm = await CyclicMarkets.deployed();
+//     let ac = await AcyclicMarkets.deployed();
     master = await Master.at(master.address);
-    let implementations = [allMarkets.address, bPlotToken.address, dr.address, cm.address, ac.address];
+//     let implementations = [allMarkets.address, bPlotToken.address, dr.address, cm.address, ac.address];
+    let implementations = [bPlotToken.address];
+
     console.log(accounts[0])
     await master.initiateMaster(implementations, deployPlotusToken.address, accounts[0], accounts[0]);
     master = await OwnedUpgradeabilityProxy.at(master.address);
     await master.transferProxyOwnership(accounts[0]);
     master = await Master.at(master.address);
-    
-    let allMarketsProxy = await OwnedUpgradeabilityProxy.at(
-      await master.getLatestAddress(web3.utils.toHex('AM'))
-      );
-    var date = Date.now();
-    date = Math.round(date/1000);
 
-    allMarkets = await AllMarkets.at(allMarketsProxy.address);
-    cm = await CyclicMarkets.at(await master.getLatestAddress(web3.utils.toHex('CM')));
-    ac = await AcyclicMarkets.at(await master.getLatestAddress(web3.utils.toHex('AC')));
-    // await allMarkets.setAssetPlotConversionRate(plotusToken.address, 1);
+//     let allMarketsProxy = await OwnedUpgradeabilityProxy.at(
+//       await master.getLatestAddress(web3.utils.toHex('AM'))
+//       );
+//     var date = Date.now();
+//     date = Math.round(date/1000);
 
-    assert.equal(await master.isInternal(allMarkets.address), true);
-    await allMarkets.addAuthorizedMarketCreator(ac.address);
-    await allMarkets.addAuthorizedMarketCreator(cm.address);
-    await allMarkets.initializeDependencies();
-    await plotusToken.approve(allMarkets.address, "1000000000000000000000000");
-    await cm.whitelistMarketCreator(accounts[0]);
-    await cm.addInitialMarketTypesAndStart(date, ethChainlinkOracle.address, ethChainlinkOracle.address);
-    let rf = await deployer.deploy(Referral, master.address);
-    let ul = await deployer.deploy(UserLevels, master.address);
-    await cm.setReferralContract(rf.address);
-    await cm.setUserLevelsContract(ul.address);
-    await ac.setReferralContract(rf.address);
-    await ac.setUserLevelsContract(ul.address);
+//     allMarkets = await AllMarkets.at(allMarketsProxy.address);
+//     cm = await CyclicMarkets.at(await master.getLatestAddress(web3.utils.toHex('CM')));
+//     ac = await AcyclicMarkets.at(await master.getLatestAddress(web3.utils.toHex('AC')));
+//     // await allMarkets.setAssetPlotConversionRate(plotusToken.address, 1);
+
+//     assert.equal(await master.isInternal(allMarkets.address), true);
+//     await allMarkets.addAuthorizedMarketCreator(ac.address);
+//     await allMarkets.addAuthorizedMarketCreator(cm.address);
+//     await allMarkets.initializeDependencies();
+//     await plotusToken.approve(allMarkets.address, "1000000000000000000000000");
+//     await cm.whitelistMarketCreator(accounts[0]);
+//     await cm.addInitialMarketTypesAndStart(date, ethChainlinkOracle.address, ethChainlinkOracle.address);
+//     let rf = await deployer.deploy(Referral, master.address);
+//     let ul = await deployer.deploy(UserLevels, master.address);
+//     await cm.setReferralContract(rf.address);
+//     await cm.setUserLevelsContract(ul.address);
+//     await ac.setReferralContract(rf.address);
+//     await ac.setUserLevelsContract(ul.address);
   });
 };

@@ -36,6 +36,8 @@ contract BPLOT is Iupgradable {
  
     mapping (address => uint256) internal _balances;
 
+    IMaster ms;
+
     uint256 private _totalSupply;
 
     /**
@@ -73,10 +75,14 @@ contract BPLOT is Iupgradable {
         );
         require(msg.sender == proxy.proxyOwner(), "Sender is not proxy owner.");
         require(plotToken == address(0), "Already Initialized");
-        IMaster ms = IMaster(msg.sender);
+        ms = IMaster(msg.sender);
         plotToken = ms.dAppToken();
         authorized = ms.getLatestAddress("AM");
         _addMinter(_defaultMinter);
+    }
+
+    function initializeDependencies() public {
+        authorized = ms.getLatestAddress("AM");
     }
     
  

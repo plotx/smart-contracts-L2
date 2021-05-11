@@ -7,6 +7,9 @@ const CyclicMarkets = artifacts.require("MockCyclicMarkets");
 const EthChainlinkOracle = artifacts.require('MockChainLinkAggregator');
 const BLOT = artifacts.require("BPLOT");
 const BigNumber = require("bignumber.js");
+const Referral = artifacts.require("Referral");
+const DisputeResolution = artifacts.require('DisputeResolution');
+const UserLevels = artifacts.require('UserLevels');
 
 const increaseTime = require("./utils/increaseTime.js").increaseTime;
 const assertRevert = require("./utils/assertRevert").assertRevert;
@@ -33,6 +36,43 @@ describe("newPlotusWithBlot", () => {
             masterInstance = await OwnedUpgradeabilityProxy.deployed();
             masterInstance = await Master.at(masterInstance.address);
             plotusToken = await PlotusToken.deployed();
+            timeNow = await latestTime();
+            allMarkets = await AllMarkets.deployed();
+            cyclicMarkets = await CyclicMarkets.deployed();
+            disputeResolution = await DisputeResolution.deployed();
+
+            await masterInstance.addNewContract(web3.utils.toHex("AM"),allMarkets.address);
+            await masterInstance.addNewContract(web3.utils.toHex("DR"),disputeResolution.address);
+            await masterInstance.addNewContract(web3.utils.toHex("CM"),cyclicMarkets.address);
+
+
+            allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
+            cyclicMarkets = await CyclicMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("CM")));
+            // referral = await Referral.deployed();
+            disputeResolution = await DisputeResolution.at(await masterInstance.getLatestAddress(web3.utils.toHex("DR")));
+
+
+            let bplot = await BLOT.at(await masterInstance.getLatestAddress(web3.utils.toHex("BL")));
+            await bplot.initializeDependencies();
+            //===================================//
+            assert.equal(await masterInstance.isInternal(allMarkets.address), true);
+            await allMarkets.addAuthorizedMarketCreator(cyclicMarkets.address);
+            await allMarkets.initializeDependencies();
+            await plotusToken.approve(allMarkets.address, "1000000000000000000000000");
+            var date = Date.now();
+            date = Math.round(date/1000);
+            let ethChainlinkOracle = await EthChainlinkOracle.deployed();
+            await cyclicMarkets.addInitialMarketTypesAndStart(date, ethChainlinkOracle.address, ethChainlinkOracle.address);
+
+            referral = await Referral.new(masterInstance.address);
+            let ul = await UserLevels.new(masterInstance.address);
+            await cyclicMarkets.setReferralContract(referral.address);
+            await cyclicMarkets.setUserLevelsContract(ul.address);
+            
+
+
+            //======================================================//
+
             allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
 			cyclicMarkets = await CyclicMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("CM")));
             await increaseTime(4 * 60 * 60 + 1);
