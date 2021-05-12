@@ -71,7 +71,7 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
     mapping(uint256 => MarketData) internal marketData;
     mapping(address => uint256) public marketCreationReward;
     mapping (address => uint256) public relayerFeeEarned;
-    // mapping(uint256 => uint) public marketMaxOption;
+    mapping(address => bool) public whiteListedMarketCreators;
 
     mapping(address => mapping(uint256 => bool)) public multiplierApplied;
 
@@ -79,7 +79,6 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
     uint internal stakingFactorMinStake;
     uint32 internal stakingFactorWeightage;
     uint32 internal timeWeightage;
-    uint64 internal marketInitialLiquidity;
     uint internal predictionDecimalMultiplier;
     uint internal minPredictionAmount;
     uint internal maxPredictionAmount;
@@ -117,8 +116,24 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
       maxPredictionAmount = 100000 ether; // Need to be updated
       minTimePassed = 10 hours; // need to set
       predictionDecimalMultiplier = 10;
-      marketInitialLiquidity = 100 * 1e8;
       _initializeEIP712("AC");
+    }
+
+    /**
+    * @dev Whitelisting Market Creators
+    * @param _userAdd Address of the creator
+    */
+    function addWhiteListedAddress(address _userAdd) external onlyAuthorized {
+      require(_userAdd != address(0));
+      whiteListedMarketCreators[_userAdd] = true;
+    }
+
+    /**
+    * @dev Removing user from whitelist
+    */
+    function removeFromWhitelist(address _userAdd) external onlyAuthorized {
+      require(_userAdd != address(0));
+      whiteListedMarketCreators[_userAdd] = false;
     }
 
     /**
@@ -158,21 +173,22 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
     /**
     * @dev Create the market.
     */
-    function createMarket(string calldata _questionDetails, uint64[] calldata _optionRanges, uint32[] calldata _marketTimes,bytes8 _marketType, bytes8 _marketCurr) external {
+    function createMarket(string calldata _questionDetails, uint64[] calldata _optionRanges, uint32[] calldata _marketTimes,bytes8 _marketType, bytes8 _marketCurr, uint64 _marketInitialLiquidity) external {
       require(!paused);
-      // Add check for market creator
+      // address _marketCreator = _msgSender();
+      require(whiteListedMarketCreators[_msgSender()]);
       uint32[] memory _timesArray = new uint32[](_marketTimes.length+1);
       _timesArray[0] = uint32(now);
       _timesArray[1] = _marketTimes[0].sub(uint32(now));
       _timesArray[2] = _marketTimes[1].sub(uint32(now));
       _timesArray[3] = _marketTimes[2];
       uint64 _marketId = allMarkets.getTotalMarketsLength();
-      address _marketCreator = _msgSender();
+      
       marketData[_marketId].pricingData = PricingData(stakingFactorMinStake, stakingFactorWeightage, timeWeightage, minTimePassed);
-      marketData[_marketId].marketCreator = _marketCreator;
-      allMarkets.createMarket(_timesArray, _optionRanges, _marketCreator, marketInitialLiquidity);
+      marketData[_marketId].marketCreator = _msgSender();
+      allMarkets.createMarket(_timesArray, _optionRanges, _msgSender(), _marketInitialLiquidity);
 
-      emit MarketParams(_marketId, _questionDetails, _optionRanges,_marketTimes, stakingFactorMinStake, minTimePassed, _marketCreator, _marketType, _marketCurr);
+      emit MarketParams(_marketId, _questionDetails, _optionRanges,_marketTimes, stakingFactorMinStake, minTimePassed, _msgSender(), _marketType, _marketCurr);
     }
 
     /**
