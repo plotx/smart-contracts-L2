@@ -342,6 +342,36 @@ contract AllPlotMarkets is IAuth, NativeMetaTransaction {
     }
 
     /**
+    * @dev Deposit and Place prediction on the available options of the market with both PLOT and BPLOT.
+    * @param _marketId Index of the market
+    * @param _tokenDeposit prediction token amount to deposit
+    * @param _asset The asset used by user during prediction whether it is prediction token address or in Bonus token.
+    * @param _prediction The option on which user placed prediction.
+    * @param _plotPredictionAmount The PLOT amount staked by user at the time of prediction.
+    * @param _bPLOTPredictionAmount The BPLOT amount staked by user at the time of prediction.
+    * _tokenDeposit should be passed with 18 decimals
+    * _plotPredictionAmount and _bPLOTPredictionAmount should be passed with 8 decimals, reduced it to 8 decimals to reduce the storage space of prediction data
+    */
+    function depositAndPredictWithBoth(uint _tokenDeposit, uint _marketId, address _asset, uint256 _prediction, uint64 _plotPredictionAmount, uint64 _bPLOTPredictionAmount) external {
+      address payable _msgSenderAddress = _msgSender();
+      UserData storage _userData = userData[_msgSenderAddress];
+      uint64 _predictionStake = _plotPredictionAmount.add(_bPLOTPredictionAmount);
+      //Can deposit only if prediction stake amount contains plot
+      if(_plotPredictionAmount > 0 && _tokenDeposit > 0) {
+        _deposit(_tokenDeposit, _msgSenderAddress);
+      }
+      if(_bPLOTPredictionAmount > 0) {
+        require(!_userData.userMarketData[_marketId].predictedWithBlot);
+        _userData.userMarketData[_marketId].predictedWithBlot = true;
+        uint256 _amount = (10**predictionDecimalMultiplier).mul(_bPLOTPredictionAmount);
+        bPLOTInstance.convertToPLOT(_msgSenderAddress, address(this), _amount);
+        _userData.unusedBalance = _userData.unusedBalance.add(_amount);
+      }
+      require(_asset == plotToken);
+      _placePrediction(_marketId, _msgSenderAddress, _asset, _predictionStake, _prediction);
+    }
+
+    /**
     * @dev Deposit and Place prediction on the available options of the market.
     * @param _marketId Index of the market
     * @param _tokenDeposit prediction token amount to deposit

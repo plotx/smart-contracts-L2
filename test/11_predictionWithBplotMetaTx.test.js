@@ -80,6 +80,23 @@ describe("newPlotusWithBlot", () => {
               predictionToken = BLOTInstance.address;
             }
             let functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)",depositAmt , 7, predictionToken, to8Power(predictionVal[i]), options[i]);
+            if(i == 5) {
+                // Predict with only bPLOT
+                predictionToken = plotusToken.address;
+                functionSignature = encode3("depositAndPredictWithBoth(uint,uint,address,uint256,uint64,uint64)",depositAmt , 7, predictionToken, options[i], 0, to8Power(predictionVal[i]));
+            }
+            if( i==4) {
+                // Predict with some plot and some bPLOT
+                predictionToken = plotusToken.address;
+                await plotusToken.transfer(users[i], toWei(1));
+                await plotusToken.approve(allMarkets.address, toWei(1), { from: users[i] });
+                depositAmt=toWei(1);
+                functionSignature = encode3("depositAndPredictWithBoth(uint,uint,address,uint256,uint64,uint64)",depositAmt , 7, predictionToken, options[i], to8Power(1), to8Power(predictionVal[i]-1));
+            }
+            if(i == 3) {
+                // Predict with only PLOT
+                functionSignature = encode3("depositAndPredictWithBoth(uint,uint,address,uint256,uint64,uint64)",depositAmt , 7, predictionToken, options[i], to8Power(predictionVal[i]), 0);
+            }
             await cyclicMarkets.setNextOptionPrice(options[i]*9);
             await signAndExecuteMetaTx(
                 pkList[i],
