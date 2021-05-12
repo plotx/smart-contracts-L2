@@ -33,7 +33,7 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
     event MarketCreatorReward(address indexed createdBy, uint256 indexed marketIndex, uint256 tokenIncentive);
     event ClaimedMarketCreationReward(address indexed user, uint reward, address predictionToken);
 
-    uint32 minTimePassed;
+    uint32 public minTimePassed;
 
     struct PricingData {
       uint256 stakingFactorMinStake;
@@ -66,7 +66,6 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
     IAllMarkets internal allMarkets;
     IReferral internal referral;
     IUserLevels internal userLevels;
-    address internal predictionToken;
 
     mapping(uint256 => MarketData) internal marketData;
     mapping(address => uint256) public marketCreationReward;
@@ -100,7 +99,6 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
       masterAddress = msg.sender;
       address _plotToken = ms.dAppToken();
       plotToken = _plotToken;
-      predictionToken = _plotToken;
       allMarkets = IAllMarkets(ms.getLatestAddress("AM"));
       authorized = _authorizedMultiSig;
       stakingFactorMinStake = uint(20000).mul(10**8);
@@ -469,6 +467,10 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
         minPredictionAmount = value;
       } else if(code == "MAXP") { // Maximum prediction amount
         maxPredictionAmount = value;
+      } else if(code == "MTP") {
+        uint32 _val = uint32(value);
+        require(_val == value); // to avoid overflow while type casting
+        minTimePassed = _val;
       } else {
         MarketFeeParams storage _marketFeeParams = marketFeeParams;
         require(value < 10000);
