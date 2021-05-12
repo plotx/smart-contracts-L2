@@ -68,8 +68,11 @@ contract("Rewards-Market", async function(users) {
 			await acyclicMarkets.setNextOptionPrice(18);
 			// await acyclicMarkets.claimRelayerRewards();
 			timeNow = await latestTime();
-            await acyclicMarkets.createMarket("Question1", [100,400], [timeNow/1+4*3600,timeNow/1+8*3600,3600],toHex("NFT"),toHex("PLOT"),{from:users[11],gasPrice:500000});
+			let initialLiquidity = 100*10**8;
+            await acyclicMarkets.whitelistMarketCreator(users[11]);
+            await acyclicMarkets.createMarket("Question1", [100,400], [timeNow/1+4*3600,timeNow/1+8*3600,3600],toHex("NFT"),toHex("PLOT"), 100*10**8,{from:users[11],gasPrice:500000});
             
+	        await assertRevert(acyclicMarkets.setReferralContract(users[0]));
 
             // await assertRevert(marketIncentives.setMasterAddress(users[0], users[0]));
             await assertRevert(acyclicMarkets.handleFee(1, 1, users[11], users[11]));
@@ -83,6 +86,8 @@ contract("Rewards-Market", async function(users) {
 			let predictionVal  = [0,100, 400, 210, 123, 500, 700, 200, 50, 300, 150];
 			let options=[0,2,2,2,3,1,1,2,3,3,2,1];
 			let daoCommissions = [0, 1.8, 6.4, 3.36, 1.968, 8, 11.2, 3.2, 0.8, 4.8, 2.4];
+			const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+			await assertRevert(referral.setReferrer(ZERO_ADDRESS, ZERO_ADDRESS));
 			for(i=1; i<11;i++){
 				if(i>1) {
 					//Should not allow unauthorized address to set referrer
@@ -104,6 +109,11 @@ contract("Rewards-Market", async function(users) {
 			      allMarkets,
               	   "AM"
 			      );
+				
+				if(i == 10) {
+					await acyclicMarkets.removeReferralContract();
+					await assertRevert(acyclicMarkets.removeReferralContract());
+				}
 			}
 
 			let functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", totalDepositedPlot, 7, plotusToken.address, 1e7, 1);
@@ -239,7 +249,7 @@ contract("Rewards-Market", async function(users) {
 			await assertRevert(acyclicMarkets.toggleMarketCreation(true));
 			assert.equal(await acyclicMarkets.paused(), true);
 			timeNow = await latestTime();
-            await assertRevert(acyclicMarkets.createMarket("Question1", [100,400], [timeNow/1+4*3600,timeNow/1+8*3600,3600],toHex("NFT"),toHex("PLOT"),{from:users[11]}));
+            await assertRevert(acyclicMarkets.createMarket("Question1", [100,400], [timeNow/1+4*3600,timeNow/1+8*3600,3600],toHex("NFT"),toHex("PLOT"), 100*10**8,{from:users[11]}));
 		});
 
 		it("Should be able to resume market creation", async() => {
@@ -247,7 +257,7 @@ contract("Rewards-Market", async function(users) {
 			await assertRevert(acyclicMarkets.toggleMarketCreation(false));
 			assert.equal(await acyclicMarkets.paused(), false);
 			timeNow = await latestTime();
-            await acyclicMarkets.createMarket("Question1", [100,400], [timeNow/1+4*3600,timeNow/1+8*3600,3600],toHex("NFT"),toHex("PLOT"),{from:users[11]});
+            await acyclicMarkets.createMarket("Question1", [100,400], [timeNow/1+4*3600,timeNow/1+8*3600,3600],toHex("NFT"),toHex("PLOT"), 100*10**8,{from:users[11]});
 		});
 	});
 });
@@ -275,7 +285,8 @@ contract("Rewards-Market Stake less than 1 ether", async function(users) {
 			await acyclicMarkets.setNextOptionPrice(18);
 			// await acyclicMarkets.claimRelayerRewards();
 			timeNow = await latestTime();
-            await acyclicMarkets.createMarket("Question1", [100,400], [timeNow/1+4*3600,timeNow/1+8*3600,3600],toHex("NFT"),toHex("PLOT"),{from:users[11],gasPrice:500000});
+            await acyclicMarkets.whitelistMarketCreator(users[11]);
+            await acyclicMarkets.createMarket("Question1", [100,400], [timeNow/1+4*3600,timeNow/1+8*3600,3600],toHex("NFT"),toHex("PLOT"), 100*10**8,{from:users[11],gasPrice:500000});
             // await marketIncentives.claimCreationReward(100,{from:users[11]});
 		});
 
@@ -382,7 +393,8 @@ contract("Rewards-Market Raise dispute and pass the proposal ", async function(u
 			await acyclicMarkets.setNextOptionPrice(18);
 			// await acyclicMarkets.claimRelayerRewards();
 			timeNow = await latestTime();
-            await acyclicMarkets.createMarket("Question1", [100,400], [timeNow/1+4*3600,timeNow/1+8*3600,3600],toHex("NFT"),toHex("PLOT"),{from:users[11],gasPrice:500000});
+            await acyclicMarkets.whitelistMarketCreator(users[11]);
+            await acyclicMarkets.createMarket("Question1", [100,400], [timeNow/1+4*3600,timeNow/1+8*3600,3600],toHex("NFT"),toHex("PLOT"), 100*10**8,{from:users[11],gasPrice:500000});
             await assertRevert(acyclicMarkets.claimCreationReward({from:users[11]}));
 		});
 

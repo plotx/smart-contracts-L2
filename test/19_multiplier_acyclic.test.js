@@ -40,10 +40,14 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
             await plotusToken.transfer(userMarketCreator, toWei(1000));
             await plotusToken.approve(allMarkets.address, toWei(1000), { from: userMarketCreator });
             timeNow = await latestTime();
-            await acyclicMarkets.createMarket("Question1", [100,400], [timeNow/1+4*3600,timeNow/1+8*3600,3600],toHex("NFT"),toHex("PLOT"), { from: userMarketCreator });
+            await acyclicMarkets.whitelistMarketCreator(userMarketCreator);
+            await acyclicMarkets.createMarket("Question1", [100,400], [timeNow/1+4*3600,timeNow/1+8*3600,3600],toHex("NFT"),toHex("PLOT"), 100*10**8, { from: userMarketCreator });
             marketId++;
         });
         it("1.1 Position without User levels", async () => {
+            await acyclicMarkets.removeUserLevelsContract();
+            await assertRevert(acyclicMarkets.removeUserLevelsContract());
+            
             await plotusToken.transfer(user1, toWei("100"));
             await plotusToken.transfer(user2, toWei("400"));
             await plotusToken.transfer(user3, toWei("100"));
@@ -151,6 +155,11 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
             assert.equal(~~(balanceAfter/1e15), balanceBefore/1e15  + creationReward*1e3);
         });
 
+        it("Set User levels contract to activate multiplier", async () => {
+          await acyclicMarkets.setUserLevelsContract(userLevels.address);
+          await assertRevert(acyclicMarkets.setUserLevelsContract(user1));
+        })
+
         it("1.2 Positions After increasing user levels", async () => {
             await increaseTime(4 * 60 * 60 + 1);
 
@@ -172,7 +181,7 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
             await assertRevert(userLevels.setMultiplierLevels(userLevelsArray, multipliers, { from: user2 }));
             await assertRevert(userLevels.setMultiplierLevels([1,2,3], [1,2]));
             timeNow = await latestTime();
-            await acyclicMarkets.createMarket("Question2", [100,400], [timeNow/1+4*3600,timeNow/1+8*3600,3600],toHex("NFT"),toHex("PLOT"), { from: userMarketCreator })
+            await acyclicMarkets.createMarket("Question2", [100,400], [timeNow/1+4*3600,timeNow/1+8*3600,3600],toHex("NFT"),toHex("PLOT"), 100*10**8, { from: userMarketCreator })
             marketId++;
             
             await assertRevert(userLevels.setUserLevel(user1, 1, {from:user2}));
@@ -293,7 +302,7 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
         it("1.3 Positions After increasing user levels, should not give multiplier twice", async () => {
           await increaseTime(4 * 60 * 60 + 1);
           timeNow = await latestTime();
-          await acyclicMarkets.createMarket("Question3", [100,400], [timeNow/1+4*3600,timeNow/1+8*3600,3600],toHex("NFT"),toHex("PLOT"), { from: userMarketCreator })
+          await acyclicMarkets.createMarket("Question3", [100,400], [timeNow/1+4*3600,timeNow/1+8*3600,3600],toHex("NFT"),toHex("PLOT"), 100*10**8, { from: userMarketCreator })
           marketId++;
 
           await plotusToken.transfer(user1, toWei("200"));
