@@ -33,7 +33,7 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
     event MarketCreatorReward(address indexed createdBy, uint256 indexed marketIndex, uint256 tokenIncentive);
     event ClaimedMarketCreationReward(address indexed user, uint reward, address predictionToken);
 
-    uint32 minTimePassed;
+    uint32 public minTimePassed;
 
     struct PricingData {
       uint256 stakingFactorMinStake;
@@ -66,12 +66,11 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
     IAllMarkets internal allMarkets;
     IReferral internal referral;
     IUserLevels internal userLevels;
-    address internal predictionToken;
 
     mapping(uint256 => MarketData) internal marketData;
     mapping(address => uint256) public marketCreationReward;
     mapping (address => uint256) public relayerFeeEarned;
-    // mapping(uint256 => uint) public marketMaxOption;
+    mapping(address => bool) public whiteListedMarketCreators;
 
     mapping(address => mapping(uint256 => bool)) public multiplierApplied;
 
@@ -79,7 +78,6 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
     uint internal stakingFactorMinStake;
     uint32 internal stakingFactorWeightage;
     uint32 internal timeWeightage;
-    uint64 internal marketInitialLiquidity;
     uint internal predictionDecimalMultiplier;
     uint internal minPredictionAmount;
     uint internal maxPredictionAmount;
@@ -101,7 +99,6 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
       masterAddress = msg.sender;
       address _plotToken = ms.dAppToken();
       plotToken = _plotToken;
-      predictionToken = _plotToken;
       allMarkets = IAllMarkets(ms.getLatestAddress("AM"));
       authorized = _authorizedMultiSig;
       stakingFactorMinStake = uint(20000).mul(10**8);
@@ -117,8 +114,25 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
       maxPredictionAmount = 100000 ether; // Need to be updated
       minTimePassed = 10 hours; // need to set
       predictionDecimalMultiplier = 10;
-      marketInitialLiquidity = 100 * 1e8;
       _initializeEIP712("AC");
+    }
+
+    /**
+    * @dev Whitelisting Market Creators
+    * @param _userAdd Address of the creator
+    */
+    function whitelistMarketCreator(address _userAdd) external onlyAuthorized {
+      require(_userAdd != address(0));
+      whiteListedMarketCreators[_userAdd] = true;
+    }
+
+    /**
+    * @dev Removing user from whitelist
+    * @param _userAdd Address of the creator
+    */
+    function deWhitelistMarketCreator(address _userAdd) external onlyAuthorized {
+      require(_userAdd != address(0));
+      whiteListedMarketCreators[_userAdd] = false;
     }
 
     /**
@@ -140,7 +154,7 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
 
     /**
     * @dev Set the User levels contract address, to handle user multiplier.
-    * @param _userLevelsContract Address of the referral contract
+    * @param _userLevelsContract Address of the UserLevels contract
     */
     function setUserLevelsContract(address _userLevelsContract) external onlyAuthorized {
       require(address(userLevels) == address(0));
@@ -158,21 +172,22 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
     /**
     * @dev Create the market.
     */
-    function createMarket(string calldata _questionDetails, uint64[] calldata _optionRanges, uint32[] calldata _marketTimes,bytes8 _marketType, bytes8 _marketCurr) external {
+    function createMarket(string calldata _questionDetails, uint64[] calldata _optionRanges, uint32[] calldata _marketTimes,bytes8 _marketType, bytes8 _marketCurr, uint64 _marketInitialLiquidity) external {
       require(!paused);
-      // Add check for market creator
+      // address _marketCreator = _msgSender();
+      require(whiteListedMarketCreators[_msgSender()]);
       uint32[] memory _timesArray = new uint32[](_marketTimes.length+1);
       _timesArray[0] = uint32(now);
       _timesArray[1] = _marketTimes[0].sub(uint32(now));
       _timesArray[2] = _marketTimes[1].sub(uint32(now));
       _timesArray[3] = _marketTimes[2];
       uint64 _marketId = allMarkets.getTotalMarketsLength();
-      address _marketCreator = _msgSender();
+      
       marketData[_marketId].pricingData = PricingData(stakingFactorMinStake, stakingFactorWeightage, timeWeightage, minTimePassed);
-      marketData[_marketId].marketCreator = _marketCreator;
-      allMarkets.createMarket(_timesArray, _optionRanges, _marketCreator, marketInitialLiquidity);
+      marketData[_marketId].marketCreator = _msgSender();
+      allMarkets.createMarket(_timesArray, _optionRanges, _msgSender(), _marketInitialLiquidity);
 
-      emit MarketParams(_marketId, _questionDetails, _optionRanges,_marketTimes, stakingFactorMinStake, minTimePassed, _marketCreator, _marketType, _marketCurr);
+      emit MarketParams(_marketId, _questionDetails, _optionRanges,_marketTimes, stakingFactorMinStake, minTimePassed, _msgSender(), _marketType, _marketCurr);
     }
 
     /**
@@ -203,7 +218,10 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
       // _fee = _calculateAmulBdivC(_marketFeeParams.cummulativeFeePercent, _amount, 10000);
       uint64 _referrerFee = _calculateAmulBdivC(_marketFeeParams.referrerFeePercent, _cummulativeFee, 10000);
       uint64 _refereeFee = _calculateAmulBdivC(_marketFeeParams.refereeFeePercent, _cummulativeFee, 10000);
-      bool _isEligibleForReferralReward = referral.setReferralRewardData(_msgSenderAddress, plotToken, _referrerFee, _refereeFee);
+      bool _isEligibleForReferralReward;
+      if(address(referral) != address(0)) {
+      _isEligibleForReferralReward = referral.setReferralRewardData(_msgSenderAddress, plotToken, _referrerFee, _refereeFee);
+      }
       if(_isEligibleForReferralReward){
         _transferAsset(plotToken, address(referral), (10**predictionDecimalMultiplier).mul(_referrerFee.add(_refereeFee)));
       } else {
@@ -255,8 +273,10 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
       uint64 _optionPrice = getOptionPrice(_marketId, _prediction);
       predictionPoints = uint64(_predictionStake).div(_optionPrice);
       if(!multiplierApplied) {
-        uint256 _predictionPoints;
-        (_predictionPoints, isMultiplierApplied) = checkMultiplier(_user,  predictionPoints);
+        uint256 _predictionPoints = predictionPoints;
+        if(address(userLevels) != address(0)) {
+          (_predictionPoints, isMultiplierApplied) = checkMultiplier(_user,  predictionPoints);
+        }
         predictionPoints = uint64(_predictionPoints);
       }
     }
@@ -448,6 +468,10 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
         minPredictionAmount = value;
       } else if(code == "MAXP") { // Maximum prediction amount
         maxPredictionAmount = value;
+      } else if(code == "MTP") {
+        uint32 _val = uint32(value);
+        require(_val == value); // to avoid overflow while type casting
+        minTimePassed = _val;
       } else {
         MarketFeeParams storage _marketFeeParams = marketFeeParams;
         require(value < 10000);
