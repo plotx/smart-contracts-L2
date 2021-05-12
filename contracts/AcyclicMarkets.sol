@@ -272,7 +272,7 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
       uint64 _optionPrice = getOptionPrice(_marketId, _prediction);
       predictionPoints = uint64(_predictionStake).div(_optionPrice);
       if(!multiplierApplied) {
-        uint256 _predictionPoints;
+        uint256 _predictionPoints = predictionPoints;
         if(address(userLevels) != address(0)) {
           (_predictionPoints, isMultiplierApplied) = checkMultiplier(_user,  predictionPoints);
         }
