@@ -71,7 +71,6 @@ module.exports = function(deployer, network, accounts){
     await allMarkets.initializeDependencies();
     await plotusToken.approve(allMarkets.address, "1000000000000000000000000");
     await cm.whitelistMarketCreator(accounts[0]);
-
     await ac.whitelistMarketCreator(accounts[0]);
 
     var date = Date.now();
