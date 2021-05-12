@@ -121,15 +121,16 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
     * @dev Whitelisting Market Creators
     * @param _userAdd Address of the creator
     */
-    function addWhiteListedAddress(address _userAdd) external onlyAuthorized {
+    function whitelistMarketCreator(address _userAdd) external onlyAuthorized {
       require(_userAdd != address(0));
       whiteListedMarketCreators[_userAdd] = true;
     }
 
     /**
     * @dev Removing user from whitelist
+    * @param _userAdd Address of the creator
     */
-    function removeFromWhitelist(address _userAdd) external onlyAuthorized {
+    function deWhitelistMarketCreator(address _userAdd) external onlyAuthorized {
       require(_userAdd != address(0));
       whiteListedMarketCreators[_userAdd] = false;
     }
