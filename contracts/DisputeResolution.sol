@@ -87,6 +87,48 @@ contract DisputeResolution is IAuth, NativeMetaTransaction {
   }
 
   /**
+    * @dev function to update integer parameters
+    * @param code Code of the updating parameter.
+    * @param value Value to which the parameter should be updated
+    */
+    function updateUintParameters(bytes8 code, uint256 value) external onlyAuthorized {
+      if(code == "TSD") { // Token to stake for raising a dispute
+        tokenStakeForDispute = value;
+      } else if(code == "REWARD") { // Number of tokens to be rewarded for DR voters
+        rewardForVoting = value;
+      } else if(code == "DRLOCKP") { // Time for which tokens of DR voter are locked
+        drTokenLockPeriod = value;
+      } else if(code == "THMUL") { // Multiplier X, to be used to check if the voting has reached threshold for resolving dispute . Threshold = X times of Market Participation
+        voteThresholdMultiplier = value;
+      } else if(code == "VOTETIME") { // Time for which the voting in Dispute resolution is open
+        drVotePeriod = value;
+      } else {
+        revert("Invalid code");
+      }
+    }
+
+    /**
+    * @dev function to get integer parameters
+    * @param code Code of the parameter.
+    * @return codeVal Code of the parameter.
+    * @return value Value of the queried parameter.
+    */
+    function getUintParameters(bytes8 code) external view returns(bytes8 codeVal, uint256 value) {
+      codeVal = code;
+      if(code == "TSD") { // Token to stake for raising a dispute
+        value = tokenStakeForDispute;
+      } else if(code == "REWARD") { // Number of tokens to be rewarded for DR voters
+        value = rewardForVoting;
+      } else if(code == "DRLOCKP") { // Time for which tokens of DR voter are locked
+        value = drTokenLockPeriod;
+      } else if(code == "THMUL") { // Multiplier X, to be used to check if the voting has reached threshold for resolving dispute . Threshold = X times of Market Participation
+        value = voteThresholdMultiplier;
+      } else if(code == "VOTETIME") { // Time for which the voting in Dispute resolution is open
+        value = drVotePeriod;
+      }
+    }
+
+  /**
   * @dev Raise the dispute if wrong value passed at the time of market result declaration.
   * User should deposit `tokenStakeForDispute` number of tokens to raise a dispute
   * The deposited tokens can be claimable if the dispute is accepted,
