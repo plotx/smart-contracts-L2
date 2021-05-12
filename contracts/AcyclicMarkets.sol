@@ -155,7 +155,7 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
 
     /**
     * @dev Set the User levels contract address, to handle user multiplier.
-    * @param _userLevelsContract Address of the referral contract
+    * @param _userLevelsContract Address of the UserLevels contract
     */
     function setUserLevelsContract(address _userLevelsContract) external onlyAuthorized {
       require(address(userLevels) == address(0));
@@ -219,7 +219,10 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
       // _fee = _calculateAmulBdivC(_marketFeeParams.cummulativeFeePercent, _amount, 10000);
       uint64 _referrerFee = _calculateAmulBdivC(_marketFeeParams.referrerFeePercent, _cummulativeFee, 10000);
       uint64 _refereeFee = _calculateAmulBdivC(_marketFeeParams.refereeFeePercent, _cummulativeFee, 10000);
-      bool _isEligibleForReferralReward = referral.setReferralRewardData(_msgSenderAddress, plotToken, _referrerFee, _refereeFee);
+      bool _isEligibleForReferralReward;
+      if(address(referral) != address(0)) {
+      _isEligibleForReferralReward = referral.setReferralRewardData(_msgSenderAddress, plotToken, _referrerFee, _refereeFee);
+      }
       if(_isEligibleForReferralReward){
         _transferAsset(plotToken, address(referral), (10**predictionDecimalMultiplier).mul(_referrerFee.add(_refereeFee)));
       } else {
@@ -272,7 +275,9 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
       predictionPoints = uint64(_predictionStake).div(_optionPrice);
       if(!multiplierApplied) {
         uint256 _predictionPoints;
-        (_predictionPoints, isMultiplierApplied) = checkMultiplier(_user,  predictionPoints);
+        if(address(userLevels) != address(0)) {
+          (_predictionPoints, isMultiplierApplied) = checkMultiplier(_user,  predictionPoints);
+        }
         predictionPoints = uint64(_predictionPoints);
       }
     }
