@@ -1,4 +1,5 @@
 const BLOT = artifacts.require('BPLOT');
+const BPLOTMigration = artifacts.require('bPLOTMigration');
 const PLOT = artifacts.require('MockPLOT');
 const OwnedUpgradeabilityProxy = artifacts.require("OwnedUpgradeabilityProxy");
 const Master = artifacts.require("Master");
@@ -79,6 +80,50 @@ contract('bLOTToken', function([user1,user2,user3,user4]){
     it('7. Should not allow to mint to zero address',async function(){
         await PLOTInstance.approve(BLOTInstance.address, "10000000000000000000000");
         await assertRevert(BLOTInstance.mint(ZERO_ADDRESS,"1000000000000000000000"));
+    });
+
+    it('8. Add bPLOT migration contract as minter', async function() {
+        bPLOTMigration = await BPLOTMigration.new(BLOTInstance.address, user3, user4);
+        await BLOTInstance.addMinter(bPLOTMigration.address);
+        assert.equal(await BLOTInstance.isMinter(bPLOTMigration.address), true);
     })
+
+    it('9. Should authorise the txn when called from authController', async function() {
+        await (bPLOTMigration.whitelistMigration(hash,user1,user2,timestamp,"1000000000000000000000",{from:user3}));
+    });
+
+    it('10. Should not authorise when the same txn is authorised again', async function() {
+        await assertRevert(bPLOTMigration.whitelistMigration(hash,user1,user2,timestamp,"1000000000000000000000",{from:user3}));
+    });
+
+    it('11. Should not be able to migrate tokens if migration contract doesnt hold bPLOT', async function() {
+        await assertRevert(bPLOTMigration.migrate(hash,user1,user2,timestamp,"1000000000000000000000",{from:user4}));
+    });
+
+    it('12. Should migrate tokens as authorised when called from migrationController', async function() {
+        await BLOTInstance.mint(bPLOTMigration.address,"10000000000000000000000")
+        await (bPLOTMigration.migrate(hash,user1,user2,timestamp,"1000000000000000000000",{from:user4}));
+    });
+
+    it('13.Should not migrate tokens if the authorised txn is already migrated', async function() {
+        await assertRevert(bPLOTMigration.migrate(hash,user1,user2,timestamp,"1000000000000000000000",{from:user4}));
+    });
+
+    it('14.Should not migrate tokens if the txn is not authorised', async function() {
+        await assertRevert(bPLOTMigration.migrate(hash,user1,user2,timestamp,"2000000000000000000000",{from:user4}));
+    });
+
+    it('15.Should revert when not called from authController', async function() {
+        await assertRevert(bPLOTMigration.whitelistMigration(hash,user1,user2,timestamp,"2000000000000000000000",{from:user2}));
+    });
+
+    it('16.Should revert when not called from migrationController', async function() {
+        await assertRevert(bPLOTMigration.migrate(hash,user1,user2,timestamp,"2000000000000000000000",{from:user2}));
+    });
+
+    it('17.Should be able to renounce as minter', async function() {
+        await bPLOTMigration.renounceMinterRole({from:user3});
+        assert.equal(await BLOTInstance.isMinter(bPLOTMigration.address), false);
+    });
 
 })

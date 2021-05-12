@@ -2,6 +2,7 @@ const Master = artifacts.require('Master');
 const AllMarkets = artifacts.require('MockAllMarkets');
 const CyclicMarkets = artifacts.require('CyclicMarkets');
 const AcyclicMarkets = artifacts.require('AcyclicMarkets');
+const DisputeResolution = artifacts.require('DisputeResolution');
 const PlotusToken = artifacts.require("MockPLOT");
 const MockchainLink = artifacts.require('MockChainLinkAggregator');
 const MultiSigWallet = artifacts.require('MultiSigWallet');
@@ -40,12 +41,14 @@ contract('Configure Global Parameters', accounts => {
       allMarkets = await AllMarkets.at(await ms.getLatestAddress(toHex('AM')));
       cyclicMarkets = await CyclicMarkets.at(await ms.getLatestAddress(toHex('CM')));
       acyclicMarkets = await AcyclicMarkets.at(await ms.getLatestAddress(toHex('AC')));
+      disputeResolution = await DisputeResolution.at(await ms.getLatestAddress(toHex('DR')));
       plotTok = await PlotusToken.deployed();
       feedInstance = await MockchainLink.deployed();
       multiSigWallet = await MultiSigWallet.new([accounts[0], accounts[1], accounts[2]],3);
       await allMarkets.changeAuthorizedAddress(multiSigWallet.address);
       await cyclicMarkets.changeAuthorizedAddress(multiSigWallet.address);
       await acyclicMarkets.changeAuthorizedAddress(multiSigWallet.address);
+      await disputeResolution.changeAuthorizedAddress(multiSigWallet.address);
       let owners = await multiSigWallet.getOwners();
       for(let i = 0;i<3;i++) {
         owners[i] = accounts[i];
@@ -148,58 +151,6 @@ contract('Configure Global Parameters', accounts => {
       } catch (err) {}
       assert.notEqual(parameter[1], proposedValue);
     }
-
-
-
-    // describe('Update Market Config Params', function() {
-
-    //   it('Should update Min PredictionAmount', async function() {
-    //     await updateParameter(24, 2, 'MINPRD', marketConfig, 'configUint', 75);
-    //     let configData = await marketConfig.getBasicMarketDetails();
-    //     assert.equal(configData[0], 75, 'Not updated');
-    //   });
-
-    //   it('Should update Max PredictionAmount', async function() {
-    //     await updateParameter(24, 2, 'MAXPRD', marketConfig, 'configUint', 80);
-    //     let configData = await marketConfig.getBasicMarketDetails();
-    //     assert.equal(configData[2]/1, 80, 'Not updated');
-    //   });
-
-    //   it('Should update Position Decimals', async function() {
-    //     await updateParameter(24, 2, 'PDEC', marketConfig, 'configUint', 19);
-    //     let configData = await marketConfig.getBasicMarketDetails();
-    //     assert.equal(configData[1]/1, 19, 'Not updated');
-    //   });
-
-    //   it('Should update Token Stake For Dispute', async function() {
-    //     await updateParameter(24, 2, 'TSDISP', pl, 'configUint', 26);
-    //     let configData = await marketConfig.getDisputeResolutionParams();
-    //     assert.equal(configData, 26, 'Not updated');
-    //   });
-
-    //   it('Should update Min Stake For Multiplier', async function() {
-    //     await updateParameter(24, 2, 'SFMS', marketConfig, 'configUint', 23);
-    //     let configData = await marketConfig.getPriceCalculationParams();
-    //     assert.equal(configData[0], 23, 'Not updated');
-    //   });
-
-    //   it('Should Staking Factor Weightage and Current Price weightage', async function() {
-    //     await updateParameter(24, 2, 'SFCPW', marketConfig, 'configUint', 24);
-    //     let configData = await marketConfig.getPriceCalculationParams();
-    //     assert.equal(configData[1], 24, 'Not updated');
-    //     assert.equal(configData[2], 100-24, 'Not updated');
-    //   });
-
-    //   it('Should not update if invalid code is passed', async function() {
-    //     await updateParameter(24, 2, 'CDTIM1', pl, 'configUint', 28);
-    //   });
-
-    //   it('Should not allow to update if unauthorized call', async function() {
-    //     await assertRevert(marketConfig.updateUintParameters(toHex("UNIFAC"),100));
-    //   });
-
-
-    // });
 
 
     describe('Update Cyclic Markets Parameters', async function() {
@@ -313,6 +264,27 @@ contract('Configure Global Parameters', accounts => {
       });
       it('Should not update if Current price weightage > 100', async function() {
         await updateInvalidParameter('CPW', acyclicMarkets, 'uint', '200');
+      });
+    })
+
+    describe('Update Dispute Resolution Parameters', async function() {
+      it('Should update tokenStakeForDispute', async function() {
+        await updateParameter( 'TSD', disputeResolution, 'uint', '5300');
+      });
+      it('Should update rewardForVoting', async function() {
+        await updateParameter( 'REWARD', disputeResolution, 'uint', '2500');
+      });
+      it('Should update drTokenLockPeriod', async function() {
+        await updateParameter( 'DRLOCKP', disputeResolution, 'uint', '1000');
+      });
+      it('Should update voteThresholdMultiplier', async function() {
+        await updateParameter( 'THMUL', disputeResolution, 'uint', '2600');
+      });
+      it('Should update drVotePeriod', async function() {
+        await updateParameter( 'VOTETIME', disputeResolution, 'uint', '1500');
+      });
+      it('Should not update if parameter code is incorrect', async function() {
+        await updateInvalidParameter('ASDF', disputeResolution, 'uint', '2');
       });
     })
 

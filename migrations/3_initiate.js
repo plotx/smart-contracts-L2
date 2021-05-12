@@ -22,23 +22,43 @@ module.exports = function(deployer, network, accounts){
     let bPlotToken = await BPLOT.deployed();
     let masterProxy = await Master.deployed();
     let master = await OwnedUpgradeabilityProxy.deployed();
-    let allMarkets = await AllMarkets.deployed();
-    let dr = await DisputeResolution.deployed();
-    let cm = await CyclicMarkets.deployed();
-    let ac = await AcyclicMarkets.deployed();
+
+//     let allMarkets = await AllMarkets.deployed();
+//     let dr = await DisputeResolution.deployed();
+//     let cm = await CyclicMarkets.deployed();
+//     let ac = await AcyclicMarkets.deployed();
     master = await Master.at(master.address);
-    let implementations = [allMarkets.address, bPlotToken.address, dr.address, cm.address, ac.address];
+//     let implementations = [allMarkets.address, bPlotToken.address, dr.address, cm.address, ac.address];
+    let implementations = [bPlotToken.address];
+
     console.log(accounts[0])
     await master.initiateMaster(implementations, deployPlotusToken.address, accounts[0], accounts[0]);
     master = await OwnedUpgradeabilityProxy.at(master.address);
     await master.transferProxyOwnership(accounts[0]);
     master = await Master.at(master.address);
-    
+
+    allMarkets = await AllMarkets.deployed();
+		cyclicMarkets = await CyclicMarkets.deployed();
+		acyclicMarkets = await AcyclicMarkets.deployed();
+		disputeResolution = await DisputeResolution.deployed();
+
+		await master.addNewContract(web3.utils.toHex("AM"),allMarkets.address);
+		await master.addNewContract(web3.utils.toHex("DR"),disputeResolution.address);
+		await master.addNewContract(web3.utils.toHex("CM"),cyclicMarkets.address);
+		await master.addNewContract(web3.utils.toHex("AC"),acyclicMarkets.address);
+
+    allMarkets = await AllMarkets.at(await master.getLatestAddress(web3.utils.toHex("AM")));
+		cyclicMarkets = await CyclicMarkets.at(await master.getLatestAddress(web3.utils.toHex("CM")));
+		acyclicMarkets = await AcyclicMarkets.at(await master.getLatestAddress(web3.utils.toHex("AC")));
+		// referral = await Referral.deployed();
+		disputeResolution = await DisputeResolution.at(await master.getLatestAddress(web3.utils.toHex("DR")));
+		bPlotToken = await BPLOT.at(await master.getLatestAddress(web3.utils.toHex("BL")));
+
+    await bPlotToken.initializeDependencies();
+
     let allMarketsProxy = await OwnedUpgradeabilityProxy.at(
       await master.getLatestAddress(web3.utils.toHex('AM'))
       );
-    var date = Date.now();
-    date = Math.round(date/1000);
 
     allMarkets = await AllMarkets.at(allMarketsProxy.address);
     cm = await CyclicMarkets.at(await master.getLatestAddress(web3.utils.toHex('CM')));
@@ -51,7 +71,12 @@ module.exports = function(deployer, network, accounts){
     await allMarkets.initializeDependencies();
     await plotusToken.approve(allMarkets.address, "1000000000000000000000000");
     await cm.whitelistMarketCreator(accounts[0]);
+
     await ac.whitelistMarketCreator(accounts[0]);
+
+    var date = Date.now();
+    date = Math.round(date/1000);
+ 
     await cm.addInitialMarketTypesAndStart(date, ethChainlinkOracle.address, ethChainlinkOracle.address);
     let rf = await deployer.deploy(Referral, master.address);
     let ul = await deployer.deploy(UserLevels, master.address);
