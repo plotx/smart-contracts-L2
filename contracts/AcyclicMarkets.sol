@@ -29,7 +29,7 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
       Settled
     }
 
-    event MarketParams(uint256 indexed marketIndex, string _question, uint64[] _optionRanges, uint32[] _marketTimes, uint256 _stakingFactorMinStake,uint32 _minTimePassed, address marketCreator, bytes8 _marketType, bytes8 _marketCurrency);
+    event MarketParams(uint256 indexed marketIndex, string _question, uint64[] _optionRanges, uint32[] _marketTimes, uint256 _stakingFactorMinStake,uint32 _minTimePassed, address marketCreator, bytes8 _marketType, bytes32 _marketCurrency);
     event MarketCreatorReward(address indexed createdBy, uint256 indexed marketIndex, uint256 tokenIncentive);
     event ClaimedMarketCreationReward(address indexed user, uint reward, address predictionToken);
 
@@ -172,7 +172,7 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
     /**
     * @dev Create the market.
     */
-    function createMarket(string calldata _questionDetails, uint64[] calldata _optionRanges, uint32[] calldata _marketTimes,bytes8 _marketType, bytes8 _marketCurr, uint64 _marketInitialLiquidity) external {
+    function createMarket(string calldata _questionDetails, uint64[] calldata _optionRanges, uint32[] calldata _marketTimes,bytes8 _marketType, bytes32 _marketCurr, uint64 _marketInitialLiquidity) external {
       require(!paused);
       // address _marketCreator = _msgSender();
       require(whiteListedMarketCreators[_msgSender()]);
