@@ -46,20 +46,6 @@ contract ERC20 is Context, IERC20 {
     string _symbol;
     uint8 private _decimals;
 
-    /**
-     * @dev Sets the values for {name} and {symbol}, initializes {decimals} with
-     * a default value of 18.
-     *
-     * To select a different value for {decimals}, use {_setupDecimals}.
-     *
-     * All three of these values are immutable: they can only be set once during
-     * construction.
-     */
-    constructor (string memory name, string memory symbol) public {
-        _name = name;
-        _symbol = symbol;
-        _decimals = 18;
-    }
 
     /**
      * @dev Returns the name of the token.
