@@ -81,6 +81,7 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
     uint internal predictionDecimalMultiplier;
     uint internal minPredictionAmount;
     uint internal maxPredictionAmount;
+    uint internal minLiquidityByCreator;
 
     modifier onlyAllMarkets {
       require(msg.sender == address(allMarkets));
@@ -114,6 +115,7 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
       maxPredictionAmount = 100000 ether; // Need to be updated
       minTimePassed = 10 hours; // need to set
       predictionDecimalMultiplier = 10;
+      minLiquidityByCreator = 100 ether;
       _initializeEIP712("AC");
     }
 
@@ -176,6 +178,7 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
       require(!paused);
       // address _marketCreator = _msgSender();
       require(whiteListedMarketCreators[_msgSender()]);
+      require(_marketInitialLiquidity >= minLiquidityByCreator);
       uint32[] memory _timesArray = new uint32[](_marketTimes.length+1);
       _timesArray[0] = uint32(now);
       _timesArray[1] = _marketTimes[0].sub(uint32(now));
@@ -371,40 +374,18 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
      **/
     function getOptionPrice(uint _marketId, uint256 _prediction) public view returns(uint64) {
       uint optionLen = allMarkets.getTotalOptions(_marketId);
-      (uint[] memory _optionPricingParams, uint32 _startTime) = allMarkets.getMarketOptionPricingParams(_marketId,_prediction);
+      (uint[] memory _optionPricingParams,) = allMarkets.getMarketOptionPricingParams(_marketId,_prediction);
       PricingData storage _marketPricingData = marketData[_marketId].pricingData;
-      (,,uint _predictionTime,,) = allMarkets.getMarketData(_marketId);
-      uint stakingFactorConst;
-      uint optionPrice; 
       
       // Checking if current stake in market reached minimum stake required for considering staking factor.
-      if(_optionPricingParams[1] < _marketPricingData.stakingFactorMinStake)
+      if(_optionPricingParams[1] < _marketPricingData.stakingFactorMinStake || _optionPricingParams[0] == 0)
       {
 
         return uint64(uint(100000).div(optionLen));
 
       } else {
-        // 10000 / staking weightage
-        stakingFactorConst = uint(10000).div(_marketPricingData.stakingFactorWeightage); 
-        // (stakingFactorConst x Amount staked in option x 10^18) / Total staked in market --- (1)
-        optionPrice = (stakingFactorConst.mul(_optionPricingParams[0]).mul(10**18).div(_optionPricingParams[1])); 
+        return uint64(uint(100000).mul(_optionPricingParams[0]).div(_optionPricingParams[1]));
       }
-      uint timeElapsedFactor = uint(now).sub(_startTime);
-      // max(timeElapsed, minTimePassed)
-      if(timeElapsedFactor < _marketPricingData.minTimePassed) {
-        timeElapsedFactor = _marketPricingData.minTimePassed;
-      }
-
-      // (Time Elapsed x 10000) / (Time Weightage)
-      timeElapsedFactor = timeElapsedFactor.mul(10000).div(_marketPricingData.timeWeightage);
-
-      // (1) + ( timeFactor x 10^18 / Total Prediction Time)  -- (2)
-      optionPrice = optionPrice.add((timeElapsedFactor).mul(10**18).div(_predictionTime));  
-      // (2) / ((stakingFactorConst x 10^13) + timeFactor x 10^13 / Total Prediction Time)
-      optionPrice = optionPrice.div(stakingFactorConst.mul(10**13).add(optionLen.mul(timeElapsedFactor).mul(10**13).div(_predictionTime)));
-
-      // option price for `_prediction` in 10^5 format
-      return uint64(optionPrice);
 
     }
 
@@ -448,6 +429,8 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
         value = marketFeeParams.refereeFeePercent;
       } else if(code == "MCF") { // Market Creator fee percent in Cummulative fee
         value = marketFeeParams.marketCreatorFeePercent;
+      } else if(code == "MLC") {
+        value = minLiquidityByCreator;
       }
     }
 
@@ -472,6 +455,8 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
         uint32 _val = uint32(value);
         require(_val == value); // to avoid overflow while type casting
         minTimePassed = _val;
+      } else if(code == "MLC") {
+        minLiquidityByCreator = value;
       } else {
         MarketFeeParams storage _marketFeeParams = marketFeeParams;
         require(value < 10000);
