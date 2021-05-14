@@ -1,6 +1,6 @@
-[![Build Status](https://travis-ci.org/plotx/smart-contracts-L2.svg?branch=03-2021_audit)](https://travis-ci.org/plotx/smart-contracts-L2)
+[![Build Status](https://travis-ci.org/plotx/smart-contracts-L2.svg?branch=merge-finalDeployment)](https://travis-ci.org/plotx/smart-contracts-L2)
 
-[![Coverage Status](https://coveralls.io/repos/github/plotx/smart-contracts-L2/badge.svg?branch=03-2021_audit)](https://coveralls.io/github/plotx/smart-contracts-L2)
+[![Coverage Status](https://coveralls.io/repos/github/plotx/smart-contracts-L2/badge.svg?branch=merge-finalDeployment)](https://coveralls.io/github/plotx/smart-contracts-L2)
 
 <h1><a id="PLOTX"></a>PlotX SMART CONTRACTS</h1>
 <p>Smart contracts for PlotX - Curated prediction markets for crypto traders . https://plotx.io/.</p>
@@ -39,20 +39,10 @@ npm run coverage
 ```
 
 ### Contract Addresses
-- PLOT Token: 0x72F020f8f3E8fd9382705723Cd26380f8D0c66Bb
-- Master: 0x03c41c5Aff6D541EF7D4c51c8B2E32a5d4427275
-- MarketRegistry: 0xE210330d6768030e816d223836335079C7A0c851
-- AllMarkets: 0xb9448E3a0d95cFF578F9508084A0ed92D724c29A
-- MarketCreationRewards: 0x22376814188De44e8B6f482daa98B050ac190B46
-- MarketUtility: 0x2330058D49fA61D5C5405fA8B17fcD823c59F7Bb
-- Governance: 0x16763F192d529B420F33B699dC72F39f16620717
-- ProposalCategory: 0x2D90743ef134b35cE415855F1c38ca47d65b314C
-- MemberRoles: 0xda06bcd22a68Fa40B63867277aA0eB34702fd80D
-- TokenController: 0x12d7053Efc680Ba6671F8Cb96d1421D906ce3dE2
-- bPLOT Token: 0x82cB6Cd09Bf80fB4014935871fF553b027255D36
-- Vesting: 0x5172C83B5316b86861802d29746d8435f4cB67e6
+- PLOT Token: 0xe82808eaA78339b06a691fd92E1Be79671cAd8D3
+- Master: 0x5aac88D5A607b69b7a90D7e0519A6fb5265Aa60a
+- AllPlotMarkets: 0xcc424cfff84B0FcdDf6F3A7163cc6fFB415c0844
+- CyclicMarkets: 0x7EA095c78eE700D36E203A04E40eb26752f6F7A8
+- bPLOT Token: 0x4A7e335B8653F2DF6216e7d266cC643D09d83bdD
 
-Market Implementation Addresses
-- ETH/USD: 0x25cf9d73b711bff4d3445a0f7f2e63ade5133e67
-- BTC/USD: 0x5d24cf40ead0601893c212ff3af4895dc42a760b
 
