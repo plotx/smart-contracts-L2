@@ -50,7 +50,7 @@ contract PooledMarketCreation is
 
     function setMasterAddress(address _authorizedMultiSig, address _defaultAuthorizedAddress) public {
         OwnedUpgradeabilityProxy proxy =  OwnedUpgradeabilityProxy(address(uint160(address(this))));
-        require(msg.sender == proxy.proxyOwner());
+        require(msg.sender == proxy.proxyOwner(),"Only callable by proxy owner");
         ms = IMaster(msg.sender);
         plotToken = ERC20(ms.dAppToken());
         _name = "LP";
@@ -74,53 +74,75 @@ contract PooledMarketCreation is
         return NativeMetaTransaction._msgSender();
     }
 
+    /**
+     * @dev Stakes Plot tokens in pool.
+     * @param _stakePlotAmount amount of Plot tokens to stake
+     */
     function stake(uint _stakePlotAmount) public {
-        require(_stakePlotAmount>0);
+        require(_stakePlotAmount>0,"Value can not be 0");
+        address payable __msgSender = _msgSender();
+        userLastStaked[__msgSender] = now;
         claimCreationAndParticipationReward(defaultMaxRecords);
-        address payable _msgSender = _msgSender();
-        userLastStaked[_msgSender] = now;
         uint plotBalance = (plotToken.balanceOf(address(this)));
-        plotToken.transferFrom(_msgSender, address(this), _stakePlotAmount);
+        require(plotToken.transferFrom(__msgSender, address(this), _stakePlotAmount),"ERC20 call Failed");
         uint mintAmount = _stakePlotAmount;
         uint lpSupply = totalSupply();
         if(lpSupply > 0) {
           mintAmount = _stakePlotAmount.mul(lpSupply).div(plotBalance);
         }
-        _mint(_msgSender, mintAmount);
+        _mint(__msgSender, mintAmount);
 
-        emit Staked(_msgSender, _stakePlotAmount, mintAmount);
+        emit Staked(__msgSender, _stakePlotAmount, mintAmount);
 
     }
 
+    /**
+     * @dev Unstakes Plot tokens from pool.
+     * @param _unStakeLP amount of lp tokens to return.
+     */
     function unstake(uint _unStakeLP) public {
-        require(_unStakeLP>0);
+        require(_unStakeLP>0,"Value can not be 0");
         claimCreationAndParticipationReward(defaultMaxRecords);
-        address payable _msgSender = _msgSender();
-        require(userLastStaked[_msgSender].add(unstakeRestrictTime) < now);
+        address payable __msgSender = _msgSender();
+        require(userLastStaked[__msgSender].add(unstakeRestrictTime) < now,"Can not unstake in restricted period");
         uint lpSupply = totalSupply();
-        _burn(_msgSender, _unStakeLP);
+        _burn(__msgSender, _unStakeLP);
         uint plotBalance = (plotToken.balanceOf(address(this)));
         uint returnToken = _unStakeLP.mul(plotBalance).div(lpSupply);
-        plotToken.transfer(_msgSender,returnToken);
+        require(plotToken.transfer(__msgSender,returnToken),"ERC20 call Failed");
 
-        emit Unstaked(_msgSender, _unStakeLP, returnToken);
+        emit Unstaked(__msgSender, _unStakeLP, returnToken);
 
     }
 
+    /**
+    * @dev Creates Market for specified currenct pair and market type.
+    * @param _currencyTypeIndex The index of market currency feed
+    * @param _marketTypeIndex The time duration of market.
+    * @param _roundId Round Id to settle previous market (If applicable, else pass 0)
+    */ 
     function createMarket(uint32 _currencyTypeIndex, uint32 _marketTypeIndex, uint80 _roundId) public {
         ICyclicMarkets cm = ICyclicMarkets(ms.getLatestAddress("CM"));
         uint initialLiquidity = cm.getInitialLiquidity(_marketTypeIndex);
         claimCreationAndParticipationReward(defaultMaxRecords);
-        require(plotToken.balanceOf(address(this)).sub(initialLiquidity.mul(10**predictionDecimalMultiplier)) >= minLiquidity);
+        require(plotToken.balanceOf(address(this)).sub(initialLiquidity.mul(10**predictionDecimalMultiplier)) >= minLiquidity,"Liquidity falling beyond minimum liquidity");
         cm.createMarket(_currencyTypeIndex,_marketTypeIndex,_roundId);
 
         emit MarketCreated(_currencyTypeIndex,_marketTypeIndex,initialLiquidity);
     }
 
+    /**
+    * @dev Approves Plot tokens to allPlotMarket contract to spend behalf of current contract
+    * @param _amount amount of plot tokens
+    */ 
     function approveToAllMarkets(uint _amount) external onlyAuthorized {
-        plotToken.approve(ms.getLatestAddress("AM"),_amount);
+        require(plotToken.approve(ms.getLatestAddress("AM"),_amount),"ERC20 call Failed");
     }
 
+    /**
+    * @dev Claims reward for previously created markets
+    * @param _maxRecords max number of records to process
+    */ 
     function claimCreationAndParticipationReward(uint _maxRecords) public {
         IAllPlotMarkets allMarkets = IAllPlotMarkets(ms.getLatestAddress("AM"));
         ICyclicMarkets cyclicMarket = ICyclicMarkets(ms.getLatestAddress("CM"));
@@ -138,20 +160,32 @@ contract PooledMarketCreation is
 
     }
 
+    /**
+    * @dev Updates unstake restrict time
+    * @param _val new value to be updated as time restriction for unstake since last stake
+    */ 
     function updateUnstakeRestrictTime(uint _val) external onlyAuthorized {
-        require(_val > 0);
+        require(_val > 0,"Value can not be 0");
         unstakeRestrictTime = _val;
     }
 
+    /**
+    * @dev Updates minimum liquidity contract should hold for market creation
+    * @param _val new value to be updated as minimum liquidity beyonf which contract balance should not fall
+    */ 
     function updateMinLiquidity(uint _val) external onlyAuthorized {
-        require(_val > 0);
+        require(_val > 0,"Value can not be 0");
         minLiquidity = _val;
     }
 
+    /**
+    * @dev To add additional reward for contributors of pool
+    * @param _val amount of tokens as additional reward
+    */ 
     function addAdditionalReward(uint _val) external {
-        require(_val != 0);
-        address payable _msgSender = _msgSender();
-        require(plotToken.transferFrom(_msgSender, address(this), _val));
-        emit AddedAdditionalReward(_msgSender, _val);
+        require(_val > 0,"Value can not be 0");
+        address payable __msgSender = _msgSender();
+        require(plotToken.transferFrom(__msgSender, address(this), _val),"ERC20 call Failed");
+        emit AddedAdditionalReward(__msgSender, _val);
     }
 }
