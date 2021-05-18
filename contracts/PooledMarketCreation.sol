@@ -8,10 +8,17 @@ import "./external/proxy/OwnedUpgradeabilityProxy.sol";
 import "./interfaces/IAuth.sol";
 
 contract ICyclicMarkets {
-  function createMarket(uint32 _marketCurrencyIndex,uint32 _marketTypeIndex, uint80 _roundId) public;
-  function claimCreationReward() external;
-  function getInitialLiquidity(uint _marketType) external view returns(uint);
-  function getPendingMarketCreationRewards(address _user) external view returns(uint256 tokenIncentive);
+    struct MarketCreationData {
+      uint32 initialStartTime;
+      uint64 latestMarket;
+      uint64 penultimateMarket;
+      bool paused;
+    }
+    function createMarket(uint32 _marketCurrencyIndex,uint32 _marketTypeIndex, uint80 _roundId) public;
+    function claimCreationReward() external;
+    function getInitialLiquidity(uint _marketType) external view returns(uint);
+    function getPendingMarketCreationRewards(address _user) external view returns(uint256 tokenIncentive);
+    mapping(uint256 => mapping(uint256 => MarketCreationData)) public marketCreationData;
 }
 
 contract IMaster {
@@ -40,7 +47,9 @@ contract PooledMarketCreation is
     uint internal predictionDecimalMultiplier;
     uint public unstakeRestrictTime;
     uint public defaultMaxRecords;
+    address public rewardWallet;
     mapping(address => uint) public userLastStaked;
+    mapping(uint32 => mapping(uint32 => uint)) public marketTypeAdditionalReward;
 
     event Staked(address _user, uint _plotAmountStaked, uint lpTokensMinted);
     event Unstaked(address _user, uint _lpAmountUnstaked, uint plotTokensTransferred);
@@ -61,6 +70,7 @@ contract PooledMarketCreation is
         predictionDecimalMultiplier = 10;
         unstakeRestrictTime = 1 days;
         defaultMaxRecords=10;
+        rewardWallet = _defaultAuthorizedAddress;
         _initializeEIP712("PMC");
     }
 
@@ -127,6 +137,11 @@ contract PooledMarketCreation is
         claimCreationAndParticipationReward(defaultMaxRecords);
         require(plotToken.balanceOf(address(this)).sub(initialLiquidity.mul(10**predictionDecimalMultiplier)) >= minLiquidity,"Liquidity falling beyond minimum liquidity");
         cm.createMarket(_currencyTypeIndex,_marketTypeIndex,_roundId);
+        uint additionalReward = marketTypeAdditionalReward[_currencyTypeIndex][_marketTypeIndex];
+        if(additionalReward>0)
+        {
+            _addAdditionalReward(additionalReward);
+        }
 
         emit MarketCreated(_currencyTypeIndex,_marketTypeIndex,initialLiquidity);
     }
@@ -156,7 +171,10 @@ contract PooledMarketCreation is
             allMarkets.withdraw(_tokenLeft.add(_tokenReward),_maxRecords);
         }
 
-        emit Claimed(marketcCreationReward.add(_tokenLeft).add(_tokenReward),_maxRecords);
+        if(marketcCreationReward.add(_tokenLeft).add(_tokenReward)>0){
+
+            emit Claimed(marketcCreationReward.add(_tokenLeft).add(_tokenReward),_maxRecords);
+        }
 
     }
 
@@ -182,10 +200,41 @@ contract PooledMarketCreation is
     * @dev To add additional reward for contributors of pool
     * @param _val amount of tokens as additional reward
     */ 
-    function addAdditionalReward(uint _val) external {
-        require(_val > 0,"Value can not be 0");
-        address payable __msgSender = _msgSender();
-        require(plotToken.transferFrom(__msgSender, address(this), _val),"ERC20 call Failed");
-        emit AddedAdditionalReward(__msgSender, _val);
+    function _addAdditionalReward(uint _val) internal {
+        require(plotToken.transferFrom(rewardWallet, address(this), _val),"ERC20 call Failed");
+        emit AddedAdditionalReward(rewardWallet, _val);
+    }
+
+    /**
+    * @dev Returns Plot worth of entered LP
+    * @param _unStakeLP amount of LP tokens
+    * @return  Plot worth of entered LP.
+    */
+    function getPlotWorthOfLP(uint _unStakeLP) external view returns(uint){
+        uint plotBalance = (plotToken.balanceOf(address(this)));
+        uint lpSupply = totalSupply();
+        return _unStakeLP.mul(plotBalance).div(lpSupply);
+    }
+
+    /**
+    * @dev Updates Additional reward to br given per market type
+    * @param _currencyTypeIndex The index of market currency 
+    * @param _marketTypeIndex The index of market type.
+    * @param _val Additional reward to be given
+    */
+    function updateAdditionalRewardPerMarketType(uint32 _currencyTypeIndex, uint32 _marketTypeIndex, uint _val) external onlyAuthorized {
+        ICyclicMarkets cm = ICyclicMarkets(ms.getLatestAddress("CM"));
+        (, uint64 latestTime, ,) = cm.marketCreationData(_marketTypeIndex, _currencyTypeIndex);
+        require(latestTime > 0, "Not valid Market type");
+        marketTypeAdditionalReward[_currencyTypeIndex][_marketTypeIndex] = _val;
+    }
+
+    /**
+    * @dev Updates wallet address from which addtional reward will be deducted
+    * @param _wallet Wallet address
+    */
+    function updateWalletAddress(address _wallet) external onlyAuthorized {
+        require(_wallet != address(0),"Address should not be null");
+        rewardWallet = _wallet;
     }
 }
