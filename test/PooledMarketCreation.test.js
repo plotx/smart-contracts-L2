@@ -57,11 +57,11 @@ contract("Pooled Market Creation", async function(users) {
 			await masterInstance.addNewContract(toHex("PC"), PMC.address);
 			PMC = await PooledMarketCreation.at(await masterInstance.getLatestAddress(web3.utils.toHex("PC")));
             await increaseTime(5 * 3600);
-            await plotusToken.transfer(users[1],toWei(1600));
+            await plotusToken.transfer(users[1],toWei(600));
             await plotusToken.transfer(users[2],toWei(600));
             await plotusToken.transfer(users[3],toWei(600));
             await plotusToken.transfer(users[11],toWei(1200));
-            await plotusToken.approve(PMC.address,toWei(500),{from:users[0]});
+            await plotusToken.approve(PMC.address,toWei(600),{from:users[0]});
             await plotusToken.approve(PMC.address,toWei(1600),{from:users[1]});
             await plotusToken.approve(PMC.address,toWei(600),{from:users[2]});
             await plotusToken.approve(PMC.address,toWei(600),{from:users[3]});
@@ -70,7 +70,7 @@ contract("Pooled Market Creation", async function(users) {
 			let nullAddress = "0x0000000000000000000000000000";
 			await cyclicMarkets.updateMarketType(0,100,3600,2400,300*1e8);
          
-            await PMC.approveToAllMarkets(toWei(600));
+            await PMC.approveToAllMarkets(toWei(1600));
             
 		});
 
@@ -152,6 +152,9 @@ contract("Pooled Market Creation", async function(users) {
 			assert.equal(poolPlotBalBefore-poolPlotBalAfter,toWei(300));
 			assert.equal(poolPlotBalAfter,toWei(400));
 			assert.equal(lpTotalSupply,toWei(700));
+
+			assert.equal(Math.round((await PMC.getPlotWorthOfLP(await PMC.balanceOf(users[1])))/1e13),17142857);
+			assert.equal(Math.round((await PMC.getPlotWorthOfLP(await PMC.balanceOf(users[2])))/1e13),22857143);
 		});
 
 		it("Staker S1 stakes 50 Plot", async () => {
@@ -215,6 +218,8 @@ contract("Pooled Market Creation", async function(users) {
 			assert.equal(poolPlotBalAfter-poolPlotBalBefore,toWei(1383.2));
 			assert.equal(poolPlotBalAfter,toWei(1833.2));
 			assert.equal(lpTotalSupply,toWei(787.5));
+			assert.equal(Math.round((await PMC.getPlotWorthOfLP(await PMC.balanceOf(users[1])))/1e13),90205079);
+			assert.equal(Math.round((await PMC.getPlotWorthOfLP(await PMC.balanceOf(users[2])))/1e13),93114921);
 		});
 
 		it("Staker S1 stakes 50 Plot", async () => {
@@ -304,13 +309,15 @@ contract("Pooled Market Creation", async function(users) {
 			assert.equal(poolPlotBalBefore-poolPlotBalAfter,toWei(300));
 			assert.equal(Math.round(poolPlotBalAfter/1e18),100);
 			assert.equal(Math.round(lpTotalSupply/1e13),17183068);
+			assert.equal(Math.round((await PMC.getPlotWorthOfLP(await PMC.balanceOf(users[1])))/1e18),100);
+			assert.equal(await PMC.getPlotWorthOfLP(await PMC.balanceOf(users[2])),0);
 		});
 
-		it("Staker S3 stakes 100 Plot", async () => {
+		it("Staker S3 stakes 400 Plot", async () => {
 			let userPlotBalBefore = await plotusToken.balanceOf(users[3]);
 			let userLPBalBefore = await PMC.balanceOf(users[3]);
 			let poolPlotBalBefore = await plotusToken.balanceOf(PMC.address);
-			let functionSignature = encode3("stake(uint)", toWei(100));
+			let functionSignature = encode3("stake(uint)", toWei(400));
 			await signAndExecuteMetaTx(
 			      privateKeyList[3],
 			      users[3],
@@ -323,28 +330,35 @@ contract("Pooled Market Creation", async function(users) {
 			let poolPlotBalAfter = await plotusToken.balanceOf(PMC.address);
 			let lpTotalSupply = await PMC.totalSupply();
 
-			assert.equal(userPlotBalBefore-userPlotBalAfter,toWei(100));
-			assert.equal(Math.round((userLPBalAfter-userLPBalBefore)/1e13),17183068);
-			assert.equal(Math.round((poolPlotBalAfter-poolPlotBalBefore)/1e18),100);
-			assert.equal(Math.round(poolPlotBalAfter/1e18),200);
-			assert.equal(Math.round(userLPBalAfter/1e13),17183068);
-			assert.equal(Math.round(lpTotalSupply/1e13),34366136);	
+			assert.equal(userPlotBalBefore-userPlotBalAfter,toWei(400));
+			assert.equal(Math.round((userLPBalAfter-userLPBalBefore)/1e13),68732271);
+			assert.equal(Math.round((poolPlotBalAfter-poolPlotBalBefore)/1e18),400);
+			assert.equal(Math.round(poolPlotBalAfter/1e18),500);
+			assert.equal(Math.round(userLPBalAfter/1e13),68732271);
+			assert.equal(Math.round(lpTotalSupply/1e13),85915339);	
 		});
-		it("Add Additional reward of 500 Plots", async () => {
+		it("Update Additional reward for market type", async () => {
+			assert.equal(await PMC.marketTypeAdditionalReward(0,0),0);
+			await PMC.updateAdditionalRewardPerMarketType(0,0,toWei(503.6));
+			assert.equal(await PMC.marketTypeAdditionalReward(0,0),toWei(503.6));
+		});
+		it("Create, settle market and Add additional reward of 503.6 plots", async () => {
+			let ethChainlinkOracle = await EthChainlinkOracle.deployed();
+            await ethChainlinkOracle.setLatestAnswer(10000000000);
+            await increaseTime(10*60*60);
 			let poolPlotBalBefore = await plotusToken.balanceOf(PMC.address);
-			let functionSignature = encode3("addAdditionalReward(uint)", toWei(500));
-			await signAndExecuteMetaTx(
-			      privateKeyList[0],
-			      users[0],
-			      functionSignature,
-			      PMC,
-              	  "PMC"
-			      );
+			await PMC.createMarket(0,0,3);
+			await cyclicMarkets.settleMarket(8,3);
+			await increaseTime(1*60*60);
+			await PMC.claimCreationAndParticipationReward(10);
 			let poolPlotBalAfter = await plotusToken.balanceOf(PMC.address);
 			let lpTotalSupply = await PMC.totalSupply();
 			assert.equal(Math.round((poolPlotBalAfter-poolPlotBalBefore)/1e18),500);
-			assert.equal(Math.round(poolPlotBalAfter/1e18),700);
-			assert.equal(Math.round(lpTotalSupply/1e13),34366136);	
+			assert.equal(Math.round(poolPlotBalAfter/1e18),1000);
+			assert.equal(Math.round(lpTotalSupply/1e13),85915339);	
+			assert.equal(Math.round((await PMC.getPlotWorthOfLP(await PMC.balanceOf(users[1])))/1e18),200);
+			assert.equal(await PMC.getPlotWorthOfLP(await PMC.balanceOf(users[2])),0);
+			assert.equal(Math.round((await PMC.getPlotWorthOfLP(await PMC.balanceOf(users[3])))/1e18),800);
 		});
 		it("Staker S1 unstakes all of their LP ", async () => {
 			let totalLp =await PMC.balanceOf(users[1]);
@@ -364,12 +378,12 @@ contract("Pooled Market Creation", async function(users) {
 			let poolPlotBalAfter = await plotusToken.balanceOf(PMC.address);
 			let lpTotalSupply = await PMC.totalSupply();
 
-			assert.equal(Math.round((userPlotBalAfter-userPlotBalBefore)/1e18),350);
+			assert.equal(Math.round((userPlotBalAfter-userPlotBalBefore)/1e18),200);
 			assert.equal(Math.round((userLPBalBefore-userLPBalAfter)/1e13),17183068);
-			assert.equal(Math.round((poolPlotBalBefore-poolPlotBalAfter)/1e18),350);
-			assert.equal(Math.round(poolPlotBalAfter/1e18),350);
+			assert.equal(Math.round((poolPlotBalBefore-poolPlotBalAfter)/1e18),200);
+			assert.equal(Math.round(poolPlotBalAfter/1e18),800);
 			assert.equal(Math.round(userLPBalAfter/1e13),0);
-			assert.equal(Math.round(lpTotalSupply/1e13),17183068);
+			assert.equal(Math.round(lpTotalSupply/1e13),68732271);
 		});
 		it("Staker S3 unstakes all of their LP ", async () => {
 			await increaseTime(24 * 3600);
@@ -390,9 +404,9 @@ contract("Pooled Market Creation", async function(users) {
 			let poolPlotBalAfter = await plotusToken.balanceOf(PMC.address);
 			let lpTotalSupply = await PMC.totalSupply();
 
-			assert.equal(Math.round((userPlotBalAfter-userPlotBalBefore)/1e18),350);
-			assert.equal(Math.round((userLPBalBefore-userLPBalAfter)/1e13),17183068);
-			assert.equal(Math.round((poolPlotBalBefore-poolPlotBalAfter)/1e18),350);
+			assert.equal(Math.round((userPlotBalAfter-userPlotBalBefore)/1e18),800);
+			assert.equal(Math.round((userLPBalBefore-userLPBalAfter)/1e13),68732271);
+			assert.equal(Math.round((poolPlotBalBefore-poolPlotBalAfter)/1e18),800);
 			assert.equal(poolPlotBalAfter,0);
 			assert.equal(userLPBalAfter,0);
 			assert.equal(lpTotalSupply,0);
@@ -431,7 +445,6 @@ contract("Pooled Market Creation", async function(users) {
 
 		it("Should not be able to update unstakeRestrictTime as 0", async () => {
 			await assertRevert(PMC.updateUnstakeRestrictTime(0));
-			
 		});
 
 		it("Authorised user should be able to update minLiquidity", async () => {
@@ -448,9 +461,25 @@ contract("Pooled Market Creation", async function(users) {
 			
 		});
 
-		it("Should not be able to add additional reward as 0", async () => {
-			await assertRevert(PMC.addAdditionalReward(0));
-			
+		it("Authorised user should be able to update wallet address", async () => {
+
+			assert.equal(await PMC.rewardWallet(),users[0]);
+			await PMC.updateWalletAddress(users[3]);
+			assert.equal(await PMC.rewardWallet(),users[3]);
+
+		});
+
+		it("Should not be able to update wallet address as null", async () => {
+			let ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+			assert.equal(await PMC.rewardWallet(),users[3]);
+			await assertRevert(PMC.updateWalletAddress(ZERO_ADDRESS));
+			assert.equal(await PMC.rewardWallet(),users[3]);
+
+		});
+
+		it("Should not be able to update marketTypeAdditionalReward for invalid market type", async () => {
+			await assertRevert(PMC.updateAdditionalRewardPerMarketType(0,5,12));
+
 		});
 	});
 });
