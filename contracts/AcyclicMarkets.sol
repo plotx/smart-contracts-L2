@@ -81,7 +81,7 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
     uint internal predictionDecimalMultiplier;
     uint internal minPredictionAmount;
     uint internal maxPredictionAmount;
-    uint internal minLiquidityByCreator;
+    uint64 internal minLiquidityByCreator;
 
     modifier onlyAllMarkets {
       require(msg.sender == address(allMarkets));
@@ -115,7 +115,7 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
       maxPredictionAmount = 100000 ether; // Need to be updated
       minTimePassed = 10 hours; // need to set
       predictionDecimalMultiplier = 10;
-      minLiquidityByCreator = 100 ether;
+      minLiquidityByCreator = 100 * 10**8;
       _initializeEIP712("AC");
     }
 
@@ -373,6 +373,7 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
      * @return  option price
      **/
     function getOptionPrice(uint _marketId, uint256 _prediction) public view returns(uint64) {
+      require(marketData[_marketId].marketCreator != address(0),"Invalid Market id");
       uint optionLen = allMarkets.getTotalOptions(_marketId);
       (uint[] memory _optionPricingParams,) = allMarkets.getMarketOptionPricingParams(_marketId,_prediction);
       PricingData storage _marketPricingData = marketData[_marketId].pricingData;
@@ -456,7 +457,9 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
         require(_val == value); // to avoid overflow while type casting
         minTimePassed = _val;
       } else if(code == "MLC") {
-        minLiquidityByCreator = value;
+        uint64 _val = uint64(value);
+        require(_val == value); // to avoid overflow while type casting
+        minLiquidityByCreator = _val;
       } else {
         MarketFeeParams storage _marketFeeParams = marketFeeParams;
         require(value < 10000);

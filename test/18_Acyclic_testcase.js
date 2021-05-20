@@ -553,5 +553,16 @@ contract("Rewards-Market Raise dispute and pass the proposal ", async function(u
 				assert.equal(Math.round((plotBalAfter/1e13-plotBalBefore/1e13)),reward/1e3);
 			}
 		})
+
+		it("Should not be able to create market with less liquidity than fixed", async() => {
+			await assertRevert(acyclicMarkets.createMarket("Question1", [100,400], [timeNow/1+4*3600,timeNow/1+8*3600,3600],toHex("NFT"),toHex("PLOT"), 100,{from:users[11]}));
+		});
+
+		it("Authorised user should be able to update minLiquidityByCreator", async() => {
+			assert.equal((await acyclicMarkets.getUintParameters(toHex("MLC")))[1],100*1e8);
+			await acyclicMarkets.updateUintParameters(toHex("MLC"),200*1e8);
+			assert.equal((await acyclicMarkets.getUintParameters(toHex("MLC")))[1],200*1e8);
+		});
+
 	});
 });
