@@ -51,11 +51,11 @@ contract PooledMarketCreation is
     mapping(address => uint) public userLastStaked;
     mapping(uint32 => mapping(uint32 => uint)) public marketTypeAdditionalReward;
 
-    event Staked(address _user, uint _plotAmountStaked, uint lpTokensMinted);
-    event Unstaked(address _user, uint _lpAmountUnstaked, uint plotTokensTransferred);
-    event MarketCreated(uint _currencyType, uint _marketType, uint _initialLiquidity);
-    event Claimed(uint _amountClaimed, uint _maxRecordProcessed);
-    event AddedAdditionalReward(address _user, uint _amount);
+    event Staked(address _user, uint _plotAmountStaked, uint lpTokensMinted, uint plotLeftInPool, uint totalLpSupply);
+    event Unstaked(address _user, uint _lpAmountUnstaked, uint plotTokensTransferred, uint plotLeftInPool, uint totalLpSupply);
+    event MarketCreated(uint _currencyType, uint _marketType, uint _initialLiquidity, uint plotLeftInPool, uint totalLpSupply);
+    event Claimed(uint _amountClaimed, uint _maxRecordProcessed, uint plotLeftInPool, uint totalLpSupply);
+    event AddedAdditionalReward(address _user, uint _amount, uint plotLeftInPool, uint totalLpSupply);
 
     function setMasterAddress(address _authorizedMultiSig, address _defaultAuthorizedAddress) public {
         OwnedUpgradeabilityProxy proxy =  OwnedUpgradeabilityProxy(address(uint160(address(this))));
@@ -93,7 +93,7 @@ contract PooledMarketCreation is
         address payable __msgSender = _msgSender();
         userLastStaked[__msgSender] = now;
         claimCreationAndParticipationReward(defaultMaxRecords);
-        uint plotBalance = (plotToken.balanceOf(address(this)));
+        uint plotBalance = (getPlotLeftInPool());
         require(plotToken.transferFrom(__msgSender, address(this), _stakePlotAmount),"ERC20 call Failed");
         uint mintAmount = _stakePlotAmount;
         uint lpSupply = totalSupply();
@@ -102,7 +102,7 @@ contract PooledMarketCreation is
         }
         _mint(__msgSender, mintAmount);
 
-        emit Staked(__msgSender, _stakePlotAmount, mintAmount);
+        emit Staked(__msgSender, _stakePlotAmount, mintAmount, getPlotLeftInPool(), totalSupply());
 
     }
 
@@ -117,11 +117,11 @@ contract PooledMarketCreation is
         require(userLastStaked[__msgSender].add(unstakeRestrictTime) < now,"Can not unstake in restricted period");
         uint lpSupply = totalSupply();
         _burn(__msgSender, _unStakeLP);
-        uint plotBalance = (plotToken.balanceOf(address(this)));
+        uint plotBalance = (getPlotLeftInPool());
         uint returnToken = _unStakeLP.mul(plotBalance).div(lpSupply);
         require(plotToken.transfer(__msgSender,returnToken),"ERC20 call Failed");
 
-        emit Unstaked(__msgSender, _unStakeLP, returnToken);
+        emit Unstaked(__msgSender, _unStakeLP, returnToken, getPlotLeftInPool(), totalSupply());
 
     }
 
@@ -135,7 +135,7 @@ contract PooledMarketCreation is
         ICyclicMarkets cm = ICyclicMarkets(ms.getLatestAddress("CM"));
         uint initialLiquidity = cm.getInitialLiquidity(_marketTypeIndex);
         claimCreationAndParticipationReward(defaultMaxRecords);
-        require(plotToken.balanceOf(address(this)).sub(initialLiquidity.mul(10**predictionDecimalMultiplier)) >= minLiquidity,"Liquidity falling beyond minimum liquidity");
+        require(getPlotLeftInPool().sub(initialLiquidity.mul(10**predictionDecimalMultiplier)) >= minLiquidity,"Liquidity falling beyond minimum liquidity");
         cm.createMarket(_currencyTypeIndex,_marketTypeIndex,_roundId);
         uint additionalReward = marketTypeAdditionalReward[_currencyTypeIndex][_marketTypeIndex];
         if(additionalReward>0)
@@ -143,7 +143,7 @@ contract PooledMarketCreation is
             _addAdditionalReward(additionalReward);
         }
 
-        emit MarketCreated(_currencyTypeIndex,_marketTypeIndex,initialLiquidity);
+        emit MarketCreated(_currencyTypeIndex,_marketTypeIndex,initialLiquidity, getPlotLeftInPool(), totalSupply());
     }
 
     /**
@@ -173,7 +173,7 @@ contract PooledMarketCreation is
 
         if(marketcCreationReward.add(_tokenLeft).add(_tokenReward)>0){
 
-            emit Claimed(marketcCreationReward.add(_tokenLeft).add(_tokenReward),_maxRecords);
+            emit Claimed(marketcCreationReward.add(_tokenLeft).add(_tokenReward),_maxRecords, getPlotLeftInPool(), totalSupply());
         }
 
     }
@@ -202,7 +202,7 @@ contract PooledMarketCreation is
     */ 
     function _addAdditionalReward(uint _val) internal {
         require(plotToken.transferFrom(rewardWallet, address(this), _val),"ERC20 call Failed");
-        emit AddedAdditionalReward(rewardWallet, _val);
+        emit AddedAdditionalReward(rewardWallet, _val, getPlotLeftInPool(), totalSupply());
     }
 
     /**
@@ -211,9 +211,17 @@ contract PooledMarketCreation is
     * @return  Plot worth of entered LP.
     */
     function getPlotWorthOfLP(uint _unStakeLP) external view returns(uint){
-        uint plotBalance = (plotToken.balanceOf(address(this)));
+        uint plotBalance = (getPlotLeftInPool());
         uint lpSupply = totalSupply();
         return _unStakeLP.mul(plotBalance).div(lpSupply);
+    }
+
+    /**
+    * @dev Returns Plot Left in the pool
+    * @return  Plot worth of entered LP.
+    */
+    function getPlotLeftInPool() public view returns(uint){
+        return plotToken.balanceOf(address(this));
     }
 
     /**
