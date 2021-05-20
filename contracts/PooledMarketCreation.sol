@@ -51,11 +51,11 @@ contract PooledMarketCreation is
     mapping(address => uint) public userLastStaked;
     mapping(uint32 => mapping(uint32 => uint)) public marketTypeAdditionalReward;
 
-    event Staked(address _user, uint _plotAmountStaked, uint lpTokensMinted, uint plotLeftInPool, uint totalLpSupply);
-    event Unstaked(address _user, uint _lpAmountUnstaked, uint plotTokensTransferred, uint plotLeftInPool, uint totalLpSupply);
+    event Staked(address indexed _user, uint _plotAmountStaked, uint lpTokensMinted, uint plotLeftInPool, uint totalLpSupply);
+    event Unstaked(address indexed _user, uint _lpAmountUnstaked, uint plotTokensTransferred, uint plotLeftInPool, uint totalLpSupply);
     event MarketCreated(uint _currencyType, uint _marketType, uint _initialLiquidity, uint plotLeftInPool, uint totalLpSupply);
     event Claimed(uint _amountClaimed, uint _maxRecordProcessed, uint plotLeftInPool, uint totalLpSupply);
-    event AddedAdditionalReward(address _user, uint _amount, uint plotLeftInPool, uint totalLpSupply);
+    event AddedAdditionalReward(address indexed _user, uint _amount, uint plotLeftInPool, uint totalLpSupply);
 
     function setMasterAddress(address _authorizedMultiSig, address _defaultAuthorizedAddress) public {
         OwnedUpgradeabilityProxy proxy =  OwnedUpgradeabilityProxy(address(uint160(address(this))));
