@@ -561,11 +561,13 @@ contract("Rewards-Market Raise dispute and pass the proposal ", async function(u
 		});
 
 		it("Should not be able to create market with invalid time params", async() => {
+			timeNow = await latestTime();
 			await assertRevert(acyclicMarkets.createMarket("Question1", [100,400], [timeNow/1+4*3600,timeNow/1+8*3600,0],toHex("NFT"),toHex("PLOT"), 1000*1e8,{from:users[11]}));
 			await assertRevert(acyclicMarkets.createMarket("Question1", [100,400], [timeNow/1+4*3600,timeNow/1+3*3600,3600],toHex("NFT"),toHex("PLOT"), 1000*1e8,{from:users[11]}));
 		});
 
 		it("Should not be able to create market with invalid option range", async() => {
+			timeNow = await latestTime();
 			await assertRevert(acyclicMarkets.createMarket("Question1", [0,400], [timeNow/1+4*3600,timeNow/1+8*3600,3600],toHex("NFT"),toHex("PLOT"), 1000*1e8,{from:users[11]}));
 			await assertRevert(acyclicMarkets.createMarket("Question1", [100,50], [timeNow/1+4*3600,timeNow/1+3*3600,3600],toHex("NFT"),toHex("PLOT"), 1000*1e8,{from:users[11]}));
 		});
