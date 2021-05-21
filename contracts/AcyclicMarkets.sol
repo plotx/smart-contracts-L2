@@ -430,6 +430,8 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
         value = marketFeeParams.refereeFeePercent;
       } else if(code == "MCF") { // Market Creator fee percent in Cummulative fee
         value = marketFeeParams.marketCreatorFeePercent;
+      } else if(code == "MTP") {
+        value = minTimePassed;
       } else if(code == "MLC") {
         value = minLiquidityByCreator;
       }
