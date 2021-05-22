@@ -569,7 +569,7 @@ contract("Rewards-Market Raise dispute and pass the proposal ", async function(u
 		it("Should not be able to create market with invalid option range", async() => {
 			timeNow = await latestTime();
 			await assertRevert(acyclicMarkets.createMarket("Question1", [0,400], [timeNow/1+4*3600,timeNow/1+8*3600,3600],toHex("NFT"),toHex("PLOT"), 1000*1e8,{from:users[11]}));
-			await assertRevert(acyclicMarkets.createMarket("Question1", [100,50], [timeNow/1+4*3600,timeNow/1+3*3600,3600],toHex("NFT"),toHex("PLOT"), 1000*1e8,{from:users[11]}));
+			await assertRevert(acyclicMarkets.createMarket("Question1", [100,50], [timeNow/1+4*3600,timeNow/1+8*3600,3600],toHex("NFT"),toHex("PLOT"), 1000*1e8,{from:users[11]}));
 		});
 
 		it("Authorised user should be able to update minLiquidityByCreator", async() => {
@@ -614,6 +614,10 @@ contract("Rewards-Market Raise dispute and pass the proposal ", async function(u
 			assert.equal((await acyclicMarkets.getUintParameters(toHex("MLC")))[1],200*1e8);
 			await assertRevert(acyclicMarkets.updateUintParameters(toHex("MLC"),"18446744073709551616"));
 			assert.equal((await acyclicMarkets.getUintParameters(toHex("MLC")))[1],200*1e8);
+		});
+		it("Should revert if tried to pass null address as market creator", async() => {
+			let nullAddress = "0x0000000000000000000000000000000000000000";
+			await assertRevert(allMarkets.createMarket([],[],nullAddress,1000*1e8));
 		});
 
 	});
