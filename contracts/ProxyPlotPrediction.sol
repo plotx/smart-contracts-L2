@@ -19,6 +19,7 @@ import "./external/openzeppelin-solidity/math/SafeMath.sol";
 import "./external/NativeMetaTransaction.sol";
 import "./interfaces/IAllMarkets.sol";
 import "./interfaces/IToken.sol";
+import "./interfaces/ISwapRouter.sol";
 
 contract ProxyPlotPrediction is NativeMetaTransaction {
 
@@ -26,9 +27,44 @@ contract ProxyPlotPrediction is NativeMetaTransaction {
 
     IAllMarkets allPlotMarkets;
     IToken plotToken;
-    function swapAndPlacePrediction(address[] calldata _path, uint _inputAmount, address _predictFor, uint _marketId, uint _prediction, uint64 _bPLOTPredictionAmount) external {
-      address payable _msgSenderAddress = _msgSender();
-      uint _tokenDeposit = _inputAmount; // Process input amount
+    IUniswapV2Router router;
+
+    address public maticAddress;
+
+    function initiate(address _allPlotMarkets, address _plotToken, address _router, address _maticAddress) external {
+      allPlotMarkets = IAllMarkets(_allPlotMarkets);
+      plotToken = IToken(_plotToken);
+      router = IUniswapV2Router(_router);
+      maticAddress = _maticAddress;
+    }
+
+    function swapAndPlacePrediction(address[] calldata _path, uint _inputAmount, address _predictFor, uint _marketId, uint _prediction, uint64 _bPLOTPredictionAmount) external payable {
+      uint deadline = now*2;
+      uint amountOutMin = 1;
+      require(_path[_path.length-1] == address(plotToken));
+      uint[] memory _output; 
+      if(_path[0] == maticAddress && msg.value >0) {
+        _output = router.swapExactETHForTokens(
+          amountOutMin,
+          _path,
+          address(this),
+          deadline
+        );
+      } else {
+        require(msg.value == 0);
+        address payable _msgSenderAddress = _msgSender();
+        IToken(_path[0]).transferFrom(_msgSenderAddress, address(this), _inputAmount);
+        IToken(_path[0]).approve(address(router), _inputAmount);
+        _output = router.swapExactTokensForTokens(
+          _inputAmount,
+          amountOutMin,
+          _path,
+          address(this),
+          deadline
+        );
+      }
+      uint _tokenDeposit = _output[1];
+      plotToken.approve(address(allPlotMarkets), _inputAmount);
       allPlotMarkets.depositAndPredictFor(_predictFor, _tokenDeposit, _marketId, address(plotToken), _prediction, uint64(_tokenDeposit.div(10**10)), _bPLOTPredictionAmount);
     }
 }
