@@ -42,9 +42,12 @@ contract ProxyPlotPrediction is NativeMetaTransaction {
       uint deadline = now*2;
       uint amountOutMin = 1;
       require(_path[_path.length-1] == address(plotToken));
+      bool _isNativeToken = (_path[0] == maticAddress && msg.value >0);
+      // uint _initialFromTokenBalance = getTokenBalance(_path[0], _isNativeToken);
+      // uint _initialToTokenBalance = getTokenBalance(_path[_path.length-1], false);
       uint[] memory _output; 
-      if(_path[0] == maticAddress && msg.value >0) {
-        _output = router.swapExactETHForTokens(
+      if(_isNativeToken) {
+        _output = router.swapExactETHForTokens.value(msg.value)(
           amountOutMin,
           _path,
           address(this),
@@ -66,5 +69,18 @@ contract ProxyPlotPrediction is NativeMetaTransaction {
       uint _tokenDeposit = _output[1];
       plotToken.approve(address(allPlotMarkets), _inputAmount);
       allPlotMarkets.depositAndPredictFor(_predictFor, _tokenDeposit, _marketId, address(plotToken), _prediction, uint64(_tokenDeposit.div(10**10)), _bPLOTPredictionAmount);
+      // require(_initialFromTokenBalance == getTokenBalance(_path[0], _isNativeToken));
+      // require(_initialToTokenBalance == getTokenBalance(_path[_path.length-1], false));
+    }
+
+    function getTokenBalance(address _token, bool _isNativeCurrency) public returns(uint) {
+      if(_isNativeCurrency) {
+        return ((address(this)).balance);
+      }
+      return IToken(_token).balanceOf(address(this));
+    }
+
+    function transferLeftOverTokens(address _token) external {
+      IToken(_token).transfer(msg.sender, getTokenBalance(_token, false));
     }
 }
