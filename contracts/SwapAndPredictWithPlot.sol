@@ -27,11 +27,13 @@ contract SwapAndPredictWithPlot is NativeMetaTransaction, IAuth {
 
     using SafeMath for uint;
 
+    event SwapAndPredictFor(address predictFor, uint marketId, address swapFromToken, address swapToToken, uint inputAmount, uint outputAmount);
+    
     IAllMarkets allPlotMarkets;
     IToken predictionToken;
     IUniswapV2Router router;
 
-    address public maticAddress;
+    address public nativeCurrencyAddress;
     address public defaultAuthorized;
 
     /**
@@ -47,23 +49,44 @@ contract SwapAndPredictWithPlot is NativeMetaTransaction, IAuth {
       _initializeEIP712("SP");
     }
 
-    function initiate(address _allPlotMarkets, address _predictionToken, address _router, address _maticAddress) external {
+    /**
+     * @dev Initiate the contract with required addresses
+     * @param _allPlotMarkets AllPlotMarkets contract address
+     * @param _predictionToken Address of token used for placing predictions
+     * @param _router Router address of exchange to be used for swap transactions
+     * @param _nativeCurrencyAddress Wrapped token address of Native currency of network/chain
+     */
+    function initiate(address _allPlotMarkets, address _predictionToken, address _router, address _nativeCurrencyAddress) external {
       require(msg.sender == defaultAuthorized);
       allPlotMarkets = IAllMarkets(_allPlotMarkets);
       predictionToken = IToken(_predictionToken);
       router = IUniswapV2Router(_router);
-      maticAddress = _maticAddress;
+      nativeCurrencyAddress = _nativeCurrencyAddress;
     }
 
+    /**
+    * @dev Swap any allowed token to prediction token and then place prediction
+    * @param _path Order path for swap transaction
+    * @param _inputAmount Input amount for swap transaction
+    * @param _predictFor Address of user on whose behalf the prediction should be placed
+    * @param _marketId Index of the market to place prediction
+    * @param _prediction Option in the market to place prediction
+    * @param _bPLOTPredictionAmount Bplot amount of `_predictFor` user to be used for prediction
+    */
     function swapAndPlacePrediction(address[] calldata _path, uint _inputAmount, address _predictFor, uint _marketId, uint _prediction, uint64 _bPLOTPredictionAmount) external payable {
       uint deadline = now*2;
       uint amountOutMin = 1;
       require(_path[_path.length-1] == address(predictionToken));
-      bool _isNativeToken = (_path[0] == maticAddress && msg.value >0);
+      if(_bPLOTPredictionAmount > 0) {
+        // bPLOT can not be used if another user is placing proxy prediction
+        require(_msgSender() == _predictFor);
+      }
+      bool _isNativeToken = (_path[0] == nativeCurrencyAddress && msg.value >0);
       // uint _initialFromTokenBalance = getTokenBalance(_path[0], _isNativeToken);
       // uint _initialToTokenBalance = getTokenBalance(_path[_path.length-1], false);
       uint[] memory _output; 
       if(_isNativeToken) {
+        require(_inputAmount == msg.value);
         _output = router.swapExactETHForTokens.value(msg.value)(
           amountOutMin,
           _path,
@@ -84,12 +107,18 @@ contract SwapAndPredictWithPlot is NativeMetaTransaction, IAuth {
         );
       }
       uint _tokenDeposit = _output[1];
+      emit SwapAndPredictFor(_predictFor, _marketId, _path[0], address(predictionToken), _inputAmount, _output[1]);
       predictionToken.approve(address(allPlotMarkets), _inputAmount);
       allPlotMarkets.depositAndPredictFor(_predictFor, _tokenDeposit, _marketId, address(predictionToken), _prediction, uint64(_tokenDeposit.div(10**10)), _bPLOTPredictionAmount);
       // require(_initialFromTokenBalance == getTokenBalance(_path[0], _isNativeToken));
       // require(_initialToTokenBalance == getTokenBalance(_path[_path.length-1], false));
     }
 
+    /**
+    * @dev Get contract balance of the given token
+    * @param _token Address of token to query balance for 
+    * @param _isNativeCurrency Falg defining if the balance needed to be fetched for native currency of the network/chain
+    */
     function getTokenBalance(address _token, bool _isNativeCurrency) public returns(uint) {
       if(_isNativeCurrency) {
         return ((address(this)).balance);
@@ -97,7 +126,13 @@ contract SwapAndPredictWithPlot is NativeMetaTransaction, IAuth {
       return IToken(_token).balanceOf(address(this));
     }
 
-    function transferLeftOverTokens(address _token) external onlyAuthorized {
-      IToken(_token).transfer(msg.sender, getTokenBalance(_token, false));
+    /**
+    * @dev Transfer any left over token in contract to given address
+    * @param _token Address of token to transfer 
+    * @param _recipient Address of token recipient
+    */
+    function transferLeftOverTokens(address _token, address _recipient) external onlyAuthorized {
+      require(_token != address(0));
+      IToken(_token).transfer(_recipient, getTokenBalance(_token, false));
     }
 }
