@@ -37,7 +37,8 @@ contract AllPlotMarkets_2 is AllPlotMarkets {
     }
 
     /**
-    * @dev Deposit and Place prediction on the available options of the market with both PLOT and BPLOT.
+    * @dev Deposit and Place prediction on behalf of another address
+    * @param _predictFor Address of user, to place prediction for
     * @param _marketId Index of the market
     * @param _tokenDeposit prediction token amount to deposit
     * @param _asset The asset used by user during prediction whether it is prediction token address or in Bonus token.
