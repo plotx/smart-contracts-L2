@@ -16,24 +16,41 @@
 pragma solidity 0.5.7;
 
 import "./external/openzeppelin-solidity/math/SafeMath.sol";
+import "./external/proxy/OwnedUpgradeabilityProxy.sol";
 import "./external/NativeMetaTransaction.sol";
 import "./interfaces/IAllMarkets.sol";
 import "./interfaces/IToken.sol";
 import "./interfaces/ISwapRouter.sol";
+import "./interfaces/IAuth.sol";
 
-contract ProxyPlotPrediction is NativeMetaTransaction {
+contract SwapAndPredictWithPlot is NativeMetaTransaction, IAuth {
 
     using SafeMath for uint;
 
     IAllMarkets allPlotMarkets;
-    IToken plotToken;
+    IToken predictionToken;
     IUniswapV2Router router;
 
     address public maticAddress;
+    address public defaultAuthorized;
 
-    function initiate(address _allPlotMarkets, address _plotToken, address _router, address _maticAddress) external {
+    /**
+     * @dev Changes the master address and update it's instance
+     * @param _authorizedMultiSig Authorized address to execute critical functions in the protocol.
+     * @param _defaultAuthorizedAddress Authorized address to trigger initial functions by passing required external values.
+     */
+    function setMasterAddress(address _authorizedMultiSig, address _defaultAuthorizedAddress) public {
+      OwnedUpgradeabilityProxy proxy =  OwnedUpgradeabilityProxy(address(uint160(address(this))));
+      require(msg.sender == proxy.proxyOwner());
+      authorized = _authorizedMultiSig;
+      defaultAuthorized = _defaultAuthorizedAddress;
+      _initializeEIP712("SP");
+    }
+
+    function initiate(address _allPlotMarkets, address _predictionToken, address _router, address _maticAddress) external {
+      require(msg.sender == defaultAuthorized);
       allPlotMarkets = IAllMarkets(_allPlotMarkets);
-      plotToken = IToken(_plotToken);
+      predictionToken = IToken(_predictionToken);
       router = IUniswapV2Router(_router);
       maticAddress = _maticAddress;
     }
@@ -41,7 +58,7 @@ contract ProxyPlotPrediction is NativeMetaTransaction {
     function swapAndPlacePrediction(address[] calldata _path, uint _inputAmount, address _predictFor, uint _marketId, uint _prediction, uint64 _bPLOTPredictionAmount) external payable {
       uint deadline = now*2;
       uint amountOutMin = 1;
-      require(_path[_path.length-1] == address(plotToken));
+      require(_path[_path.length-1] == address(predictionToken));
       bool _isNativeToken = (_path[0] == maticAddress && msg.value >0);
       // uint _initialFromTokenBalance = getTokenBalance(_path[0], _isNativeToken);
       // uint _initialToTokenBalance = getTokenBalance(_path[_path.length-1], false);
@@ -67,8 +84,8 @@ contract ProxyPlotPrediction is NativeMetaTransaction {
         );
       }
       uint _tokenDeposit = _output[1];
-      plotToken.approve(address(allPlotMarkets), _inputAmount);
-      allPlotMarkets.depositAndPredictFor(_predictFor, _tokenDeposit, _marketId, address(plotToken), _prediction, uint64(_tokenDeposit.div(10**10)), _bPLOTPredictionAmount);
+      predictionToken.approve(address(allPlotMarkets), _inputAmount);
+      allPlotMarkets.depositAndPredictFor(_predictFor, _tokenDeposit, _marketId, address(predictionToken), _prediction, uint64(_tokenDeposit.div(10**10)), _bPLOTPredictionAmount);
       // require(_initialFromTokenBalance == getTokenBalance(_path[0], _isNativeToken));
       // require(_initialToTokenBalance == getTokenBalance(_path[_path.length-1], false));
     }
@@ -80,7 +97,7 @@ contract ProxyPlotPrediction is NativeMetaTransaction {
       return IToken(_token).balanceOf(address(this));
     }
 
-    function transferLeftOverTokens(address _token) external {
+    function transferLeftOverTokens(address _token) external onlyAuthorized {
       IToken(_token).transfer(msg.sender, getTokenBalance(_token, false));
     }
 }

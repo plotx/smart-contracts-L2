@@ -21,6 +21,10 @@ contract AllPlotMarkets_2 is AllPlotMarkets {
 
     mapping(address => bool) public authToProxyPrediction;
 
+    function addAuthorizedProxyPreditictor(address _proxyAddress) external onlyAuthorized {
+      authToProxyPrediction[_proxyAddress] = true;
+    }
+
     /**
     * @dev Function to deposit prediction token for participation in markets
     * @param _amount Amount of prediction token to deposit
