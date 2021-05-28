@@ -29,12 +29,21 @@ contract SwapAndPredictWithPlot is NativeMetaTransaction, IAuth {
 
     event SwapAndPredictFor(address predictFor, uint marketId, address swapFromToken, address swapToToken, uint inputAmount, uint outputAmount);
     
-    IAllMarkets allPlotMarkets;
-    IToken predictionToken;
-    IUniswapV2Router router;
+    IAllMarkets internal allPlotMarkets;
+    IUniswapV2Router internal router;
+    address internal predictionToken;
 
     address public nativeCurrencyAddress;
     address public defaultAuthorized;
+
+    modifier holdNoFunds(address[] memory _path) {
+      bool _isNativeToken = (_path[0] == nativeCurrencyAddress && msg.value >0);
+      uint _initialFromTokenBalance = getTokenBalance(_path[0], _isNativeToken);
+      uint _initialToTokenBalance = getTokenBalance(_path[_path.length-1], false);
+      _;  
+      require(_initialFromTokenBalance == getTokenBalance(_path[0], _isNativeToken));
+      require(_initialToTokenBalance == getTokenBalance(_path[_path.length-1], false));
+    }
 
     /**
      * @dev Changes the master address and update it's instance
@@ -59,7 +68,7 @@ contract SwapAndPredictWithPlot is NativeMetaTransaction, IAuth {
     function initiate(address _allPlotMarkets, address _predictionToken, address _router, address _nativeCurrencyAddress) external {
       require(msg.sender == defaultAuthorized);
       allPlotMarkets = IAllMarkets(_allPlotMarkets);
-      predictionToken = IToken(_predictionToken);
+      predictionToken = _predictionToken;
       router = IUniswapV2Router(_router);
       nativeCurrencyAddress = _nativeCurrencyAddress;
     }
@@ -73,19 +82,42 @@ contract SwapAndPredictWithPlot is NativeMetaTransaction, IAuth {
     * @param _prediction Option in the market to place prediction
     * @param _bPLOTPredictionAmount Bplot amount of `_predictFor` user to be used for prediction
     */
-    function swapAndPlacePrediction(address[] calldata _path, uint _inputAmount, address _predictFor, uint _marketId, uint _prediction, uint64 _bPLOTPredictionAmount) external payable {
-      uint deadline = now*2;
-      uint amountOutMin = 1;
-      require(_path[_path.length-1] == address(predictionToken));
+    function swapAndPlacePrediction(
+      address[] memory _path,
+      uint _inputAmount,
+      address _predictFor,
+      uint _marketId,
+      uint _prediction,
+      uint64 _bPLOTPredictionAmount
+    ) public payable
+      // Contract should not hold any of input/output tokens provided in transaction
+      holdNoFunds(_path)
+    {
+      require(_path[_path.length-1] == predictionToken);
+      address payable _msgSenderAddress = _msgSender();
       if(_bPLOTPredictionAmount > 0) {
         // bPLOT can not be used if another user is placing proxy prediction
-        require(_msgSender() == _predictFor);
+        require(_msgSenderAddress == _predictFor);
       }
-      bool _isNativeToken = (_path[0] == nativeCurrencyAddress && msg.value >0);
-      // uint _initialFromTokenBalance = getTokenBalance(_path[0], _isNativeToken);
-      // uint _initialToTokenBalance = getTokenBalance(_path[_path.length-1], false);
+
+      uint _tokenDeposit = _swapUserTokens(_path, _inputAmount, _msgSenderAddress);
+      
+      _provideApproval(predictionToken, address(allPlotMarkets), _tokenDeposit);
+      allPlotMarkets.depositAndPredictFor(_predictFor, _tokenDeposit, _marketId, predictionToken, _prediction, uint64(_tokenDeposit.div(10**10)), _bPLOTPredictionAmount);
+      emit SwapAndPredictFor(_predictFor, _marketId, _path[0], predictionToken, _inputAmount, _tokenDeposit);
+    }
+
+    /**
+    * @dev Internal function to swap given user tokens to desired preditcion token
+    * @param _path Order path to follow for swap transaction
+    * @param _inputAmount Amount of tokens to swap from. In Wei
+    * @param _msgSenderAddress Address of user who signed the transaction 
+    */
+    function _swapUserTokens(address[] memory _path, uint256 _inputAmount, address _msgSenderAddress) internal returns(uint256 outputAmount) {
       uint[] memory _output; 
-      if(_isNativeToken) {
+      uint deadline = now*2;
+      uint amountOutMin = 1;
+      if((_path[0] == nativeCurrencyAddress && msg.value >0)) {
         require(_inputAmount == msg.value);
         _output = router.swapExactETHForTokens.value(msg.value)(
           amountOutMin,
@@ -95,9 +127,8 @@ contract SwapAndPredictWithPlot is NativeMetaTransaction, IAuth {
         );
       } else {
         require(msg.value == 0);
-        address payable _msgSenderAddress = _msgSender();
-        IToken(_path[0]).transferFrom(_msgSenderAddress, address(this), _inputAmount);
-        IToken(_path[0]).approve(address(router), _inputAmount);
+        _transferTokenFrom(_path[0], _msgSenderAddress, address(this), _inputAmount);
+        _provideApproval(_path[0], address(router), _inputAmount);
         _output = router.swapExactTokensForTokens(
           _inputAmount,
           amountOutMin,
@@ -106,12 +137,28 @@ contract SwapAndPredictWithPlot is NativeMetaTransaction, IAuth {
           deadline
         );
       }
-      uint _tokenDeposit = _output[_output.length - 1];
-      emit SwapAndPredictFor(_predictFor, _marketId, _path[0], address(predictionToken), _inputAmount, _output[1]);
-      predictionToken.approve(address(allPlotMarkets), _tokenDeposit);
-      allPlotMarkets.depositAndPredictFor(_predictFor, _tokenDeposit, _marketId, address(predictionToken), _prediction, uint64(_tokenDeposit.div(10**10)), _bPLOTPredictionAmount);
-      // require(_initialFromTokenBalance == getTokenBalance(_path[0], _isNativeToken));
-      // require(_initialToTokenBalance == getTokenBalance(_path[_path.length-1], false));
+      return _output[_output.length - 1];
+    }
+
+    /**
+    * @dev Internal function to provide approval to external address from this contract
+    * @param _tokenAddress Address of the ERC20 token
+    * @param _spender Address, indented to spend the tokens
+    * @param _amount Amount of tokens to provide approval for. In Wei
+    */
+    function _provideApproval(address _tokenAddress, address _spender, uint256 _amount) internal {
+        IToken(_tokenAddress).approve(_spender, _amount);
+    }
+
+    /**
+    * @dev Internal function to call transferFrom function of a given token
+    * @param _token Address of the ERC20 token
+    * @param _from Address from which the tokens are to be received
+    * @param _to Address to which the tokens are to be transferred
+    * @param _amount Amount of tokens to transfer. In Wei
+    */
+    function _transferTokenFrom(address _token, address _from, address _to, uint256 _amount) internal {
+      IToken(_token).transferFrom(_from, _to, _amount);
     }
 
     /**
