@@ -21,8 +21,6 @@ module.exports = function(deployer, network, accounts){
         await allMarkets.addAuthorizedProxyPreditictor(swapAnPredict.address);
         let router = await deployer.deploy(MockUniswapRouter, await master.dAppToken());
         await swapAnPredict.initiate(
-            allMarkets.address,
-            await master.dAppToken(),
             router.address,
             await router.WETH()
         );

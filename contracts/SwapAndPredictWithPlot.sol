@@ -22,6 +22,7 @@ import "./interfaces/IAllMarkets.sol";
 import "./interfaces/IToken.sol";
 import "./interfaces/ISwapRouter.sol";
 import "./interfaces/IAuth.sol";
+import "./interfaces/IMaster.sol";
 
 contract SwapAndPredictWithPlot is NativeMetaTransaction, IAuth {
 
@@ -32,16 +33,18 @@ contract SwapAndPredictWithPlot is NativeMetaTransaction, IAuth {
     IAllMarkets internal allPlotMarkets;
     IUniswapV2Router internal router;
     address internal predictionToken;
+    IMaster internal master;
 
     address public nativeCurrencyAddress;
     address public defaultAuthorized;
+    uint public maxSlippage;
 
     modifier holdNoFunds(address[] memory _path) {
       bool _isNativeToken = (_path[0] == nativeCurrencyAddress && msg.value >0);
       uint _initialFromTokenBalance = getTokenBalance(_path[0], _isNativeToken);
       uint _initialToTokenBalance = getTokenBalance(_path[_path.length-1], false);
       _;  
-      require(_initialFromTokenBalance == getTokenBalance(_path[0], _isNativeToken));
+      require(_initialFromTokenBalance.sub(msg.value) == getTokenBalance(_path[0], _isNativeToken));
       require(_initialToTokenBalance == getTokenBalance(_path[_path.length-1], false));
     }
 
@@ -55,20 +58,21 @@ contract SwapAndPredictWithPlot is NativeMetaTransaction, IAuth {
       require(msg.sender == proxy.proxyOwner());
       authorized = _authorizedMultiSig;
       defaultAuthorized = _defaultAuthorizedAddress;
+      master = IMaster(msg.sender);
       _initializeEIP712("SP");
     }
 
     /**
      * @dev Initiate the contract with required addresses
-     * @param _allPlotMarkets AllPlotMarkets contract address
-     * @param _predictionToken Address of token used for placing predictions
      * @param _router Router address of exchange to be used for swap transactions
      * @param _nativeCurrencyAddress Wrapped token address of Native currency of network/chain
      */
-    function initiate(address _allPlotMarkets, address _predictionToken, address _router, address _nativeCurrencyAddress) external {
+    function initiate(address _router, address _nativeCurrencyAddress) external {
       require(msg.sender == defaultAuthorized);
-      allPlotMarkets = IAllMarkets(_allPlotMarkets);
-      predictionToken = _predictionToken;
+      require(predictionToken == address(0));// Already Initialized
+      maxSlippage = 300; //With two decimals
+      allPlotMarkets = IAllMarkets(master.getLatestAddress("AM"));
+      predictionToken = master.dAppToken();
       router = IUniswapV2Router(_router);
       nativeCurrencyAddress = _nativeCurrencyAddress;
     }
@@ -116,7 +120,8 @@ contract SwapAndPredictWithPlot is NativeMetaTransaction, IAuth {
     function _swapUserTokens(address[] memory _path, uint256 _inputAmount, address _msgSenderAddress) internal returns(uint256 outputAmount) {
       uint[] memory _output; 
       uint deadline = now*2;
-      uint amountOutMin = 1;
+      //Min output = Inpute - (Input * Slippage/100)
+      uint amountOutMin =_inputAmount.sub(_inputAmount.mul(maxSlippage).div(10000));
       if((_path[0] == nativeCurrencyAddress && msg.value >0)) {
         require(_inputAmount == msg.value);
         _output = router.swapExactETHForTokens.value(msg.value)(
@@ -166,7 +171,7 @@ contract SwapAndPredictWithPlot is NativeMetaTransaction, IAuth {
     * @param _token Address of token to query balance for 
     * @param _isNativeCurrency Falg defining if the balance needed to be fetched for native currency of the network/chain
     */
-    function getTokenBalance(address _token, bool _isNativeCurrency) public returns(uint) {
+    function getTokenBalance(address _token, bool _isNativeCurrency) public view returns(uint) {
       if(_isNativeCurrency) {
         return ((address(this)).balance);
       }
