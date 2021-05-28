@@ -115,14 +115,19 @@ contract("Rewards-Market", async function(users) {
                 let spPlotBalanceBefore = await plotusToken.balanceOf(spInstance.address); 
                 let spTokenBalanceBefore = await externalToken.balanceOf(spInstance.address); 
                 // await spInstance.swapAndPlacePrediction([externalToken.address, plotusToken.address], _inputAmount, users[i], 7, options[i], 0)
-			    let functionSignature = encode3("swapAndPlacePrediction(address[],uint256,address,uint256,uint256,uint64)", [externalToken.address, plotusToken.address], _inputAmount, users[i], 7, options[i], 0);
-                await signAndExecuteMetaTx(
-			      privateKeyList[i],
-			      users[i],
-			      functionSignature,
-			      spInstance,
-              	   "SP"
-			      );
+			    let functionSignature;
+				if(i == 2) {
+					await spInstance.swapAndPlacePrediction(["0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE", plotusToken.address], _inputAmount, users[i], 7, options[i], 0, {from:users[i], value:_inputAmount});
+				} else {
+					functionSignature = encode3("swapAndPlacePrediction(address[],uint256,address,uint256,uint256,uint64)", [externalToken.address, plotusToken.address], _inputAmount, users[i], 7, options[i], 0);
+					await signAndExecuteMetaTx(
+					  privateKeyList[i],
+					  users[i],
+					  functionSignature,
+					  spInstance,
+						 "SP"
+					  );
+				}
                 let spPlotBalanceAfter = await plotusToken.balanceOf(spInstance.address); 
                 let spTokenBalanceAfter = await externalToken.balanceOf(spInstance.address); 
                 await assert.equal(spPlotBalanceAfter/1, spPlotBalanceBefore/1);
