@@ -1,4 +1,4 @@
-const AllPlotMarkets_2 = artifacts.require('AllPlotMarkets_2');
+const AllPlotMarkets_2 = artifacts.require('MockAllMarkets_2');
 const OwnedUpgradeabilityProxy = artifacts.require('OwnedUpgradeabilityProxy');
 const Master = artifacts.require('Master');
 const SwapAndPredictWithPlot = artifacts.require('SwapAndPredictWithPlot');
@@ -9,7 +9,7 @@ module.exports = function(deployer, network, accounts){
     deployer.then(async () => {
         let master = await OwnedUpgradeabilityProxy.deployed();
         master = await Master.at(master.address);
-        let allMarketsNewImpl = await await deployer.deploy(AllPlotMarkets_2);
+        let allMarketsNewImpl = await deployer.deploy(AllPlotMarkets_2);
         let spImpl = await deployer.deploy(SwapAndPredictWithPlot);
         await master.upgradeMultipleImplementations(
             [web3.utils.toHex("AM")],
