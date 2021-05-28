@@ -158,7 +158,7 @@ contract SwapAndPredictWithPlot is NativeMetaTransaction, IAuth {
     * @param _amount Amount of tokens to transfer. In Wei
     */
     function _transferTokenFrom(address _token, address _from, address _to, uint256 _amount) internal {
-      IToken(_token).transferFrom(_from, _to, _amount);
+      require(IToken(_token).transferFrom(_from, _to, _amount));
     }
 
     /**
@@ -180,6 +180,6 @@ contract SwapAndPredictWithPlot is NativeMetaTransaction, IAuth {
     */
     function transferLeftOverTokens(address _token, address _recipient) external onlyAuthorized {
       require(_token != address(0));
-      IToken(_token).transfer(_recipient, getTokenBalance(_token, false));
+      require(IToken(_token).transfer(_recipient, getTokenBalance(_token, false)));
     }
 }
