@@ -22,6 +22,7 @@ contract AllPlotMarkets_2 is AllPlotMarkets {
     mapping(address => bool) public authToProxyPrediction;
 
     function addAuthorizedProxyPreditictor(address _proxyAddress) external onlyAuthorized {
+      require(_proxyAddress != address(0));
       authToProxyPrediction[_proxyAddress] = true;
     }
 

@@ -70,6 +70,8 @@ contract SwapAndPredictWithPlot is NativeMetaTransaction, IAuth {
     function initiate(address _router, address _nativeCurrencyAddress) external {
       require(msg.sender == defaultAuthorized);
       require(predictionToken == address(0));// Already Initialized
+      require(_router != address(0));
+      require(_nativeCurrencyAddress != address(0));
       maxSlippage = 300; //With two decimals
       allPlotMarkets = IAllMarkets(master.getLatestAddress("AM"));
       predictionToken = master.dAppToken();
