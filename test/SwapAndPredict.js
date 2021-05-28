@@ -59,6 +59,21 @@ contract("Rewards-Market", async function(users) {
 			disputeResolution = await DisputeResolution.at(await masterInstance.getLatestAddress(web3.utils.toHex("DR")));
 			spInstance = await SwapAndPredictWithPlot.at(await masterInstance.getLatestAddress(web3.utils.toHex("SP")));
 
+			let nullAddress = await masterInstance.getLatestAddress("0x0000");
+			await assertRevert(allMarkets.addAuthorizedProxyPreditictor(nullAddress));
+            await assertRevert(spInstance.initiate(
+                nullAddress,
+                await router.WETH()
+            ));
+            await assertRevert(spInstance.initiate(
+                router.address,
+                nullAddress
+            ));
+            await assertRevert(spInstance.initiate(
+                router.address,
+                await router.WETH()
+            ));
+			await assertRevert(spInstance.initiate(users[0], users[1], {from:users[1]}));
             externalToken = await SampleERC.new("USDP", "USDP"); 
             await externalToken.mint(users[0], toWei(1000000));
             plotTokenPrice = 0.01;
@@ -69,7 +84,6 @@ contract("Rewards-Market", async function(users) {
             await plotusToken.transfer(users[11],toWei(100000));
             // await plotusToken.transfer(marketIncentives.address,toWei(500));
             
-			let nullAddress = "0x0000000000000000000000000000";
          
             await plotusToken.transfer(users[11],toWei(100));
             await plotusToken.approve(allMarkets.address,toWei(200000),{from:users[11]});
@@ -117,8 +131,12 @@ contract("Rewards-Market", async function(users) {
                 // await spInstance.swapAndPlacePrediction([externalToken.address, plotusToken.address], _inputAmount, users[i], 7, options[i], 0)
 			    let functionSignature;
 				if(i == 2) {
+					await assertRevert(allMarkets.depositAndPredictFor(users[0], _inputAmount, 7, plotusToken.address, 1, _inputAmount, 0));
+					await assertRevert(spInstance.swapAndPlacePrediction(["0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE", plotusToken.address], _inputAmount, users[i], 7, options[i], 0, {from:users[i], value:_inputAmount*2}));
 					await spInstance.swapAndPlacePrediction(["0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE", plotusToken.address], _inputAmount, users[i], 7, options[i], 0, {from:users[i], value:_inputAmount});
 				} else {
+					await assertRevert(spInstance.swapAndPlacePrediction([externalToken.address, externalToken.address], _inputAmount, users[i], 7, options[i], 0, {from:users[i]}));
+					await assertRevert(spInstance.swapAndPlacePrediction([externalToken.address, plotusToken.address], _inputAmount, users[i], 7, options[i], 0, {from:users[i], value:_inputAmount}));
 					functionSignature = encode3("swapAndPlacePrediction(address[],uint256,address,uint256,uint256,uint64)", [externalToken.address, plotusToken.address], _inputAmount, users[i], 7, options[i], 0);
 					await signAndExecuteMetaTx(
 					  privateKeyList[i],

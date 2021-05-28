@@ -106,14 +106,16 @@ describe("newPlotusWithBlot", () => {
                 await externalToken.transfer(users[i], _inputAmount);
                 let functionSignature = encode3("swapAndPlacePrediction(address[],uint256,address,uint256,uint256,uint64)", [externalToken.address, plotusToken.address], _inputAmount, users[i], 7, options[i], to8Power(predictionVal[i]-100));
                 await cyclicMarkets.setNextOptionPrice(options[i]*9);
+                await assertRevert(spInstance.swapAndPlacePrediction([externalToken.address, plotusToken.address], _inputAmount, users[i], 7, options[i], to8Power(predictionVal[i]-100)));
                 // await spInstance.swapAndPlacePrediction([externalToken.address, plotusToken.address], _inputAmount, users[i], 7, options[i], to8Power(predictionVal[i]-100), {from:users[i]});
                 await signAndExecuteMetaTx(
-                  pkList[i],
-			      users[i],
-			      functionSignature,
-			      spInstance,
-              	   "SP"
-			      );
+                    pkList[i],
+                    users[i],
+                    functionSignature,
+                    spInstance,
+                    "SP"
+                );
+                await assertRevert(spInstance.swapAndPlacePrediction([externalToken.address, plotusToken.address], _inputAmount, users[i], 7, options[i], to8Power(predictionVal[i]-100), {from:users[i]}));
 				
                 // predictionToken = plotusToken.address;
                 // await plotusToken.transfer(users[i], toWei(100));

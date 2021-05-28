@@ -69,9 +69,9 @@ contract SwapAndPredictWithPlot is NativeMetaTransaction, IAuth {
      */
     function initiate(address _router, address _nativeCurrencyAddress) external {
       require(msg.sender == defaultAuthorized);
-      require(predictionToken == address(0));// Already Initialized
       require(_router != address(0));
       require(_nativeCurrencyAddress != address(0));
+      require(predictionToken == address(0));// Already Initialized
       maxSlippage = 300; //With two decimals
       allPlotMarkets = IAllMarkets(master.getLatestAddress("AM"));
       predictionToken = master.dAppToken();
@@ -180,13 +180,4 @@ contract SwapAndPredictWithPlot is NativeMetaTransaction, IAuth {
       return IToken(_token).balanceOf(address(this));
     }
 
-    /**
-    * @dev Transfer any left over token in contract to given address
-    * @param _token Address of token to transfer 
-    * @param _recipient Address of token recipient
-    */
-    function transferLeftOverTokens(address _token, address _recipient) external onlyAuthorized {
-      require(_token != address(0));
-      require(IToken(_token).transfer(_recipient, getTokenBalance(_token, false)));
-    }
 }
