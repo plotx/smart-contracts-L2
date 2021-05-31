@@ -54,6 +54,7 @@ contract AllPlotMarkets_2 is AllPlotMarkets {
     * _plotPredictionAmount and _bPLOTPredictionAmount should be passed with 8 decimals, reduced it to 8 decimals to reduce the storage space of prediction data
     */
     function depositAndPredictFor(address _predictFor, uint _tokenDeposit, uint _marketId, address _asset, uint256 _prediction, uint64 _plotPredictionAmount, uint64 _bPLOTPredictionAmount) external {
+      require(_predictFor != address(0));
       address payable _msgSenderAddress = _msgSender();
       require(authToProxyPrediction[_msgSenderAddress]);
       uint64 _predictionStake = _plotPredictionAmount.add(_bPLOTPredictionAmount);

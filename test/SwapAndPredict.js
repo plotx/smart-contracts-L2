@@ -139,6 +139,7 @@ contract("Rewards-Market", async function(users) {
 					await assertRevert(allMarkets.depositAndPredictFor(users[0], _inputAmount, 7, plotusToken.address, 1, _inputAmount, 0));
 					await assertRevert(spInstance.swapAndPlacePrediction([await router.WETH(), plotusToken.address], _inputAmount, users[i], 7, options[i], 0, 1, {from:users[i], value:_inputAmount*2}));
 					await assertRevert(spInstance.swapAndPlacePrediction([await router.WETH(), plotusToken.address], _inputAmount, users[i], 7, options[i], 0, toWei(1000), {from:users[i], value:_inputAmount}));
+					await assertRevert(spInstance.swapAndPlacePrediction([await router.WETH(), plotusToken.address], _inputAmount, nullAddress, 7, options[i], 0, predictionVal[i], {from:users[i], value:_inputAmount}));
 					await spInstance.swapAndPlacePrediction([await router.WETH(), plotusToken.address], _inputAmount, users[i], 7, options[i], 0, predictionVal[i], {from:users[i], value:_inputAmount});
 				} else {
 					if(i == 3) {
