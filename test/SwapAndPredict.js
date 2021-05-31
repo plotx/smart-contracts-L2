@@ -137,19 +137,20 @@ contract("Rewards-Market", async function(users) {
 				if(i == 2) {
 					//Predict with eth
 					await assertRevert(allMarkets.depositAndPredictFor(users[0], _inputAmount, 7, plotusToken.address, 1, _inputAmount, 0));
-					await assertRevert(spInstance.swapAndPlacePrediction([await router.WETH(), plotusToken.address], _inputAmount, users[i], 7, options[i], 0, {from:users[i], value:_inputAmount*2}));
-					await spInstance.swapAndPlacePrediction([await router.WETH(), plotusToken.address], _inputAmount, users[i], 7, options[i], 0, {from:users[i], value:_inputAmount});
+					await assertRevert(spInstance.swapAndPlacePrediction([await router.WETH(), plotusToken.address], _inputAmount, users[i], 7, options[i], 0, 1, {from:users[i], value:_inputAmount*2}));
+					await assertRevert(spInstance.swapAndPlacePrediction([await router.WETH(), plotusToken.address], _inputAmount, users[i], 7, options[i], 0, toWei(1000), {from:users[i], value:_inputAmount}));
+					await spInstance.swapAndPlacePrediction([await router.WETH(), plotusToken.address], _inputAmount, users[i], 7, options[i], 0, predictionVal[i], {from:users[i], value:_inputAmount});
 				} else {
 					if(i == 3) {
 						//Predict with WETH
 						await _weth.approve(spInstance.address, _inputAmount, {from:users[i]});
 						await _weth.transfer(users[i], _inputAmount);
 						// await spInstance.swapAndPlacePrediction([await router.WETH(), plotusToken.address], _inputAmount, users[i], 7, options[i], 0, {from:users[i], value:_inputAmount});
-						functionSignature = encode3("swapAndPlacePrediction(address[],uint256,address,uint256,uint256,uint64)", [await router.WETH(), plotusToken.address], _inputAmount, users[i], 7, options[i], 0);
+						functionSignature = encode3("swapAndPlacePrediction(address[],uint256,address,uint256,uint256,uint64,uint256)", [await router.WETH(), plotusToken.address], _inputAmount, users[i], 7, options[i], 0, predictionVal[i]);
 					} else {
-						await assertRevert(spInstance.swapAndPlacePrediction([externalToken.address, externalToken.address], _inputAmount, users[i], 7, options[i], 0, {from:users[i]}));
-						await assertRevert(spInstance.swapAndPlacePrediction([externalToken.address, plotusToken.address], _inputAmount, users[i], 7, options[i], 0, {from:users[i], value:_inputAmount}));
-						functionSignature = encode3("swapAndPlacePrediction(address[],uint256,address,uint256,uint256,uint64)", [externalToken.address, plotusToken.address], _inputAmount, users[i], 7, options[i], 0);
+						await assertRevert(spInstance.swapAndPlacePrediction([externalToken.address, externalToken.address], _inputAmount, users[i], 7, options[i], 0, predictionVal[i], {from:users[i]}));
+						await assertRevert(spInstance.swapAndPlacePrediction([externalToken.address, plotusToken.address], _inputAmount, users[i], 7, options[i], 0, predictionVal[i], {from:users[i], value:_inputAmount}));
+						functionSignature = encode3("swapAndPlacePrediction(address[],uint256,address,uint256,uint256,uint64,uint256)", [externalToken.address, plotusToken.address], _inputAmount, users[i], 7, options[i], 0, predictionVal[i]);
 					}  
 					await signAndExecuteMetaTx(
 						privateKeyList[i],

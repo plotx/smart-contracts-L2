@@ -104,9 +104,9 @@ describe("newPlotusWithBlot", () => {
                 let _inputAmount = toWei(100*plotTokenPrice);
                 await externalToken.approve(spInstance.address, toWei(1000), {from:users[i]});
                 await externalToken.transfer(users[i], toWei(1000));
-                let functionSignature = encode3("swapAndPlacePrediction(address[],uint256,address,uint256,uint256,uint64)", [externalToken.address, plotusToken.address], _inputAmount, users[i], 7, options[i], to8Power(predictionVal[i]-100));
+                let functionSignature = encode3("swapAndPlacePrediction(address[],uint256,address,uint256,uint256,uint64,uint256)", [externalToken.address, plotusToken.address], _inputAmount, users[i], 7, options[i], to8Power(predictionVal[i]-100), 1);
                 await cyclicMarkets.setNextOptionPrice(options[i]*9);
-                await assertRevert(spInstance.swapAndPlacePrediction([externalToken.address, plotusToken.address], _inputAmount, users[i], 7, options[i], to8Power(predictionVal[i]-100)));
+                await assertRevert(spInstance.swapAndPlacePrediction([externalToken.address, plotusToken.address], _inputAmount, users[i], 7, options[i], to8Power(predictionVal[i]-100), 1));
                 // await spInstance.swapAndPlacePrediction([externalToken.address, plotusToken.address], _inputAmount, users[i], 7, options[i], to8Power(predictionVal[i]-100), {from:users[i]});
                 await signAndExecuteMetaTx(
                     pkList[i],
@@ -115,7 +115,7 @@ describe("newPlotusWithBlot", () => {
                     spInstance,
                     "SP"
                 );
-                await assertRevert(spInstance.swapAndPlacePrediction([externalToken.address, plotusToken.address], _inputAmount, users[i], 7, options[i], to8Power(predictionVal[i]-100), {from:users[i]}));
+                await assertRevert(spInstance.swapAndPlacePrediction([externalToken.address, plotusToken.address], _inputAmount, users[i], 7, options[i], to8Power(predictionVal[i]-100), 1, {from:users[i]}));
 				
                 // predictionToken = plotusToken.address;
                 // await plotusToken.transfer(users[i], toWei(100));
