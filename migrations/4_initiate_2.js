@@ -3,6 +3,7 @@ const OwnedUpgradeabilityProxy = artifacts.require('OwnedUpgradeabilityProxy');
 const Master = artifacts.require('Master');
 const SwapAndPredictWithPlot = artifacts.require('SwapAndPredictWithPlot');
 const MockUniswapRouter = artifacts.require('MockUniswapRouter');
+const SampleERC = artifacts.require('SampleERC');
 const { assert } = require("chai");
 
 module.exports = function(deployer, network, accounts){
@@ -20,6 +21,8 @@ module.exports = function(deployer, network, accounts){
         allMarkets = await AllPlotMarkets_2.at(await master.getLatestAddress(web3.utils.toHex('AM')));
         await allMarkets.addAuthorizedProxyPreditictor(swapAnPredict.address);
         let router = await deployer.deploy(MockUniswapRouter, await master.dAppToken());
+        _weth = await SampleERC.new("WETH", "WETH");
+        await router.setWETH(_weth.address);
         await swapAnPredict.initiate(
             router.address,
             await router.WETH()

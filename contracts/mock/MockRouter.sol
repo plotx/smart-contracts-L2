@@ -4,19 +4,25 @@ import "../interfaces/ISwapRouter.sol";
 import "../external/openzeppelin-solidity/math/SafeMath.sol";
 import "../interfaces/IToken.sol";
 
-contract MockUniswapRouter is IUniswapV2Router {
+contract MockUniswapRouter {
 
 	using SafeMath for uint;
 
 	uint public priceOfToken = 1e16;
 	address token;
+	address weth;
 
 	constructor(address _token) public {
 		token = _token;
+        weth = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 	}
 
-    function WETH() external pure returns (address) {
-    	return 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+    function WETH() external view returns (address) {
+    	return weth;
+    }
+
+    function setWETH(address _weth) external {
+    	weth = _weth;
     }
 
     function setPrice(uint _newPrice) external {
