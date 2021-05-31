@@ -109,7 +109,7 @@ contract SwapAndPredictWithPlot is NativeMetaTransaction, IAuth {
       }
 
       uint _tokenDeposit = _swapUserTokens(_path, _inputAmount, _msgSenderAddress, _minOutput);
-      
+      require(_tokenDeposit >= _minOutput);
       _provideApproval(predictionToken, address(allPlotMarkets), _tokenDeposit);
       allPlotMarkets.depositAndPredictFor(_predictFor, _tokenDeposit, _marketId, predictionToken, _prediction, uint64(_tokenDeposit.div(decimalDivider)), _bPLOTPredictionAmount);
       emit SwapAndPredictFor(_predictFor, _marketId, _path[0], predictionToken, _inputAmount, _tokenDeposit);
