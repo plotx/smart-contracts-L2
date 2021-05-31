@@ -38,6 +38,7 @@ contract SwapAndPredictWithPlot is NativeMetaTransaction, IAuth {
     address public nativeCurrencyAddress;
     address public defaultAuthorized;
     uint public maxSlippage;
+    uint internal decimalDivider;
 
     modifier holdNoFunds(address[] memory _path) {
       bool _isNativeToken = (_path[0] == nativeCurrencyAddress && msg.value >0);
@@ -77,6 +78,8 @@ contract SwapAndPredictWithPlot is NativeMetaTransaction, IAuth {
       predictionToken = master.dAppToken();
       router = IUniswapV2Router(_router);
       nativeCurrencyAddress = _nativeCurrencyAddress;
+      //Prediction decimals are 10^8, so to convert standard decimal count to prediction supported decimals
+      decimalDivider = 10**10;
     }
 
     /**
@@ -109,7 +112,7 @@ contract SwapAndPredictWithPlot is NativeMetaTransaction, IAuth {
       uint _tokenDeposit = _swapUserTokens(_path, _inputAmount, _msgSenderAddress);
       
       _provideApproval(predictionToken, address(allPlotMarkets), _tokenDeposit);
-      allPlotMarkets.depositAndPredictFor(_predictFor, _tokenDeposit, _marketId, predictionToken, _prediction, uint64(_tokenDeposit.div(10**10)), _bPLOTPredictionAmount);
+      allPlotMarkets.depositAndPredictFor(_predictFor, _tokenDeposit, _marketId, predictionToken, _prediction, uint64(_tokenDeposit.div(decimalDivider)), _bPLOTPredictionAmount);
       emit SwapAndPredictFor(_predictFor, _marketId, _path[0], predictionToken, _inputAmount, _tokenDeposit);
     }
 
