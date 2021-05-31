@@ -37,7 +37,6 @@ contract SwapAndPredictWithPlot is NativeMetaTransaction, IAuth {
 
     address public nativeCurrencyAddress;
     address public defaultAuthorized;
-    uint public maxSlippage;
     uint internal decimalDivider;
 
     modifier holdNoFunds(address[] memory _path) {
@@ -73,7 +72,6 @@ contract SwapAndPredictWithPlot is NativeMetaTransaction, IAuth {
       require(_router != address(0));
       require(_nativeCurrencyAddress != address(0));
       require(predictionToken == address(0));// Already Initialized
-      maxSlippage = 300; //With two decimals
       allPlotMarkets = IAllMarkets(master.getLatestAddress("AM"));
       predictionToken = master.dAppToken();
       router = IUniswapV2Router(_router);
@@ -125,8 +123,7 @@ contract SwapAndPredictWithPlot is NativeMetaTransaction, IAuth {
     function _swapUserTokens(address[] memory _path, uint256 _inputAmount, address _msgSenderAddress) internal returns(uint256 outputAmount) {
       uint[] memory _output; 
       uint deadline = now*2;
-      //Min output = Inpute - (Input * Slippage/100)
-      uint amountOutMin =_inputAmount.sub(_inputAmount.mul(maxSlippage).div(10000));
+      uint amountOutMin = 1;
       if((_path[0] == nativeCurrencyAddress && msg.value >0)) {
         require(_inputAmount == msg.value);
         _output = router.swapExactETHForTokens.value(msg.value)(
