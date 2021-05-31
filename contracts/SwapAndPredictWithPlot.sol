@@ -95,7 +95,8 @@ contract SwapAndPredictWithPlot is NativeMetaTransaction, IAuth {
       address _predictFor,
       uint _marketId,
       uint _prediction,
-      uint64 _bPLOTPredictionAmount
+      uint64 _bPLOTPredictionAmount,
+      uint _minOutput
     ) public payable
       // Contract should not hold any of input/output tokens provided in transaction
       holdNoFunds(_path)
@@ -107,7 +108,7 @@ contract SwapAndPredictWithPlot is NativeMetaTransaction, IAuth {
         require(_msgSenderAddress == _predictFor);
       }
 
-      uint _tokenDeposit = _swapUserTokens(_path, _inputAmount, _msgSenderAddress);
+      uint _tokenDeposit = _swapUserTokens(_path, _inputAmount, _msgSenderAddress, _minOutput);
       
       _provideApproval(predictionToken, address(allPlotMarkets), _tokenDeposit);
       allPlotMarkets.depositAndPredictFor(_predictFor, _tokenDeposit, _marketId, predictionToken, _prediction, uint64(_tokenDeposit.div(decimalDivider)), _bPLOTPredictionAmount);
@@ -120,14 +121,13 @@ contract SwapAndPredictWithPlot is NativeMetaTransaction, IAuth {
     * @param _inputAmount Amount of tokens to swap from. In Wei
     * @param _msgSenderAddress Address of user who signed the transaction 
     */
-    function _swapUserTokens(address[] memory _path, uint256 _inputAmount, address _msgSenderAddress) internal returns(uint256 outputAmount) {
+    function _swapUserTokens(address[] memory _path, uint256 _inputAmount, address _msgSenderAddress, uint _minOutput) internal returns(uint256 outputAmount) {
       uint[] memory _output; 
       uint deadline = now*2;
-      uint amountOutMin = 1;
       if((_path[0] == nativeCurrencyAddress && msg.value >0)) {
         require(_inputAmount == msg.value);
         _output = router.swapExactETHForTokens.value(msg.value)(
-          amountOutMin,
+          _minOutput,
           _path,
           address(this),
           deadline
@@ -138,7 +138,7 @@ contract SwapAndPredictWithPlot is NativeMetaTransaction, IAuth {
         _provideApproval(_path[0], address(router), _inputAmount);
         _output = router.swapExactTokensForTokens(
           _inputAmount,
-          amountOutMin,
+          _minOutput,
           _path,
           address(this),
           deadline
