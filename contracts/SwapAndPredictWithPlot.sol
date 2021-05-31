@@ -39,6 +39,8 @@ contract SwapAndPredictWithPlot is NativeMetaTransaction, IAuth {
     address public defaultAuthorized;
     uint internal decimalDivider;
 
+    mapping(address => bool) public allowedTokens;
+
     modifier holdNoFunds(address[] memory _path) {
       bool _isNativeToken = (_path[0] == nativeCurrencyAddress && msg.value >0);
       uint _initialFromTokenBalance = getTokenBalance(_path[0], _isNativeToken);
@@ -60,6 +62,25 @@ contract SwapAndPredictWithPlot is NativeMetaTransaction, IAuth {
       defaultAuthorized = _defaultAuthorizedAddress;
       master = IMaster(msg.sender);
       _initializeEIP712("SP");
+    }
+
+    /**
+     * @dev Allow a token to be used for swap and placing prediction
+     * @param _token Address of token contract
+     */
+    function whitelistTokenForSwap(address _token) external onlyAuthorized {
+      require(_token != address(0));
+      require(!allowedTokens[_token]);
+      allowedTokens[_token] = true;
+    }
+
+    /**
+     * @dev Remove a token from whitelist to be used for swap and placing prediction
+     * @param _token Address of token contract
+     */
+    function deWhitelistTokenForSwap(address _token) external onlyAuthorized {
+      require(allowedTokens[_token]);
+      allowedTokens[_token] = false;
     }
 
     /**
@@ -120,6 +141,7 @@ contract SwapAndPredictWithPlot is NativeMetaTransaction, IAuth {
       uint[] memory _output; 
       uint deadline = now*2;
       require(_path[_path.length-1] == predictionToken);
+      require(allowedTokens[_path[0]],"Not allowed");
       if((_path[0] == nativeCurrencyAddress && msg.value >0)) {
         require(_inputAmount == msg.value);
         _output = router.swapExactETHForTokens.value(msg.value)(
