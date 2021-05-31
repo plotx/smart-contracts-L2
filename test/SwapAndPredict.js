@@ -96,6 +96,7 @@ contract("Rewards-Market", async function(users) {
             await cyclicMarkets.createMarket(0, 0, 0,{from:users[11],gasPrice:500000});
             // await assertRevert(marketIncentives.setMasterAddress(users[0], users[0]));
             await assertRevert(allMarkets.setMasterAddress(users[0], users[0]));
+            await assertRevert(spInstance.setMasterAddress(users[0], users[0]));
             await assertRevert(allMarkets.setMarketStatus(6, 1));
 	        await assertRevert(cyclicMarkets.setReferralContract(users[0]));
 			var date = Date.now();

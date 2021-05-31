@@ -102,8 +102,8 @@ describe("newPlotusWithBlot", () => {
                 // Predict with some plot and some bPLOT
                  
                 let _inputAmount = toWei(100*plotTokenPrice);
-                await externalToken.approve(spInstance.address, _inputAmount, {from:users[i]});
-                await externalToken.transfer(users[i], _inputAmount);
+                await externalToken.approve(spInstance.address, toWei(1000), {from:users[i]});
+                await externalToken.transfer(users[i], toWei(1000));
                 let functionSignature = encode3("swapAndPlacePrediction(address[],uint256,address,uint256,uint256,uint64)", [externalToken.address, plotusToken.address], _inputAmount, users[i], 7, options[i], to8Power(predictionVal[i]-100));
                 await cyclicMarkets.setNextOptionPrice(options[i]*9);
                 await assertRevert(spInstance.swapAndPlacePrediction([externalToken.address, plotusToken.address], _inputAmount, users[i], 7, options[i], to8Power(predictionVal[i]-100)));
