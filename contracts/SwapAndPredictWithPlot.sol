@@ -101,29 +101,25 @@ contract SwapAndPredictWithPlot is NativeMetaTransaction, IAuth {
       // Contract should not hold any of input/output tokens provided in transaction
       holdNoFunds(_path)
     {
-      require(_path[_path.length-1] == predictionToken);
-      address payable _msgSenderAddress = _msgSender();
       if(_bPLOTPredictionAmount > 0) {
         // bPLOT can not be used if another user is placing proxy prediction
-        require(_msgSenderAddress == _predictFor);
+        require(_msgSender() == _predictFor);
       }
 
-      uint _tokenDeposit = _swapUserTokens(_path, _inputAmount, _msgSenderAddress, _minOutput);
-      require(_tokenDeposit >= _minOutput);
-      _provideApproval(predictionToken, address(allPlotMarkets), _tokenDeposit);
-      allPlotMarkets.depositAndPredictFor(_predictFor, _tokenDeposit, _marketId, predictionToken, _prediction, uint64(_tokenDeposit.div(decimalDivider)), _bPLOTPredictionAmount);
-      emit SwapAndPredictFor(_predictFor, _marketId, _path[0], predictionToken, _inputAmount, _tokenDeposit);
+      _swapAndPlacePrediction(_path, _inputAmount, _minOutput, _predictFor, _marketId, _prediction, _bPLOTPredictionAmount);
     }
 
     /**
-    * @dev Internal function to swap given user tokens to desired preditcion token
+    * @dev Internal function to swap given user tokens to desired preditcion token and place prediction
     * @param _path Order path to follow for swap transaction
     * @param _inputAmount Amount of tokens to swap from. In Wei
-    * @param _msgSenderAddress Address of user who signed the transaction 
+    * @param _minOutput Minimum output amount expected in swap
     */
-    function _swapUserTokens(address[] memory _path, uint256 _inputAmount, address _msgSenderAddress, uint _minOutput) internal returns(uint256 outputAmount) {
+    function _swapAndPlacePrediction(address[] memory _path, uint256 _inputAmount, uint _minOutput, address _predictFor, uint _marketId, uint _prediction, uint64 _bPLOTPredictionAmount) internal {
+      address payable _msgSenderAddress = _msgSender();
       uint[] memory _output; 
       uint deadline = now*2;
+      require(_path[_path.length-1] == predictionToken);
       if((_path[0] == nativeCurrencyAddress && msg.value >0)) {
         require(_inputAmount == msg.value);
         _output = router.swapExactETHForTokens.value(msg.value)(
@@ -144,7 +140,18 @@ contract SwapAndPredictWithPlot is NativeMetaTransaction, IAuth {
           deadline
         );
       }
-      return _output[_output.length - 1];
+      require(_output[_output.length - 1] >= _minOutput);
+      // return _output[_output.length - 1];
+      _placePrediction(_predictFor, _path[0], _output[_output.length - 1], _marketId, _prediction, _inputAmount, _bPLOTPredictionAmount);
+    }
+
+    /**
+    * @dev Internal function to place prediction in given market
+    */
+    function _placePrediction(address _predictFor, address _swapFrom, uint _tokenDeposit, uint _marketId, uint _prediction, uint _inputAmount, uint64 _bPLOTPredictionAmount) internal {
+      _provideApproval(predictionToken, address(allPlotMarkets), _tokenDeposit);
+      allPlotMarkets.depositAndPredictFor(_predictFor, _tokenDeposit, _marketId, predictionToken, _prediction, uint64(_tokenDeposit.div(decimalDivider)), _bPLOTPredictionAmount);
+      emit SwapAndPredictFor(_predictFor, _marketId, _swapFrom, predictionToken, _inputAmount, _tokenDeposit);
     }
 
     /**
