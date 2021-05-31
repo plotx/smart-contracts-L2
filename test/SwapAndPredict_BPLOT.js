@@ -100,6 +100,8 @@ describe("newPlotusWithBlot", () => {
             }
             if( i==4) {
                 // Predict with some plot and some bPLOT
+				await spInstance.whitelistTokenForSwap(await router.WETH());
+				await spInstance.whitelistTokenForSwap(externalToken.address);
                  
                 let _inputAmount = toWei(100*plotTokenPrice);
                 await externalToken.approve(spInstance.address, toWei(1000), {from:users[i]});

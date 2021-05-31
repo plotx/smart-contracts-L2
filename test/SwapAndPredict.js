@@ -114,6 +114,8 @@ contract("Rewards-Market", async function(users) {
 			let daoCommissions = [0, 1.8, 6.4, 3.36, 1.968, 8, 11.2, 3.2, 0.8, 4.8, 2.4];
 			const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 			await assertRevert(referral.setReferrer(ZERO_ADDRESS, ZERO_ADDRESS));
+			await spInstance.whitelistTokenForSwap(await router.WETH());
+			await spInstance.whitelistTokenForSwap(externalToken.address);
 			for(i=1; i<11;i++){
 				if(i>1) {
 					//Should not allow unauthorized address to set referrer
