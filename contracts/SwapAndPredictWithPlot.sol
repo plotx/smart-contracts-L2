@@ -15,6 +15,7 @@
 
 pragma solidity 0.5.7;
 
+import "./external/openzeppelin-solidity/utils/ReentrancyGuard.sol";
 import "./external/openzeppelin-solidity/math/SafeMath.sol";
 import "./external/proxy/OwnedUpgradeabilityProxy.sol";
 import "./external/NativeMetaTransaction.sol";
@@ -24,7 +25,7 @@ import "./interfaces/ISwapRouter.sol";
 import "./interfaces/IAuth.sol";
 import "./interfaces/IMaster.sol";
 
-contract SwapAndPredictWithPlot is NativeMetaTransaction, IAuth {
+contract SwapAndPredictWithPlot is NativeMetaTransaction, IAuth, ReentrancyGuard {
 
     using SafeMath for uint;
 
@@ -178,6 +179,21 @@ contract SwapAndPredictWithPlot is NativeMetaTransaction, IAuth {
         return ((address(this)).balance);
       }
       return IToken(_token).balanceOf(address(this));
+    }
+
+    /**
+    * @dev Transfer `_amount` of  assets to `_to` address
+    */
+    function transferAssets(address _asset, address payable _to, uint _amount, bool _isNativeCurrency) external
+     onlyAuthorized
+     nonReentrant
+    {
+      require(_to != address(0));
+      if(_isNativeCurrency && _asset == nativeCurrencyAddress) {
+        _to.transfer(_amount);
+      } else {
+        require(IToken(_asset).transfer(_to, _amount));
+      }
     }
 
 }
