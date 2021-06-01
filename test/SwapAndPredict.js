@@ -115,8 +115,10 @@ contract("Rewards-Market", async function(users) {
 			const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 			await assertRevert(referral.setReferrer(ZERO_ADDRESS, ZERO_ADDRESS));
 			await spInstance.whitelistTokenForSwap(await router.WETH());
-			await spInstance.whitelistTokenForSwap(externalToken.address);
+			await assertRevert(spInstance.whitelistTokenForSwap(nullAddress));
+			await assertRevert(spInstance.whitelistTokenForSwap(await router.WETH()));
 			for(i=1; i<11;i++){
+				await spInstance.whitelistTokenForSwap(externalToken.address);
 				if(i>1) {
 					//Should not allow unauthorized address to set referrer
 					await assertRevert(referral.setReferrer(users[1], users[i], {from:users[i]}));
@@ -142,8 +144,11 @@ contract("Rewards-Market", async function(users) {
 					await assertRevert(spInstance.swapAndPlacePrediction([await router.WETH(), plotusToken.address], _inputAmount, users[i], 7, options[i], 0, 1, {from:users[i], value:_inputAmount*2}));
 					await assertRevert(spInstance.swapAndPlacePrediction([await router.WETH(), plotusToken.address], _inputAmount, users[i], 7, options[i], 0, toWei(1000), {from:users[i], value:_inputAmount}));
 					await assertRevert(spInstance.swapAndPlacePrediction([await router.WETH(), plotusToken.address], _inputAmount, nullAddress, 7, options[i], 0, predictionVal[i], {from:users[i], value:_inputAmount}));
+					await spInstance.deWhitelistTokenForSwap(await router.WETH());
+					await assertRevert(spInstance.swapAndPlacePrediction([await router.WETH(), plotusToken.address], _inputAmount, users[i], 7, options[i], 0, predictionVal[i], {from:users[i], value:_inputAmount}));
+					await spInstance.whitelistTokenForSwap(await router.WETH());
 					await spInstance.swapAndPlacePrediction([await router.WETH(), plotusToken.address], _inputAmount, users[i], 7, options[i], 0, predictionVal[i], {from:users[i], value:_inputAmount});
-				} else {
+			} else {
 					if(i == 3) {
 						//Predict with WETH
 						await _weth.approve(spInstance.address, _inputAmount, {from:users[i]});
@@ -167,7 +172,9 @@ contract("Rewards-Market", async function(users) {
                 let spTokenBalanceAfter = await externalToken.balanceOf(spInstance.address); 
                 await assert.equal(spPlotBalanceAfter/1, spPlotBalanceBefore/1);
                 await assert.equal(spTokenBalanceAfter/1, spTokenBalanceBefore/1);
+				await spInstance.deWhitelistTokenForSwap(externalToken.address);
 			}
+			await assertRevert(spInstance.deWhitelistTokenForSwap(externalToken.address));
 
 			//SHould not add referrer if already placed prediction
 			await assertRevert(referral.setReferrer(users[1], users[2]));
