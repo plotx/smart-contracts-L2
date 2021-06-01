@@ -210,7 +210,7 @@ contract("Pooled Market Creation", async function(users) {
 
 			await cyclicMarkets.settleMarket(7,1);
 
-			await increaseTime(60*60);
+			await increaseTime(60*61);
 			await PMC.claimCreationAndParticipationReward(10);
 			let poolPlotBalAfter = await plotusToken.balanceOf(PMC.address);
 			let lpTotalSupply = await PMC.totalSupply();
@@ -349,7 +349,7 @@ contract("Pooled Market Creation", async function(users) {
 			let poolPlotBalBefore = await plotusToken.balanceOf(PMC.address);
 			await PMC.createMarket(0,0,3);
 			await cyclicMarkets.settleMarket(8,3);
-			await increaseTime(1*60*60);
+			await increaseTime(1*60*61);
 			await PMC.claimCreationAndParticipationReward(10);
 			let poolPlotBalAfter = await plotusToken.balanceOf(PMC.address);
 			let lpTotalSupply = await PMC.totalSupply();
