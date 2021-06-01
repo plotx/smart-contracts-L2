@@ -62,8 +62,8 @@ contract PooledMarketCreation is
         require(msg.sender == proxy.proxyOwner(),"Only callable by proxy owner");
         ms = IMaster(msg.sender);
         plotToken = ERC20(ms.dAppToken());
-        _name = "LP";
-        _symbol = "LP";
+        _name = "pPLOT";
+        _symbol = "pPLOT";
         _setupDecimals(18);
         minLiquidity = 100 ether;
         authorized = _authorizedMultiSig;
