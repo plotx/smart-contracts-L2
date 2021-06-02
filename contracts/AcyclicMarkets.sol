@@ -71,7 +71,7 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
     mapping(address => uint256) public marketCreationReward;
     mapping (address => uint256) public relayerFeeEarned;
     mapping(address => bool) public whiteListedMarketCreators;
-    mapping(address => bool) public tempMarketCreator;
+    mapping(address => bool) public oneTimeMarketCreator;
 
     mapping(address => mapping(uint256 => bool)) public multiplierApplied;
 
@@ -121,12 +121,12 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
     }
 
     /**
-    * @dev Whitelist a Market Creator temporarily for one markets
+    * @dev Whitelist a Market Creator temporarily for one market
     * @param _userAdd Address of the creator
     */
     function addTemporaryMarketCreator(address _userAdd) external onlyAuthorized {
       require(_userAdd != address(0));
-      tempMarketCreator[_userAdd] = true;
+      oneTimeMarketCreator[_userAdd] = true;
     }
 
     /**
@@ -187,8 +187,8 @@ contract AcyclicMarkets is IAuth, NativeMetaTransaction {
     function createMarket(string calldata _questionDetails, uint64[] calldata _optionRanges, uint32[] calldata _marketTimes,bytes8 _marketType, bytes32 _marketCurr, uint64 _marketInitialLiquidity) external {
       require(!paused);
       // address _marketCreator = _msgSender();
-      require(whiteListedMarketCreators[_msgSender()] || tempMarketCreator[_msgSender()]);
-      delete tempMarketCreator[_msgSender()];
+      require(whiteListedMarketCreators[_msgSender()] || oneTimeMarketCreator[_msgSender()]);
+      delete oneTimeMarketCreator[_msgSender()];
       require(_marketInitialLiquidity >= minLiquidityByCreator);
       uint32[] memory _timesArray = new uint32[](_marketTimes.length+1);
       _timesArray[0] = uint32(now);
