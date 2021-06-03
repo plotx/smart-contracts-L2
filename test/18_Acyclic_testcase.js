@@ -261,6 +261,17 @@ contract("Rewards-Market", async function(users) {
 			timeNow = await latestTime();
             await acyclicMarkets.createMarket("Question1", [100,400], [timeNow/1+4*3600,timeNow/1+8*3600,3600],toHex("NFT"),toHex("PLOT"), 100*10**8,{from:users[11]});
 		});
+
+		it("Should be able to add a temporary market creator", async() => {
+            await plotusToken.transfer(users[13],toWei(10000));
+			await plotusToken.approve(allMarkets.address, toWei(1000000), {from:users[13]});
+            await assertRevert(acyclicMarkets.createMarket("Question1", [100,400], [timeNow/1+4*3600,timeNow/1+8*3600,3600],toHex("NFT"),toHex("PLOT"), 100*10**8,{from:users[13]}));
+			await acyclicMarkets.addTemporaryMarketCreator(users[13]);
+            await acyclicMarkets.createMarket("Question1", [100,400], [timeNow/1+4*3600,timeNow/1+8*3600,3600],toHex("NFT"),toHex("PLOT"), 100*10**8,{from:users[13]});
+		});
+		it("Access for temporary market creator should be revoked after a market is created", async() => {
+            await assertRevert(acyclicMarkets.createMarket("Question1", [100,400], [timeNow/1+4*3600,timeNow/1+8*3600,3600],toHex("NFT"),toHex("PLOT"), 100*10**8,{from:users[13]}));
+		});
 	});
 });
 
