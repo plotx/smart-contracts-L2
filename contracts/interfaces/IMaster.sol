@@ -1,6 +1,7 @@
 pragma solidity 0.5.7;
 
 contract IMaster {
+    address public initialAuthorizedAddress;
     function authorized() public view returns(address);
     function dAppToken() public view returns(address);
     function isInternal(address _address) public view returns(bool);
