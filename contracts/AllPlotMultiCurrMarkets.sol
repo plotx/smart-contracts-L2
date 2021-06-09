@@ -54,7 +54,7 @@ contract AllPlotMultiCurrMarkets is IAuth, NativeMetaTransaction {
 
     struct PredictionData {
       uint64 predictionPoints;
-      mapping(address => uint64) amountStaked;
+      mapping(address => uint64) assetwiseAmountStaked;
     }
     
     struct UserMarketData {
@@ -63,10 +63,10 @@ contract AllPlotMultiCurrMarkets is IAuth, NativeMetaTransaction {
     }
 
     struct UserData {
-      mapping(address => uint128) totalStaked;
+      mapping(address => uint128) assetwiseTotalStaked;
       uint128 lastClaimedIndex;
       uint[] marketsParticipated;
-      mapping(address => uint) unusedBalance;
+      mapping(address => uint) assetwiseUnusedBalance;
       mapping(uint => UserMarketData) userMarketData;
     }
 
@@ -83,8 +83,8 @@ contract AllPlotMultiCurrMarkets is IAuth, NativeMetaTransaction {
       uint32 settleTime;
       address marketCreatorContract;
       // uint incentiveToDistribute;
-      mapping(address => uint) rewardToDistribute;
-      mapping(address => uint) totalStaked;
+      mapping(address => uint) assetwiseRewardToDistribute;
+      mapping(address => uint) assetwiseTotalStaked;
       PredictionStatus predictionStatus;
     }
 
@@ -93,6 +93,7 @@ contract AllPlotMultiCurrMarkets is IAuth, NativeMetaTransaction {
     address internal masterAddress;
     address internal plotToken;
     address internal disputeResolution;
+    address public nativeCurrencyAddress;
 
     struct PredictionCurrency {
       address token;
@@ -152,8 +153,14 @@ contract AllPlotMultiCurrMarkets is IAuth, NativeMetaTransaction {
       bPLOTInstance = IbPLOTToken(ms.getLatestAddress("BL"));
     }
 
-    function addPredictionCurrency(address _asset, address _feedAdd) external onlyAuthorized {
+    function addPredictionCurrency(address _asset, address _feedAdd, bool isNativeCurr) external onlyAuthorized {
       require(currencyIndex[_asset] == 0);
+      require(_asset != address(0)); // may except this condition for native curr as null address
+      require(_feedAdd != address(0));
+      if(isNativeCurr) {
+        require(nativeCurrencyAddress == address(0));
+        nativeCurrencyAddress = _asset;
+      }
       currencyIndex[_asset] = nextCurrencyIndex;
       predictionCurrencies[nextCurrencyIndex++] = PredictionCurrency(_asset,_feedAdd);
     }
@@ -186,12 +193,17 @@ contract AllPlotMultiCurrMarkets is IAuth, NativeMetaTransaction {
     */
     function createMarket(uint32[] memory _marketTimes, uint64[] memory _optionRanges, address _marketCreator, uint64 _initialLiquidity, uint _predictionCurrencyIndex) 
     public 
+    payable
     returns(uint64 _marketIndex)
     {
       require(_marketCreator != address(0));
       require(authorizedMarketCreator[msg.sender]);
       require(!marketCreationPaused);
       require(_predictionCurrencyIndex > 0 && _predictionCurrencyIndex < nextCurrencyIndex); // valid currency index
+      if(predictionCurrencies[_predictionCurrencyIndex].token != nativeCurrencyAddress) {
+        require(msg.value == 0);
+      }
+      
       _checkForValidMarketTimes(_marketTimes);
       _checkForValidOptionRanges(_optionRanges);
       _marketIndex = uint64(marketBasicData.length);
@@ -240,13 +252,12 @@ contract AllPlotMultiCurrMarkets is IAuth, NativeMetaTransaction {
       if(_balanceAvailable < _defaultAmount) {
         _deposit(_defaultAmount.sub(_balanceAvailable), _msgSenderAddress, _predictionCurr.token);
       }
-      address _predictionToken = _predictionCurr.token;
-      uint64 _predictionAmount = _initialLiquidity/ _totalOptions;
+      uint64 _predictionAmount = _initialLiquidity.div(_totalOptions);
       for(uint i = 1;i < _totalOptions; i++) {
-        _placePrediction(_marketId, _msgSenderAddress, _predictionToken, _predictionAmount, i);
+        _placePrediction(_marketId, _msgSenderAddress, _predictionCurr.token, _predictionAmount, i);
         _initialLiquidity = _initialLiquidity.sub(_predictionAmount);
       }
-      _placePrediction(_marketId, _msgSenderAddress, _predictionToken, _initialLiquidity, _totalOptions);
+      _placePrediction(_marketId, _msgSenderAddress, _predictionCurr.token, _initialLiquidity, _totalOptions);
     }
 
     /**
@@ -256,7 +267,13 @@ contract AllPlotMultiCurrMarkets is IAuth, NativeMetaTransaction {
     */
     function _transferAsset(address _asset, address _recipient, uint256 _amount) internal {
       if(_amount > 0) { 
-          require(IToken(_asset).transfer(_recipient, _amount));
+        if(_asset == nativeCurrencyAddress)
+        {
+          address payable _recipientAdd = address(uint160(_recipient));
+          _recipientAdd.transfer(_amount);
+          return;
+        }
+        require(IToken(_asset).transfer(_recipient, _amount));
       }
     }
 
@@ -319,9 +336,13 @@ contract AllPlotMultiCurrMarkets is IAuth, NativeMetaTransaction {
     * @param _amount Amount of prediction token to deposit
     */
     function _deposit(uint _amount, address _msgSenderAddress, address _asset) internal {
-      _transferTokenFrom(_asset, _msgSenderAddress, address(this), _amount);
+      if(_asset == nativeCurrencyAddress) {
+        require(msg.value == _amount);
+      } else {
+        _transferTokenFrom(_asset, _msgSenderAddress, address(this), _amount);
+      }
       UserData storage _userData = userData[_msgSenderAddress];
-      _userData.unusedBalance[_asset] = _userData.unusedBalance[_asset].add(_amount);
+      _userData.assetwiseUnusedBalance[_asset] = _userData.assetwiseUnusedBalance[_asset].add(_amount);
       emit Deposited(_msgSenderAddress, _asset, _amount, now);
     }
 
@@ -345,7 +366,7 @@ contract AllPlotMultiCurrMarkets is IAuth, NativeMetaTransaction {
     */
     function _withdraw(uint _token, uint _maxRecords, uint _tokenLeft, address _msgSenderAddress, address _asset) internal {
       _withdrawReward(_maxRecords, _msgSenderAddress);
-      userData[_msgSenderAddress].unusedBalance[_asset] = _tokenLeft.sub(_token);
+      userData[_msgSenderAddress].assetwiseUnusedBalance[_asset] = _tokenLeft.sub(_token);
       require(_token > 0);
       _transferAsset(_asset, _msgSenderAddress, _token);
       emit Withdrawn(_msgSenderAddress, _asset, _token, now);
@@ -371,7 +392,8 @@ contract AllPlotMultiCurrMarkets is IAuth, NativeMetaTransaction {
     * _plotPredictionAmount and _bPLOTPredictionAmount should be passed with 8 decimals, reduced it to 8 decimals to reduce the storage space of prediction data
     */
     function depositAndPredictWithPlotAndBPlot(uint _tokenDeposit, uint _marketId, uint256 _prediction, uint64 _plotPredictionAmount, uint64 _bPLOTPredictionAmount) external {
-      // require(_asset == plotToken);
+      uint _currencyIndex = currencyIndex[plotToken];
+      require(_currencyIndex > 0 && _currencyIndex < nextCurrencyIndex); // plot is allowed
       address payable _msgSenderAddress = _msgSender();
       UserData storage _userData = userData[_msgSenderAddress];
       uint64 _predictionStake = _plotPredictionAmount.add(_bPLOTPredictionAmount);
@@ -384,7 +406,7 @@ contract AllPlotMultiCurrMarkets is IAuth, NativeMetaTransaction {
         _userData.userMarketData[_marketId].predictedWithBlot = true;
         uint256 _amount = (10**predictionDecimalMultiplier).mul(_bPLOTPredictionAmount);
         bPLOTInstance.convertToPLOT(_msgSenderAddress, address(this), _amount);
-        _userData.unusedBalance[plotToken] = _userData.unusedBalance[plotToken].add(_amount);
+        _userData.assetwiseUnusedBalance[plotToken] = _userData.assetwiseUnusedBalance[plotToken].add(_amount);
       }
       _placePrediction(_marketId, _msgSenderAddress, plotToken, _predictionStake, _prediction);
     }
@@ -399,10 +421,11 @@ contract AllPlotMultiCurrMarkets is IAuth, NativeMetaTransaction {
     * _tokenDeposit should be passed with 18 decimals
     * _predictioStake should be passed with 8 decimals, reduced it to 8 decimals to reduce the storage space of prediction data
     */
-    function depositAndPlacePrediction(uint _tokenDeposit, uint _marketId, address _asset, uint64 _predictionStake, uint256 _prediction) external {
+    function depositAndPlacePrediction(uint _tokenDeposit, uint _marketId, address _asset, uint64 _predictionStake, uint256 _prediction) external payable {
       uint _currIndex = currencyIndex[_asset];
       require(_currIndex > 0 && _currIndex < nextCurrencyIndex); // valid prediction currency
       address payable _msgSenderAddress = _msgSender();
+      // for depositing native currency, user need to call the function. otherwise, it will not enter into deposit function
       if(_tokenDeposit > 0) {
         _deposit(_tokenDeposit, _msgSenderAddress, _asset);
       }
@@ -424,18 +447,18 @@ contract AllPlotMultiCurrMarkets is IAuth, NativeMetaTransaction {
       uint decimalMultiplier = 10**predictionDecimalMultiplier; // need to update
       UserData storage _userData = userData[_msgSenderAddress];
       if(_asset != address(bPLOTInstance)) {
-        uint256 unusedBalance = _userData.unusedBalance[_asset];
+        uint256 unusedBalance = _userData.assetwiseUnusedBalance[_asset];
         unusedBalance = unusedBalance.div(decimalMultiplier);
         if(_predictionStake > unusedBalance)
         {
           _withdrawReward(defaultMaxRecords, _msgSenderAddress);
-          unusedBalance = _userData.unusedBalance[_asset];
+          unusedBalance = _userData.assetwiseUnusedBalance[_asset];
           unusedBalance = unusedBalance.div(decimalMultiplier);
         }
         require(_predictionStake <= unusedBalance);
-        _userData.unusedBalance[_asset] = (unusedBalance.sub(_predictionStake)).mul(decimalMultiplier);
+        _userData.assetwiseUnusedBalance[_asset] = (unusedBalance.sub(_predictionStake)).mul(decimalMultiplier);
       } else {
-        require(_asset == address(bPLOTInstance));
+        // require(_asset == address(bPLOTInstance));
         require(!_userData.userMarketData[_marketId].predictedWithBlot);
         _userData.userMarketData[_marketId].predictedWithBlot = true;
         bPLOTInstance.convertToPLOT(_msgSenderAddress, address(this), (decimalMultiplier).mul(_predictionStake));
@@ -554,7 +577,7 @@ contract AllPlotMultiCurrMarkets is IAuth, NativeMetaTransaction {
       for(uint i = 1; i < _nextCurrIndex; i++) {
          address _asset = predictionCurrencies[i].token;
          uint _reward = _calculateRewardTally(_marketId, _winningOption, _asset);
-         _marketDataExtended.rewardToDistribute[_asset] = _reward;
+         _marketDataExtended.assetwiseRewardToDistribute[_asset] = _reward;
         allCurrTotalRewards[i.sub(1)] = _reward;
       }
     }
@@ -566,7 +589,7 @@ contract AllPlotMultiCurrMarkets is IAuth, NativeMetaTransaction {
     */
     function _calculateRewardTally(uint256 _marketId, uint256 _winningOption, address _asset) internal view returns(uint64 totalReward){
       for(uint i=1; i <= marketDataExtended[_marketId].optionRanges.length +1; i++){
-        uint64 _tokenStakedOnOption = marketOptionsAvailable[_marketId][i].amountStaked[_asset];
+        uint64 _tokenStakedOnOption = marketOptionsAvailable[_marketId][i].assetwiseAmountStaked[_asset];
         if(i != _winningOption) {
           totalReward = totalReward.add(_tokenStakedOnOption);
         }
@@ -609,7 +632,7 @@ contract AllPlotMultiCurrMarkets is IAuth, NativeMetaTransaction {
       emit ReturnClaimed(_msgSenderAddress, tokenReward);
       for(uint i=1;i<=nextCurrencyIndex;i++) {
         address _asset = predictionCurrencies[i].token;
-        _userData.unusedBalance[_asset] = _userData.unusedBalance[_asset].add(tokenReward[i.sub(1)].mul(10**predictionDecimalMultiplier));
+        _userData.assetwiseUnusedBalance[_asset] = _userData.assetwiseUnusedBalance[_asset].add(tokenReward[i.sub(1)].mul(10**predictionDecimalMultiplier));
       }
       _userData.lastClaimedIndex = uint128(lastClaimed);
     }
@@ -628,7 +651,7 @@ contract AllPlotMultiCurrMarkets is IAuth, NativeMetaTransaction {
       for(uint i = _userData.lastClaimedIndex; i < len; i++) {
         tokenReward = tokenReward.add(getReturn(_user, _userData.marketsParticipated[i])[currencyIndex[_asset].sub(1)]);
       }
-      return (_userData.unusedBalance[_asset], tokenReward.mul(decimalMultiplier));
+      return (_userData.assetwiseUnusedBalance[_asset], tokenReward.mul(decimalMultiplier));
     }
 
     /**
@@ -706,7 +729,7 @@ contract AllPlotMultiCurrMarkets is IAuth, NativeMetaTransaction {
       returnAmount = new uint[](_nextCurrIndex);
       for(uint i=1;i<_nextCurrIndex;i++) {
         address _asset = predictionCurrencies[i].token;
-        returnAmount[i.sub(1)] = _userData.userMarketData[_marketId].predictionData[_winningOption].amountStaked[_asset];
+        returnAmount[i.sub(1)] = _userData.userMarketData[_marketId].predictionData[_winningOption].assetwiseAmountStaked[_asset];
         uint256 userPredictionPointsOnWinngOption = _userData.userMarketData[_marketId].predictionData[_winningOption].predictionPoints;
         if(userPredictionPointsOnWinngOption > 0) {
           returnAmount[i.sub(1)] = _addUserReward(_marketId, returnAmount[i.sub(1)], _winningOption, userPredictionPointsOnWinngOption, _asset);
@@ -722,7 +745,7 @@ contract AllPlotMultiCurrMarkets is IAuth, NativeMetaTransaction {
     */
     function _addUserReward(uint256 _marketId, uint returnAmount, uint256 _winningOption, uint256 _userPredictionPointsOnWinngOption, address _asset) internal view returns(uint){
         return returnAmount.add(
-            _userPredictionPointsOnWinngOption.mul(marketDataExtended[_marketId].rewardToDistribute[_asset]).div(marketOptionsAvailable[_marketId][_winningOption].predictionPoints)
+            _userPredictionPointsOnWinngOption.mul(marketDataExtended[_marketId].assetwiseRewardToDistribute[_asset]).div(marketOptionsAvailable[_marketId][_winningOption].predictionPoints)
           );
     }
 
@@ -772,10 +795,10 @@ contract AllPlotMultiCurrMarkets is IAuth, NativeMetaTransaction {
       _userData.userMarketData[_marketId].predictionData[_prediction].predictionPoints = _userData.userMarketData[_marketId].predictionData[_prediction].predictionPoints.add(predictionPoints);
       _predictionData.predictionPoints = _predictionData.predictionPoints.add(predictionPoints);
       
-      _userData.userMarketData[_marketId].predictionData[_prediction].amountStaked[_asset] = _userData.userMarketData[_marketId].predictionData[_prediction].amountStaked[_asset].add(_predictionStake);
-      _predictionData.amountStaked[_asset] = _predictionData.amountStaked[_asset].add(_predictionStake);
-      _userData.totalStaked[_asset] = _userData.totalStaked[_asset].add(_predictionStake);
-      marketDataExtended[_marketId].totalStaked[_asset] = marketDataExtended[_marketId].totalStaked[_asset].add(_predictionStake);
+      _userData.userMarketData[_marketId].predictionData[_prediction].assetwiseAmountStaked[_asset] = _userData.userMarketData[_marketId].predictionData[_prediction].assetwiseAmountStaked[_asset].add(_predictionStake);
+      _predictionData.assetwiseAmountStaked[_asset] = _predictionData.assetwiseAmountStaked[_asset].add(_predictionStake);
+      _userData.assetwiseTotalStaked[_asset] = _userData.assetwiseTotalStaked[_asset].add(_predictionStake);
+      marketDataExtended[_marketId].assetwiseTotalStaked[_asset] = marketDataExtended[_marketId].assetwiseTotalStaked[_asset].add(_predictionStake);
       
     }
 
@@ -840,7 +863,7 @@ contract AllPlotMultiCurrMarkets is IAuth, NativeMetaTransaction {
       require(msg.sender == disputeResolution);
       marketDataExtended[_marketId].predictionStatus = _status;
     }
-//===================need to fix according to option pricing needs====
+
     /**
     * @dev Gets the Option pricing params for market.
     * @param _marketId Index of market.
@@ -862,7 +885,7 @@ contract AllPlotMultiCurrMarkets is IAuth, NativeMetaTransaction {
       for(uint i=1;i<_nextOptionIndex;i++) {
         for(uint j=1;j<_maxOptionRange;j++)
         {
-          uint usdEquivalentStake = getEquivalentTokens(marketOptionsAvailable[_marketId][j].amountStaked[predictionCurrencies[i].token],i);
+          uint usdEquivalentStake = getEquivalentTokens(marketOptionsAvailable[_marketId][j].assetwiseAmountStaked[predictionCurrencies[i].token],i);
           if(j==_option){
             _optionPricingParams[0] = _optionPricingParams[0].add(usdEquivalentStake);
           }
@@ -876,7 +899,7 @@ contract AllPlotMultiCurrMarkets is IAuth, NativeMetaTransaction {
 
     function getEquivalentTokens(uint _amount, uint _currencyIndex) public view returns(uint) {
       // need to handle overflow
-      return  uint64(_amount.mul(10**8).div(IOracle(predictionCurrencies[_currencyIndex].token).getLatestPrice()));
+      return  _amount.mul(10**8).div(IOracle(predictionCurrencies[_currencyIndex].token).getLatestPrice());
 
     }
 
@@ -894,7 +917,7 @@ contract AllPlotMultiCurrMarkets is IAuth, NativeMetaTransaction {
       
       totalStakes = new uint[](nextCurrencyIndex);
       for(uint i=1;i<=nextCurrencyIndex;i++) {
-        totalStakes[i.sub(1)] = userData[_user].totalStaked[predictionCurrencies[i].token];
+        totalStakes[i.sub(1)] = userData[_user].assetwiseTotalStaked[predictionCurrencies[i].token];
       }
     }
 }
