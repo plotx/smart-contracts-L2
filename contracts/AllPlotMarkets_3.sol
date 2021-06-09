@@ -19,6 +19,8 @@ import "./AllPlotMarkets_2.sol";
 
 contract AllPlotMarkets_3 is AllPlotMarkets_2 {
 
+    mapping(uint => uint) creatorRewardFromRewadPool;
+
     function claimReturn(address _user, uint _marketId) internal view returns(uint256, uint256) {
 
       if(!marketSettleEventEmitted[_marketId]) {
@@ -63,17 +65,31 @@ contract AllPlotMarkets_3 is AllPlotMarkets_2 {
       }
       _marketDataExtended.WinningOption = _winningOption;
       uint64 totalReward = _calculateRewardTally(_marketId, _winningOption);
-      IMarket creatorContract = IMarket(_marketDataExtended.marketCreatorContract);
-      (,uint RPS) = creatorContract.getUintParameters("RPS");
+      (,uint RPS) = IMarket(_marketDataExtended.marketCreatorContract).getUintParameters("RPS");
       uint64 rewardForCreator = 0;
       if(RPS>0)
       {
         rewardForCreator = uint64(RPS).mul(totalReward).div(100);
-        _transferAsset(plotToken,_marketDataExtended.marketCreatorContract,rewardForCreator);
-        creatorContract.setRewardPoolShareForCreator(_marketId, rewardForCreator);
+        creatorRewardFromRewadPool[_marketId] = rewardForCreator;
       }
       _marketDataExtended.rewardToDistribute = totalReward.sub(rewardForCreator);
       emit MarketResult(_marketId, _marketDataExtended.rewardToDistribute, _winningOption, _value);
+    }
+
+    function emitMarketSettledEvent(uint256 _marketId) external {
+      require(!marketSettleEventEmitted[_marketId]);
+      require(marketStatus(_marketId) == PredictionStatus.Settled);
+      marketSettleEventEmitted[_marketId] = true;
+      uint creatorReward = creatorRewardFromRewadPool[_marketId];
+      if(creatorReward>0)
+      {
+        delete creatorRewardFromRewadPool[_marketId];
+        MarketDataExtended storage _marketDataExtended = marketDataExtended[_marketId];
+        _transferAsset(plotToken,_marketDataExtended.marketCreatorContract,creatorReward);
+        IMarket(_marketDataExtended.marketCreatorContract).setRewardPoolShareForCreator(_marketId, creatorReward);
+      }
+
+      emit MarketSettled(_marketId);
     }
 
 }
