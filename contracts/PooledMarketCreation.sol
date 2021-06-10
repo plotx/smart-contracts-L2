@@ -30,6 +30,7 @@ contract IAllPlotMarkets {
   function withdraw(uint _token, uint _maxRecords) public;
 
   function getUserUnusedBalance(address _user) public view returns(uint256, uint256);
+  function getTotalMarketsLength() external view returns(uint64);
 }
 
 
@@ -41,8 +42,10 @@ contract PooledMarketCreation is
 
     using SafeMath for uint;
 
-    ERC20 plotToken;
-    IMaster ms;
+    ERC20 internal plotToken;
+    IMaster internal ms;
+    IAllPlotMarkets internal allMarkets;
+    ICyclicMarkets internal cyclicMarkets;
     uint public minLiquidity;
     uint internal predictionDecimalMultiplier;
     uint public unstakeRestrictTime;
@@ -55,13 +58,15 @@ contract PooledMarketCreation is
     event Unstaked(address indexed _user, uint _lpAmountUnstaked, uint plotTokensTransferred, uint plotLeftInPool, uint totalLpSupply);
     event MarketCreated(uint _currencyType, uint _marketType, uint _initialLiquidity, uint plotLeftInPool, uint totalLpSupply);
     event Claimed(uint _amountClaimed, uint _maxRecordProcessed, uint plotLeftInPool, uint totalLpSupply);
-    event AddedAdditionalReward(address indexed _user, uint _amount, uint plotLeftInPool, uint totalLpSupply);
+    event AdditionalReward(address indexed _user, uint marketIndex, uint amount, uint plotLeftInPool, uint totalLpSupply);
 
     function setMasterAddress(address _authorizedMultiSig, address _defaultAuthorizedAddress) public {
         OwnedUpgradeabilityProxy proxy =  OwnedUpgradeabilityProxy(address(uint160(address(this))));
         require(msg.sender == proxy.proxyOwner(),"Only callable by proxy owner");
         ms = IMaster(msg.sender);
         plotToken = ERC20(ms.dAppToken());
+        allMarkets = IAllPlotMarkets(ms.getLatestAddress("AM"));
+        cyclicMarkets = ICyclicMarkets(ms.getLatestAddress("CM"));
         _name = "pPLOT";
         _symbol = "pPLOT";
         _setupDecimals(18);
@@ -132,15 +137,15 @@ contract PooledMarketCreation is
     * @param _roundId Round Id to settle previous market (If applicable, else pass 0)
     */ 
     function createMarket(uint32 _currencyTypeIndex, uint32 _marketTypeIndex, uint80 _roundId) public {
-        ICyclicMarkets cm = ICyclicMarkets(ms.getLatestAddress("CM"));
-        uint initialLiquidity = cm.getInitialLiquidity(_marketTypeIndex);
+        uint initialLiquidity = cyclicMarkets.getInitialLiquidity(_marketTypeIndex);
         claimCreationAndParticipationReward(defaultMaxRecords);
         require(getPlotLeftInPool().sub(initialLiquidity.mul(10**predictionDecimalMultiplier)) >= minLiquidity,"Liquidity falling beyond minimum liquidity");
-        cm.createMarket(_currencyTypeIndex,_marketTypeIndex,_roundId);
+        uint _marketIndex = allMarkets.getTotalMarketsLength();
+        cyclicMarkets.createMarket(_currencyTypeIndex,_marketTypeIndex,_roundId);
         uint additionalReward = marketTypeAdditionalReward[_currencyTypeIndex][_marketTypeIndex];
         if(additionalReward>0)
         {
-            _addAdditionalReward(additionalReward);
+            _addAdditionalReward(additionalReward, _marketIndex);
         }
 
         emit MarketCreated(_currencyTypeIndex,_marketTypeIndex,initialLiquidity, getPlotLeftInPool(), totalSupply());
@@ -151,7 +156,7 @@ contract PooledMarketCreation is
     * @param _amount amount of plot tokens
     */ 
     function approveToAllMarkets(uint _amount) external onlyAuthorized {
-        require(plotToken.approve(ms.getLatestAddress("AM"),_amount),"ERC20 call Failed");
+        require(plotToken.approve((address(allMarkets)),_amount),"ERC20 call Failed");
     }
 
     /**
@@ -159,11 +164,9 @@ contract PooledMarketCreation is
     * @param _maxRecords max number of records to process
     */ 
     function claimCreationAndParticipationReward(uint _maxRecords) public {
-        IAllPlotMarkets allMarkets = IAllPlotMarkets(ms.getLatestAddress("AM"));
-        ICyclicMarkets cyclicMarket = ICyclicMarkets(ms.getLatestAddress("CM"));
-        uint marketcCreationReward = cyclicMarket.getPendingMarketCreationRewards(address(this));
+        uint marketcCreationReward = cyclicMarkets.getPendingMarketCreationRewards(address(this));
         if(marketcCreationReward>0){
-            cyclicMarket.claimCreationReward();
+            cyclicMarkets.claimCreationReward();
         }
         (uint _tokenLeft, uint _tokenReward) = allMarkets.getUserUnusedBalance(address(this));
         if(_tokenLeft.add(_tokenReward) > 0)
@@ -200,9 +203,9 @@ contract PooledMarketCreation is
     * @dev To add additional reward for contributors of pool
     * @param _val amount of tokens as additional reward
     */ 
-    function _addAdditionalReward(uint _val) internal {
+    function _addAdditionalReward(uint _val, uint _marketIndex) internal {
         require(plotToken.transferFrom(rewardWallet, address(this), _val),"ERC20 call Failed");
-        emit AddedAdditionalReward(rewardWallet, _val, getPlotLeftInPool(), totalSupply());
+        emit AdditionalReward(rewardWallet, _marketIndex, _val, getPlotLeftInPool(), totalSupply());
     }
 
     /**
@@ -231,8 +234,7 @@ contract PooledMarketCreation is
     * @param _val Additional reward to be given
     */
     function updateAdditionalRewardPerMarketType(uint32 _currencyTypeIndex, uint32 _marketTypeIndex, uint _val) external onlyAuthorized {
-        ICyclicMarkets cm = ICyclicMarkets(ms.getLatestAddress("CM"));
-        (, uint64 latestTime, ,) = cm.marketCreationData(_marketTypeIndex, _currencyTypeIndex);
+        (, uint64 latestTime, ,) = cyclicMarkets.marketCreationData(_marketTypeIndex, _currencyTypeIndex);
         require(latestTime > 0, "Not valid Market type");
         marketTypeAdditionalReward[_currencyTypeIndex][_marketTypeIndex] = _val;
     }
