@@ -102,18 +102,17 @@ contract CyclicMarkets_2 is CyclicMarkets {
       }
     }
 
-    function setRewardPoolShareForCreator(uint _marketId, uint _amount) external {
-    	require(msg.sender == address(allMarkets));
+    function setRewardPoolShareForCreator(uint _marketId, uint _amount) external onlyAllMarkets {
     	address creator = marketData[_marketId].marketCreator;
-		rewardPoolShareForMarketCreator[creator] = rewardPoolShareForMarketCreator[creator].add(_amount);
+		  rewardPoolShareForMarketCreator[creator] = rewardPoolShareForMarketCreator[creator].add(_amount);
     }
 
-    function claimRewardPoolShare(address _creator) external {
+    function claimRewardPoolShare() external {
     	address _msgSender = _msgSender();
     	uint _amount = rewardPoolShareForMarketCreator[_msgSender];
     	require(_amount > 0);
     	delete rewardPoolShareForMarketCreator[_msgSender];
-    	_transferAsset(plotToken, _creator, _amount);
+    	_transferAsset(plotToken, _msgSender, _amount);
     }
 
 }
