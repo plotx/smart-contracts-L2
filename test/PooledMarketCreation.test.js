@@ -56,7 +56,8 @@ contract("Pooled Market Creation", async function(users) {
 			PMC = await PooledMarketCreation.new();
 			await masterInstance.addNewContract(toHex("PC"), PMC.address);
 			PMC = await PooledMarketCreation.at(await masterInstance.getLatestAddress(web3.utils.toHex("PC")));
-            await increaseTime(5 * 3600);
+			await cyclicMarkets.whitelistMarketCreator(PMC.address);
+			await increaseTime(5 * 3600);
             await plotusToken.transfer(users[1],toWei(600));
             await plotusToken.transfer(users[2],toWei(600));
             await plotusToken.transfer(users[3],toWei(600));
