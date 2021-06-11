@@ -8,8 +8,10 @@ contract SampleERC is ERC20 {
     // string public symbol;
     // uint8 public decimals = 18;
 
-    constructor(string memory tokenName, string memory tokenSymbol) public ERC20(tokenName,tokenSymbol) {
-    	
+    constructor(string memory tokenName, string memory tokenSymbol) public  {
+    	_name = tokenName;
+        _symbol = tokenSymbol;
+        _setupDecimals(18);
     }
 
     function mint(uint256 amount) public returns (uint256) {

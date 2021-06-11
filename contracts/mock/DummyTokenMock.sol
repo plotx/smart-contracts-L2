@@ -13,7 +13,10 @@ contract DummyTokenMock is ERC20 {
 
     bool public retBit;
 
-    constructor(string memory tokenName, string memory tokenSymbol) public ERC20(tokenName,tokenSymbol){
+    constructor(string memory tokenName, string memory tokenSymbol) public {
+        _name = tokenName;
+        _symbol = tokenSymbol;
+        _setupDecimals(18);
     }
 
     function mint(uint256 amount) public returns (uint256) {
