@@ -77,8 +77,8 @@ contract AllPlotMarkets_3 is AllPlotMarkets_2 {
     }
 
     function emitMarketSettledEvent(uint256 _marketId) external {
-      require(!marketSettleEventEmitted[_marketId]);
       require(marketStatus(_marketId) == PredictionStatus.Settled);
+      require(!marketSettleEventEmitted[_marketId]);
       marketSettleEventEmitted[_marketId] = true;
       uint creatorReward = creatorRewardFromRewadPool[_marketId].mul(10**predictionDecimalMultiplier);
       if(creatorReward>0)

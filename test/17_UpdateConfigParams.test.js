@@ -1,6 +1,7 @@
 const Master = artifacts.require('Master');
 const AllMarkets = artifacts.require('MockAllMarkets');
 const CyclicMarkets = artifacts.require('CyclicMarkets');
+const CyclicMarkets_2 = artifacts.require('CyclicMarkets_2');
 const AcyclicMarkets = artifacts.require('AcyclicMarkets');
 const DisputeResolution = artifacts.require('DisputeResolution');
 const PlotusToken = artifacts.require("MockPLOT");
@@ -38,6 +39,11 @@ contract('Configure Global Parameters', accounts => {
       snapshotId = await takeSnapshot();
       ms = await OwnedUpgradeabilityProxy.deployed();
       ms = await Master.at(ms.address);
+
+      let cyclicMarketsV2Impl = await CyclicMarkets_2.new();
+			await ms.upgradeMultipleImplementations([toHex("CM")], [cyclicMarketsV2Impl.address]);
+			cyclicMarkets = await CyclicMarkets_2.at(await ms.getLatestAddress(web3.utils.toHex("CM")));
+
       allMarkets = await AllMarkets.at(await ms.getLatestAddress(toHex('AM')));
       cyclicMarkets = await CyclicMarkets.at(await ms.getLatestAddress(toHex('CM')));
       acyclicMarkets = await AcyclicMarkets.at(await ms.getLatestAddress(toHex('AC')));
@@ -187,6 +193,9 @@ contract('Configure Global Parameters', accounts => {
       it('Should update Staking factor min stake', async function() {
         await updateParameter( 'SFMS', cyclicMarkets, 'uint', '123');
       });
+      it('Should update reward pool share', async function() {
+        await updateParameter( 'RPS', cyclicMarkets, 'uint', '20');
+      });
       // it('Should update Multisig address', async function() {
       //   await updateParameter(26, 2, 'MULSIG', allMarkets, 'address', allMarkets.address, "authorizedMultiSig()", true);
       // });
@@ -211,218 +220,221 @@ contract('Configure Global Parameters', accounts => {
       it('Should not update if Current price weightage > 100', async function() {
         await updateInvalidParameter('CPW', cyclicMarkets, 'uint', '200');
       });
-    });
-
-    describe('Update Acyclic Markets Parameters', async function() {
-      it('Should update Cummulative fee percent', async function() {
-        await updateParameter( 'CMFP', acyclicMarkets, 'uint', '5300');
-        let confirmedBy = await multiSigWallet.getConfirmations(0);
-        for(let i = 0; i<3;i++) {
-          assert.equal(confirmedBy[i],accounts[i]);
-        }
-      });
-      it('Should update DAO fee percent', async function() {
-        await updateParameter( 'DAOF', acyclicMarkets, 'uint', '2500');
-        let transactions = await multiSigWallet.getTransactionIds(0,2, true, true);
-        assert.equal(transactions.length,2);
-      });
-      it('Should update Market creator fee percent', async function() {
-        await updateParameter( 'MCF', acyclicMarkets, 'uint', '1000');
-      });
-      it('Should update Referrer fee percent', async function() {
-        await updateParameter( 'RFRRF', acyclicMarkets, 'uint', '2600');
-      });
-      it('Should update Referee fee percent', async function() {
-        await updateParameter( 'RFREF', acyclicMarkets, 'uint', '1500');
-      });
-      it('Should update minimum prediction amount', async function() {
-        await updateParameter( 'MINP', acyclicMarkets, 'uint', '123');
-      });
-      it('Should update maximum prediction amount', async function() {
-        await updateParameter( 'MAXP', acyclicMarkets, 'uint', '123');
-      });
-      it('Should update Current price weightage', async function() {
-        await updateParameter( 'CPW', acyclicMarkets, 'uint', '23');
-      });
-      it('Should update Staking factor min stake', async function() {
-        await updateParameter( 'SFMS', acyclicMarkets, 'uint', '123');
-      });
-      it('Should not update if Cummulative fee percent is >= 100', async function() {
-        await updateInvalidParameter('CMFP', acyclicMarkets, 'uint', '11000');
-      });
-      it('Should not update if total fee percents >= 100', async function() {
-        await updateInvalidParameter('DAOF', acyclicMarkets, 'uint', '8000');
-      });
-      it('Should not update if total fee percents >= 100', async function() {
-        await updateInvalidParameter('MCF', acyclicMarkets, 'uint', '7000');
-      });
-      it('Should not update if parameter code is incorrect', async function() {
-        await updateInvalidParameter('EPTIM', acyclicMarkets, 'uint', '2');
-      });
-      it('Should not update if parameter code is incorrect', async function() {
-        await updateInvalidParameter('EPTIM', acyclicMarkets, 'uint', '2');
-      });
-      it('Should not update if Current price weightage > 100', async function() {
-        await updateInvalidParameter('CPW', acyclicMarkets, 'uint', '200');
-      });
-    })
-
-    describe('Update Dispute Resolution Parameters', async function() {
-      it('Should update tokenStakeForDispute', async function() {
-        await updateParameter( 'TSD', disputeResolution, 'uint', '5300');
-      });
-      it('Should update rewardForVoting', async function() {
-        await updateParameter( 'REWARD', disputeResolution, 'uint', '2500');
-      });
-      it('Should update drTokenLockPeriod', async function() {
-        await updateParameter( 'DRLOCKP', disputeResolution, 'uint', '1000');
-      });
-      it('Should update voteThresholdMultiplier', async function() {
-        await updateParameter( 'THMUL', disputeResolution, 'uint', '2600');
-      });
-      it('Should update drVotePeriod', async function() {
-        await updateParameter( 'VOTETIME', disputeResolution, 'uint', '1500');
-      });
-      it('Should not update if parameter code is incorrect', async function() {
-        await updateInvalidParameter('ASDF', disputeResolution, 'uint', '2');
-      });
-    })
-
-    describe("MultisigWallet", async function() {
-      it('Should not add owner if zero address passed', async function() {
-        let data = await encode3("addOwner(address)",ZERO_ADDRESS);
-        let transactionCount = await multiSigWallet.getTransactionCount(true, true);
-        await multiSigWallet.submitTransaction(multiSigWallet.address, 0, data);
-        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[1]});
-        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[2]});
-        let status = await multiSigWallet.transactions(transactionCount);
-        assert.equal(status.executed, false);
-        assert.equal(await multiSigWallet.isOwner(ZERO_ADDRESS), false);
-      });
-      it('Should add owner', async function() {
-        let data = await encode3("addOwner(address)",accounts[3]);
-        await assertRevert(multiSigWallet.addOwner(accounts[3]));
-        let transactionCount = await multiSigWallet.getTransactionCount(true, true);
-        await multiSigWallet.submitTransaction(multiSigWallet.address, 0, data);
-        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[1]});
-        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[2]});
-        let status = await multiSigWallet.transactions(transactionCount);
-        assert.equal(status.executed, true);
-        assert.equal(await multiSigWallet.isOwner(accounts[3]), true);
-      });
-      it('Should add owner', async function() {
-        let data = await encode3("addOwner(address)",accounts[10]);
-        await assertRevert(multiSigWallet.addOwner(accounts[3]));
-        let transactionCount = await multiSigWallet.getTransactionCount(true, true);
-        await multiSigWallet.submitTransaction(multiSigWallet.address, 0, data);
-        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[1]});
-        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[2]});
-        let status = await multiSigWallet.transactions(transactionCount);
-        assert.equal(status.executed, true);
-        assert.equal(await multiSigWallet.isOwner(accounts[10]), true);
-      });
-      it('Should not add owner twice', async function() {
-        let data = await encode3("addOwner(address)",accounts[3]);
-        let transactionCount = await multiSigWallet.getTransactionCount(true, true);
-        await multiSigWallet.submitTransaction(multiSigWallet.address, 0, data);
-        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[1]});
-        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[2]});
-        let status = await multiSigWallet.transactions(transactionCount);
-        assert.equal(status.executed, false);
-      });
-      it('Cannot replace owner with another existing owner', async function() {
-        let data = await encode3("replaceOwner(address,address)",accounts[3], accounts[3]);
-        await multiSigWallet.submitTransaction(multiSigWallet.address, 0, data);
-        let transactionCount = await multiSigWallet.getTransactionCount(true, true);
-        await multiSigWallet.confirmTransaction(transactionCount/1 - 1, {from:accounts[1]});
-        await multiSigWallet.confirmTransaction(transactionCount/1 - 1, {from:accounts[2]});
-        let status = await multiSigWallet.transactions(transactionCount - 1);
-        assert.equal(status.executed, false);
-      });
-      it('Cannot replace if the provided owner doesnt exist', async function() {
-        let data = await encode3("replaceOwner(address,address)",accounts[6], accounts[4]);
-        let transactionCount = await multiSigWallet.getTransactionCount(true, true);
-        await multiSigWallet.submitTransaction(multiSigWallet.address, 0, data);
-        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[1]});
-        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[2]});
-        let status = await multiSigWallet.transactions(transactionCount);
-        assert.equal(status.executed, false);
-        assert.equal(await multiSigWallet.isOwner(accounts[4]), false);
-        assert.equal(await multiSigWallet.isOwner(accounts[6]), false);
-      });
-      it('Should replace owner', async function() {
-        let data = await encode3("replaceOwner(address,address)",accounts[3], accounts[4]);
-        let transactionCount = await multiSigWallet.getTransactionCount(true, true);
-        await multiSigWallet.submitTransaction(multiSigWallet.address, 0, data);
-        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[1]});
-        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[2]});
-        let status = await multiSigWallet.transactions(transactionCount);
-        assert.equal(status.executed, true);
-        assert.equal(await multiSigWallet.isOwner(accounts[4]), true);
-      });
-      it('Should be able to change requirement for confirmation', async function() {
-        let data = await encode3("changeRequirement(uint256)",4);
-        let transactionCount = await multiSigWallet.getTransactionCount(true, true);
-        await multiSigWallet.submitTransaction(multiSigWallet.address, 0, data);
-        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[1]});
-        await assertRevert(multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[1]}));
-        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[2]});
-        await assertRevert(multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[2]}));
-        let status = await multiSigWallet.transactions(transactionCount);
-        assert.equal(status.executed, true);
-        assert.equal(await multiSigWallet.required(), 4);
-      });
-      it('Should remove owner', async function() {
-        let data = await encode3("removeOwner(address)",accounts[2]);
-        let transactionCount = await multiSigWallet.getTransactionCount(true, true);
-        await multiSigWallet.submitTransaction(multiSigWallet.address, 0, data);
-        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[1]});
-        await assertRevert(multiSigWallet.revokeConfirmation(transactionCount/1, {from:accounts[10]}));
-        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[10]});
-        await multiSigWallet.revokeConfirmation(transactionCount/1, {from:accounts[10]});
-        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[2]});
-        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[4]});
-        await assertRevert(multiSigWallet.revokeConfirmation(transactionCount/1, {from:accounts[4]}));
-        let status = await multiSigWallet.transactions(transactionCount);
-        assert.equal(status.executed, true);
-        assert.equal(await multiSigWallet.isOwner(accounts[2]), false);
-      });
-      it('Should remove owner', async function() {
-        let data = await encode3("removeOwner(address)",accounts[4]);
-        let transactionCount = await multiSigWallet.getTransactionCount(true, true);
-        await multiSigWallet.submitTransaction(multiSigWallet.address, 0, data);
-        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[1]});
-        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[10]});
-        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[4]});
-        await assertRevert(multiSigWallet.revokeConfirmation(transactionCount/1, {from:accounts[4]}));
-        let status = await multiSigWallet.transactions(transactionCount);
-        assert.equal(status.executed, true);
-        assert.equal(await multiSigWallet.isOwner(accounts[4]), false);
-      });
-      it('Should not execute if tried to remove address which is not owner', async function() {
-        assert.equal(await multiSigWallet.isOwner(accounts[3]), false);
-        let data = await encode3("removeOwner(address)",accounts[3]);
-        let transactionCount = await multiSigWallet.getTransactionCount(true, true);
-        await multiSigWallet.submitTransaction(multiSigWallet.address, 0, data);
-        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[1]});
-        let transactions = await multiSigWallet.getTransactionIds(0,transactionCount , true, true);
-        assert.equal(transactions.length,transactionCount);
-        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[10]});
-        let status = await multiSigWallet.transactions(transactionCount);
-        assert.equal(status.executed, false);
-      });
-      it('Should not be able to change requirement if requirement > current owners length', async function() {
-        let data = await encode3("changeRequirement(uint256)",10);
-        let transactionCount = await multiSigWallet.getTransactionCount(true, true);
-        await multiSigWallet.submitTransaction(multiSigWallet.address, 0, data);
-        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[1]});
-        await assertRevert(multiSigWallet.confirmTransaction(60, {from:accounts[10]}));
-        await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[10]});
-        let status = await multiSigWallet.transactions(transactionCount);
-        assert.equal(status.executed, false);
-        assert.equal(await multiSigWallet.required(),3);
+      it('Should not update if reward pool share > 100', async function() {
+        await updateInvalidParameter('RPS', cyclicMarkets, 'uint', '200');
       });
     });
+
+    // describe('Update Acyclic Markets Parameters', async function() {
+    //   it('Should update Cummulative fee percent', async function() {
+    //     await updateParameter( 'CMFP', acyclicMarkets, 'uint', '5300');
+    //     let confirmedBy = await multiSigWallet.getConfirmations(0);
+    //     for(let i = 0; i<3;i++) {
+    //       assert.equal(confirmedBy[i],accounts[i]);
+    //     }
+    //   });
+    //   it('Should update DAO fee percent', async function() {
+    //     await updateParameter( 'DAOF', acyclicMarkets, 'uint', '2500');
+    //     let transactions = await multiSigWallet.getTransactionIds(0,2, true, true);
+    //     assert.equal(transactions.length,2);
+    //   });
+    //   it('Should update Market creator fee percent', async function() {
+    //     await updateParameter( 'MCF', acyclicMarkets, 'uint', '1000');
+    //   });
+    //   it('Should update Referrer fee percent', async function() {
+    //     await updateParameter( 'RFRRF', acyclicMarkets, 'uint', '2600');
+    //   });
+    //   it('Should update Referee fee percent', async function() {
+    //     await updateParameter( 'RFREF', acyclicMarkets, 'uint', '1500');
+    //   });
+    //   it('Should update minimum prediction amount', async function() {
+    //     await updateParameter( 'MINP', acyclicMarkets, 'uint', '123');
+    //   });
+    //   it('Should update maximum prediction amount', async function() {
+    //     await updateParameter( 'MAXP', acyclicMarkets, 'uint', '123');
+    //   });
+    //   it('Should update Current price weightage', async function() {
+    //     await updateParameter( 'CPW', acyclicMarkets, 'uint', '23');
+    //   });
+    //   it('Should update Staking factor min stake', async function() {
+    //     await updateParameter( 'SFMS', acyclicMarkets, 'uint', '123');
+    //   });
+    //   it('Should not update if Cummulative fee percent is >= 100', async function() {
+    //     await updateInvalidParameter('CMFP', acyclicMarkets, 'uint', '11000');
+    //   });
+    //   it('Should not update if total fee percents >= 100', async function() {
+    //     await updateInvalidParameter('DAOF', acyclicMarkets, 'uint', '8000');
+    //   });
+    //   it('Should not update if total fee percents >= 100', async function() {
+    //     await updateInvalidParameter('MCF', acyclicMarkets, 'uint', '7000');
+    //   });
+    //   it('Should not update if parameter code is incorrect', async function() {
+    //     await updateInvalidParameter('EPTIM', acyclicMarkets, 'uint', '2');
+    //   });
+    //   it('Should not update if parameter code is incorrect', async function() {
+    //     await updateInvalidParameter('EPTIM', acyclicMarkets, 'uint', '2');
+    //   });
+    //   it('Should not update if Current price weightage > 100', async function() {
+    //     await updateInvalidParameter('CPW', acyclicMarkets, 'uint', '200');
+    //   });
+    // })
+
+    // describe('Update Dispute Resolution Parameters', async function() {
+    //   it('Should update tokenStakeForDispute', async function() {
+    //     await updateParameter( 'TSD', disputeResolution, 'uint', '5300');
+    //   });
+    //   it('Should update rewardForVoting', async function() {
+    //     await updateParameter( 'REWARD', disputeResolution, 'uint', '2500');
+    //   });
+    //   it('Should update drTokenLockPeriod', async function() {
+    //     await updateParameter( 'DRLOCKP', disputeResolution, 'uint', '1000');
+    //   });
+    //   it('Should update voteThresholdMultiplier', async function() {
+    //     await updateParameter( 'THMUL', disputeResolution, 'uint', '2600');
+    //   });
+    //   it('Should update drVotePeriod', async function() {
+    //     await updateParameter( 'VOTETIME', disputeResolution, 'uint', '1500');
+    //   });
+    //   it('Should not update if parameter code is incorrect', async function() {
+    //     await updateInvalidParameter('ASDF', disputeResolution, 'uint', '2');
+    //   });
+    // })
+
+    // describe("MultisigWallet", async function() {
+    //   it('Should not add owner if zero address passed', async function() {
+    //     let data = await encode3("addOwner(address)",ZERO_ADDRESS);
+    //     let transactionCount = await multiSigWallet.getTransactionCount(true, true);
+    //     await multiSigWallet.submitTransaction(multiSigWallet.address, 0, data);
+    //     await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[1]});
+    //     await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[2]});
+    //     let status = await multiSigWallet.transactions(transactionCount);
+    //     assert.equal(status.executed, false);
+    //     assert.equal(await multiSigWallet.isOwner(ZERO_ADDRESS), false);
+    //   });
+    //   it('Should add owner', async function() {
+    //     let data = await encode3("addOwner(address)",accounts[3]);
+    //     await assertRevert(multiSigWallet.addOwner(accounts[3]));
+    //     let transactionCount = await multiSigWallet.getTransactionCount(true, true);
+    //     await multiSigWallet.submitTransaction(multiSigWallet.address, 0, data);
+    //     await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[1]});
+    //     await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[2]});
+    //     let status = await multiSigWallet.transactions(transactionCount);
+    //     assert.equal(status.executed, true);
+    //     assert.equal(await multiSigWallet.isOwner(accounts[3]), true);
+    //   });
+    //   it('Should add owner', async function() {
+    //     let data = await encode3("addOwner(address)",accounts[10]);
+    //     await assertRevert(multiSigWallet.addOwner(accounts[3]));
+    //     let transactionCount = await multiSigWallet.getTransactionCount(true, true);
+    //     await multiSigWallet.submitTransaction(multiSigWallet.address, 0, data);
+    //     await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[1]});
+    //     await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[2]});
+    //     let status = await multiSigWallet.transactions(transactionCount);
+    //     assert.equal(status.executed, true);
+    //     assert.equal(await multiSigWallet.isOwner(accounts[10]), true);
+    //   });
+    //   it('Should not add owner twice', async function() {
+    //     let data = await encode3("addOwner(address)",accounts[3]);
+    //     let transactionCount = await multiSigWallet.getTransactionCount(true, true);
+    //     await multiSigWallet.submitTransaction(multiSigWallet.address, 0, data);
+    //     await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[1]});
+    //     await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[2]});
+    //     let status = await multiSigWallet.transactions(transactionCount);
+    //     assert.equal(status.executed, false);
+    //   });
+    //   it('Cannot replace owner with another existing owner', async function() {
+    //     let data = await encode3("replaceOwner(address,address)",accounts[3], accounts[3]);
+    //     await multiSigWallet.submitTransaction(multiSigWallet.address, 0, data);
+    //     let transactionCount = await multiSigWallet.getTransactionCount(true, true);
+    //     await multiSigWallet.confirmTransaction(transactionCount/1 - 1, {from:accounts[1]});
+    //     await multiSigWallet.confirmTransaction(transactionCount/1 - 1, {from:accounts[2]});
+    //     let status = await multiSigWallet.transactions(transactionCount - 1);
+    //     assert.equal(status.executed, false);
+    //   });
+    //   it('Cannot replace if the provided owner doesnt exist', async function() {
+    //     let data = await encode3("replaceOwner(address,address)",accounts[6], accounts[4]);
+    //     let transactionCount = await multiSigWallet.getTransactionCount(true, true);
+    //     await multiSigWallet.submitTransaction(multiSigWallet.address, 0, data);
+    //     await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[1]});
+    //     await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[2]});
+    //     let status = await multiSigWallet.transactions(transactionCount);
+    //     assert.equal(status.executed, false);
+    //     assert.equal(await multiSigWallet.isOwner(accounts[4]), false);
+    //     assert.equal(await multiSigWallet.isOwner(accounts[6]), false);
+    //   });
+    //   it('Should replace owner', async function() {
+    //     let data = await encode3("replaceOwner(address,address)",accounts[3], accounts[4]);
+    //     let transactionCount = await multiSigWallet.getTransactionCount(true, true);
+    //     await multiSigWallet.submitTransaction(multiSigWallet.address, 0, data);
+    //     await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[1]});
+    //     await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[2]});
+    //     let status = await multiSigWallet.transactions(transactionCount);
+    //     assert.equal(status.executed, true);
+    //     assert.equal(await multiSigWallet.isOwner(accounts[4]), true);
+    //   });
+    //   it('Should be able to change requirement for confirmation', async function() {
+    //     let data = await encode3("changeRequirement(uint256)",4);
+    //     let transactionCount = await multiSigWallet.getTransactionCount(true, true);
+    //     await multiSigWallet.submitTransaction(multiSigWallet.address, 0, data);
+    //     await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[1]});
+    //     await assertRevert(multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[1]}));
+    //     await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[2]});
+    //     await assertRevert(multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[2]}));
+    //     let status = await multiSigWallet.transactions(transactionCount);
+    //     assert.equal(status.executed, true);
+    //     assert.equal(await multiSigWallet.required(), 4);
+    //   });
+    //   it('Should remove owner', async function() {
+    //     let data = await encode3("removeOwner(address)",accounts[2]);
+    //     let transactionCount = await multiSigWallet.getTransactionCount(true, true);
+    //     await multiSigWallet.submitTransaction(multiSigWallet.address, 0, data);
+    //     await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[1]});
+    //     await assertRevert(multiSigWallet.revokeConfirmation(transactionCount/1, {from:accounts[10]}));
+    //     await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[10]});
+    //     await multiSigWallet.revokeConfirmation(transactionCount/1, {from:accounts[10]});
+    //     await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[2]});
+    //     await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[4]});
+    //     await assertRevert(multiSigWallet.revokeConfirmation(transactionCount/1, {from:accounts[4]}));
+    //     let status = await multiSigWallet.transactions(transactionCount);
+    //     assert.equal(status.executed, true);
+    //     assert.equal(await multiSigWallet.isOwner(accounts[2]), false);
+    //   });
+    //   it('Should remove owner', async function() {
+    //     let data = await encode3("removeOwner(address)",accounts[4]);
+    //     let transactionCount = await multiSigWallet.getTransactionCount(true, true);
+    //     await multiSigWallet.submitTransaction(multiSigWallet.address, 0, data);
+    //     await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[1]});
+    //     await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[10]});
+    //     await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[4]});
+    //     await assertRevert(multiSigWallet.revokeConfirmation(transactionCount/1, {from:accounts[4]}));
+    //     let status = await multiSigWallet.transactions(transactionCount);
+    //     assert.equal(status.executed, true);
+    //     assert.equal(await multiSigWallet.isOwner(accounts[4]), false);
+    //   });
+    //   it('Should not execute if tried to remove address which is not owner', async function() {
+    //     assert.equal(await multiSigWallet.isOwner(accounts[3]), false);
+    //     let data = await encode3("removeOwner(address)",accounts[3]);
+    //     let transactionCount = await multiSigWallet.getTransactionCount(true, true);
+    //     await multiSigWallet.submitTransaction(multiSigWallet.address, 0, data);
+    //     await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[1]});
+    //     let transactions = await multiSigWallet.getTransactionIds(0,transactionCount , true, true);
+    //     assert.equal(transactions.length,transactionCount);
+    //     await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[10]});
+    //     let status = await multiSigWallet.transactions(transactionCount);
+    //     assert.equal(status.executed, false);
+    //   });
+    //   it('Should not be able to change requirement if requirement > current owners length', async function() {
+    //     let data = await encode3("changeRequirement(uint256)",10);
+    //     let transactionCount = await multiSigWallet.getTransactionCount(true, true);
+    //     await multiSigWallet.submitTransaction(multiSigWallet.address, 0, data);
+    //     await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[1]});
+    //     await assertRevert(multiSigWallet.confirmTransaction(60, {from:accounts[10]}));
+    //     await multiSigWallet.confirmTransaction(transactionCount/1, {from:accounts[10]});
+    //     let status = await multiSigWallet.transactions(transactionCount);
+    //     assert.equal(status.executed, false);
+    //     assert.equal(await multiSigWallet.required(),3);
+    //   });
+    // });
 
     after(async function () {
       await revertSnapshot(snapshotId);
