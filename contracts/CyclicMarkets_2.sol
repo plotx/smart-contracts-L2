@@ -19,9 +19,11 @@ import "./CyclicMarkets.sol";
 
 contract CyclicMarkets_2 is CyclicMarkets {
 
-	uint64 public rewardPoolSharePercForMarketCreator;
+  event MarketCreatorRewardPoolShare(address marketCreator, uint256 marketIndex, uint256 rewardEarned);
 
 	mapping(address=>uint) public rewardPoolShareForMarketCreator;
+
+	uint64 public rewardPoolSharePercForMarketCreator;
 
 
     /**
@@ -105,14 +107,22 @@ contract CyclicMarkets_2 is CyclicMarkets {
     function setRewardPoolShareForCreator(uint _marketId, uint _amount) external onlyAllMarkets {
     	address creator = marketData[_marketId].marketCreator;
 		  rewardPoolShareForMarketCreator[creator] = rewardPoolShareForMarketCreator[creator].add(_amount);
+      emit MarketCreatorRewardPoolShare(creator, _marketId, _amount);
     }
 
-    function claimRewardPoolShare() external {
-    	address _msgSender = _msgSender();
-    	uint _amount = rewardPoolShareForMarketCreator[_msgSender];
-    	require(_amount > 0);
-    	delete rewardPoolShareForMarketCreator[_msgSender];
-    	_transferAsset(plotToken, _msgSender, _amount);
+    /**
+    * @dev function to reward user for initiating market creation calls as per the new incetive calculations
+    */
+    function claimCreationReward() external {
+      address payable _msgSenderAddress = _msgSender();
+      uint256 rewardEarned = marketCreationReward[_msgSenderAddress];
+      delete marketCreationReward[_msgSenderAddress];
+      uint poolShareEarned = rewardPoolShareForMarketCreator[_msgSenderAddress];
+    	delete rewardPoolShareForMarketCreator[_msgSenderAddress];
+      rewardEarned = rewardEarned.add(poolShareEarned);
+      require(rewardEarned > 0, "No pending");
+      _transferAsset(plotToken, _msgSenderAddress, rewardEarned);
+      emit ClaimedMarketCreationReward(_msgSenderAddress, rewardEarned, plotToken);
     }
 
 }

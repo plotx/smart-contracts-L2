@@ -19,6 +19,7 @@ contract ICyclicMarkets {
     function getInitialLiquidity(uint _marketType) external view returns(uint);
     function getPendingMarketCreationRewards(address _user) external view returns(uint256 tokenIncentive);
     mapping(uint256 => mapping(uint256 => MarketCreationData)) public marketCreationData;
+	mapping(address=>uint) public rewardPoolShareForMarketCreator;
 }
 
 contract IMaster {
@@ -165,6 +166,8 @@ contract PooledMarketCreation is
     */ 
     function claimCreationAndParticipationReward(uint _maxRecords) public {
         uint marketcCreationReward = cyclicMarkets.getPendingMarketCreationRewards(address(this));
+        uint rewardPoolShareEarned = cyclicMarkets.rewardPoolShareForMarketCreator(address(this));
+        marketcCreationReward = marketcCreationReward.add(rewardPoolShareEarned);
         if(marketcCreationReward>0){
             cyclicMarkets.claimCreationReward();
         }

@@ -92,4 +92,30 @@ contract AllPlotMarkets_3 is AllPlotMarkets_2 {
       emit MarketSettled(_marketId);
     }
 
+    /**
+    * @dev Withdraw provided amount of deposited and available prediction token
+    * @param _token Amount of prediction token to withdraw
+    * @param _maxRecords Maximum number of records to check
+    */
+    function withdraw(uint _token, uint _maxRecords) public {
+      address payable _msgSenderAddress = _msgSender();
+      // (uint _tokenLeft, uint _tokenReward) = getUserUnusedBalance(_msgSenderAddress);
+      // _tokenLeft = _tokenLeft.add(_tokenReward);
+      _withdraw(_token, _maxRecords, 0, _msgSenderAddress);
+    }
+
+    /**
+    * @dev Internal function to withdraw deposited and available assets
+    * @param _token Amount of prediction token to withdraw
+    * @param _maxRecords Maximum number of records to check
+    * @param _tokenLeft Amount of prediction token left unused for user
+    */
+    function _withdraw(uint _token, uint _maxRecords, uint _tokenLeft, address _msgSenderAddress) internal {
+      _withdrawReward(_maxRecords, _msgSenderAddress);
+      userData[_msgSenderAddress].unusedBalance = userData[_msgSenderAddress].unusedBalance.sub(_token);
+      require(_token > 0);
+      _transferAsset(predictionToken, _msgSenderAddress, _token);
+      emit Withdrawn(_msgSenderAddress, _token, now);
+    }
+
 }
