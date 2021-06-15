@@ -6,6 +6,8 @@ const PlotusToken = artifacts.require("MockPLOT");
 const AllMarkets = artifacts.require("MockAllMarkets");
 const CyclicMarkets = artifacts.require("MockCyclicMarkets");
 const PooledMarketCreation = artifacts.require("PooledMarketCreation");
+const AllMarkets_V3 = artifacts.require("AllPlotMarkets_3");
+const CyclicMarkets_V2 = artifacts.require("MockCyclicMarkets_2");
 const EthChainlinkOracle = artifacts.require('MockChainLinkAggregator');
 const BigNumber = require("bignumber.js");
 const { increaseTimeTo } = require("./utils/increaseTime.js");
@@ -56,6 +58,15 @@ contract("Pooled Market Creation", async function(users) {
 			PMC = await PooledMarketCreation.new();
 			await masterInstance.addNewContract(toHex("PC"), PMC.address);
 			PMC = await PooledMarketCreation.at(await masterInstance.getLatestAddress(web3.utils.toHex("PC")));
+
+			let allMarketsV3Impl = await AllMarkets_V3.new();
+            let cyclicMarketsV2Impl = await CyclicMarkets_V2.new();
+			await masterInstance.upgradeMultipleImplementations([toHex("AM"), toHex("CM")], [allMarketsV3Impl.address, cyclicMarketsV2Impl.address]);
+			allMarkets = await AllMarkets_V3.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
+			cyclicMarkets = await CyclicMarkets_V2.at(await masterInstance.getLatestAddress(web3.utils.toHex("CM")));
+
+			await cyclicMarkets.updateUintParameters(toHex("RPS"),5);
+
 			await cyclicMarkets.whitelistMarketCreator(PMC.address);
 			await increaseTime(5 * 3600);
             await plotusToken.transfer(users[1],toWei(600));
@@ -212,6 +223,7 @@ contract("Pooled Market Creation", async function(users) {
 			await cyclicMarkets.settleMarket(7,1);
 
 			await increaseTime(60*61);
+			await allMarkets.emitMarketSettledEvent(7);
 			await PMC.claimCreationAndParticipationReward(10);
 			let poolPlotBalAfter = await plotusToken.balanceOf(PMC.address);
 			let lpTotalSupply = await PMC.totalSupply();
@@ -351,6 +363,7 @@ contract("Pooled Market Creation", async function(users) {
 			await PMC.createMarket(0,0,3);
 			await cyclicMarkets.settleMarket(8,3);
 			await increaseTime(1*60*61);
+			await allMarkets.emitMarketSettledEvent(8);
 			await PMC.claimCreationAndParticipationReward(10);
 			let poolPlotBalAfter = await plotusToken.balanceOf(PMC.address);
 			let lpTotalSupply = await PMC.totalSupply();
