@@ -12,15 +12,14 @@
 
 pragma solidity 0.5.7;
 
-import "./interfaces/IbPLOTToken.sol";
+import "./interfaces/IToken.sol";
 
 
-contract bPLOTMigration {
+contract PLOTMigration {
     
-    address public bPLOTToken; //0x7a86d5eB74C84C3C094404D20c1c0A68dE84b9Fb;
-    address public authController; //0x6f9f333de6eCFa67365916cF95873a4DC480217a;
-    address public migrationController; //0x3A6D2faBDf51Af157F3fC79bb50346a615c08BF6;
-    
+    address public PLOTToken; 
+    address public authController;
+    address public migrationController; 
     /**
      * @dev Checks if msg.sender is authController.
      */
@@ -39,8 +38,8 @@ contract bPLOTMigration {
     event MigrationAuthorised(bytes hash);
     event MigrationCompleted(bytes hash);
 
-    constructor(address _bPLOTToken, address _authController, address _migrationController) public {
-        bPLOTToken = _bPLOTToken;
+    constructor(address _PLOTToken, address _authController, address _migrationController) public {
+        PLOTToken = _PLOTToken;
         authController = _authController;
         migrationController = _migrationController;
     }
@@ -84,19 +83,13 @@ contract bPLOTMigration {
         require(msg.sender == migrationController, "sender is not migration controller");
         require(migrationStatus[ migrationHash(_hash, _to, _from, _timestamp,_amount)].initiated == true, "Migration not initiated");
         require(migrationStatus[ migrationHash(_hash, _to, _from, _timestamp,_amount)].completed == false, "Migration already completed");
-
-        IbPLOTToken(bPLOTToken).transfer( _to, _amount);
+        require(IToken(PLOTToken).transfer( _to, _amount));
+        
         migrationStatus[ migrationHash(_hash, _to, _from, _timestamp,_amount)].completed = true;
         emit MigrationCompleted(_hash);
 
         return true;
     }
-    
-    /**
-     * @dev Renounce contract from bPLOT Minter Role
-     */
-    function renounceMinterRole() public onlyAuthorized {
-        IbPLOTToken(bPLOTToken).renounceMinter();
-    }
+   
     
 }
