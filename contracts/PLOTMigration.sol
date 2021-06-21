@@ -35,8 +35,8 @@ contract PLOTMigration {
         bool completed;
     }
 
-    event MigrationAuthorised(bytes hash);
-    event MigrationCompleted(bytes hash);
+    event MigrationAuthorised(bytes hash, address indexed to, address indexed from, uint256 value);
+    event MigrationCompleted(bytes hash, address indexed to, address indexed from, uint256 value);
 
     constructor(address _PLOTToken, address _authController, address _migrationController) public {
         PLOTToken = _PLOTToken;
@@ -64,7 +64,7 @@ contract PLOTMigration {
         require(migrationStatus[ migrationHash(_hash, _to, _from, _timestamp,_amount)].initiated == false, "Migration already initiated");
         
         migrationStatus[ migrationHash(_hash, _to, _from, _timestamp,_amount)].initiated = true;
-        emit MigrationAuthorised(_hash);
+        emit MigrationAuthorised(_hash,_to, _from,_amount);
 
         return migrationHash(_hash, _to, _from, _timestamp,_amount);        
     }    
@@ -86,7 +86,7 @@ contract PLOTMigration {
         require(IToken(PLOTToken).transfer( _to, _amount));
         
         migrationStatus[ migrationHash(_hash, _to, _from, _timestamp,_amount)].completed = true;
-        emit MigrationCompleted(_hash);
+        emit MigrationCompleted(_hash,_to, _from,_amount);
 
         return true;
     }
