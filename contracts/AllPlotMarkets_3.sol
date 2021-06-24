@@ -104,18 +104,35 @@ contract AllPlotMarkets_3 is AllPlotMarkets_2 {
       _withdraw(_token, _maxRecords, 0, _msgSenderAddress);
     }
 
-    /**
-    * @dev Internal function to withdraw deposited and available assets
-    * @param _token Amount of prediction token to withdraw
-    * @param _maxRecords Maximum number of records to check
-    * @param _tokenLeft Amount of prediction token left unused for user
-    */
-    function _withdraw(uint _token, uint _maxRecords, uint _tokenLeft, address _msgSenderAddress) internal {
-      _withdrawReward(_maxRecords, _msgSenderAddress);
-      userData[_msgSenderAddress].unusedBalance = userData[_msgSenderAddress].unusedBalance.sub(_token);
-      require(_token > 0);
-      _transferAsset(predictionToken, _msgSenderAddress, _token);
-      emit Withdrawn(_msgSenderAddress, _token, now);
+    function _withdrawReward(uint256 maxRecords, address _msgSenderAddress) internal {
+      uint256 i;
+      UserData storage _userData = userData[_msgSenderAddress];
+      uint len = _userData.marketsParticipated.length;
+      uint count;
+      uint tokenReward =0;
+      require(!marketCreationPaused);
+      uint tempArrayCount = _userData.marketsParticipated[len -1] - _userData.marketsParticipated[_userData.lastClaimedIndex];
+      uint tempArrayLength = len < tempArrayCount? len: tempArrayCount;
+      tempArrayCount = 0;
+      uint[] memory unsettledMarkets =  new uint[](tempArrayLength);
+      for(i = _userData.lastClaimedIndex; i < len && count < maxRecords; i++) {
+        (uint claimed, uint tempTokenReward) = claimReturn(_msgSenderAddress, _userData.marketsParticipated[i]);
+        if(claimed > 0) {
+          tokenReward = tokenReward.add(tempTokenReward);
+          count++;
+        } else {
+          if(_userData.marketsParticipated[i] > 0) {
+            unsettledMarkets[tempArrayCount] = _userData.marketsParticipated[i];
+            tempArrayCount++;
+          }
+        }
+      }
+      delete _userData.marketsParticipated;
+      delete _userData.lastClaimedIndex;
+      _userData.marketsParticipated = unsettledMarkets;
+      _userData.marketsParticipated.length = tempArrayCount;
+      emit ReturnClaimed(_msgSenderAddress, tokenReward);
+      _userData.unusedBalance = _userData.unusedBalance.add(tokenReward.mul(10**predictionDecimalMultiplier));
     }
 
 }
