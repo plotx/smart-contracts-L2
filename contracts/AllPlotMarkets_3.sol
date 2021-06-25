@@ -19,7 +19,7 @@ import "./AllPlotMarkets_2.sol";
 
 contract AllPlotMarkets_3 is AllPlotMarkets_2 {
 
-    mapping(uint => uint) creatorRewardFromRewadPool;
+    mapping(uint => uint) internal creatorRewardFromRewardPool;
 
     function claimReturn(address _user, uint _marketId) internal view returns(uint256, uint256) {
 
@@ -70,7 +70,7 @@ contract AllPlotMarkets_3 is AllPlotMarkets_2 {
       if(RPS>0)
       {
         rewardForCreator = uint64(RPS).mul(totalReward).div(100);
-        creatorRewardFromRewadPool[_marketId] = rewardForCreator;
+        creatorRewardFromRewardPool[_marketId] = rewardForCreator;
       }
       _marketDataExtended.rewardToDistribute = totalReward.sub(rewardForCreator);
       emit MarketResult(_marketId, _marketDataExtended.rewardToDistribute, _winningOption, _value);
@@ -80,10 +80,10 @@ contract AllPlotMarkets_3 is AllPlotMarkets_2 {
       require(marketStatus(_marketId) == PredictionStatus.Settled);
       require(!marketSettleEventEmitted[_marketId]);
       marketSettleEventEmitted[_marketId] = true;
-      uint creatorReward = creatorRewardFromRewadPool[_marketId].mul(10**predictionDecimalMultiplier);
+      uint creatorReward = creatorRewardFromRewardPool[_marketId].mul(10**predictionDecimalMultiplier);
       if(creatorReward>0)
       {
-        delete creatorRewardFromRewadPool[_marketId];
+        delete creatorRewardFromRewardPool[_marketId];
         MarketDataExtended storage _marketDataExtended = marketDataExtended[_marketId];
         _transferAsset(plotToken,_marketDataExtended.marketCreatorContract,creatorReward);
         IMarket(_marketDataExtended.marketCreatorContract).setRewardPoolShareForCreator(_marketId, creatorReward);
@@ -123,7 +123,6 @@ contract AllPlotMarkets_3 is AllPlotMarkets_2 {
       UserData storage _userData = userData[_msgSenderAddress];
       uint[] memory _marketsParticipated = _userData.marketsParticipated;
       uint len = _marketsParticipated.length;
-      uint count;
       uint tokenReward =0;
       uint lastClaimedIndex = _userData.lastClaimedIndex;
       require(!marketCreationPaused);
@@ -138,11 +137,10 @@ contract AllPlotMarkets_3 is AllPlotMarkets_2 {
       uint[] memory unsettledMarkets =  new uint[](tempArrayCount);
       //tempArrayCount will now act as a counter for temporary array i.e: unsettledMarkets;
       tempArrayCount = 0;
-      for(i = lastClaimedIndex; i < len && count < maxRecords; i++) {
+      for(i = lastClaimedIndex; i < len; i++) {
         (uint claimed, uint tempTokenReward) = claimReturn(_msgSenderAddress, _marketsParticipated[i]);
         if(claimed > 0) {
           tokenReward = tokenReward.add(tempTokenReward);
-          count++;
         } else {
           if(_marketsParticipated[i] > 0) {
             unsettledMarkets[tempArrayCount] = _marketsParticipated[i];
