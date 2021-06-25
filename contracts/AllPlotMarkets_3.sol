@@ -107,22 +107,31 @@ contract AllPlotMarkets_3 is AllPlotMarkets_2 {
     function _withdrawReward(uint256 maxRecords, address _msgSenderAddress) internal {
       uint256 i;
       UserData storage _userData = userData[_msgSenderAddress];
-      uint len = _userData.marketsParticipated.length;
+      uint[] memory _marketsParticipated = _userData.marketsParticipated;
+      uint len = _marketsParticipated.length;
       uint count;
       uint tokenReward =0;
+      uint lastClaimedIndex = _userData.lastClaimedIndex;
       require(!marketCreationPaused);
-      uint tempArrayCount = _userData.marketsParticipated[len -1] - _userData.marketsParticipated[_userData.lastClaimedIndex];
-      uint tempArrayLength = len < tempArrayCount? len: tempArrayCount;
+
+      uint tempArrayCount;
+      if(lastClaimedIndex == 0) {
+        tempArrayCount = len;
+      } else {
+        tempArrayCount = _marketsParticipated[len -1] - _marketsParticipated[lastClaimedIndex];
+      }
+      // uint tempArrayLength = len < tempArrayCount? len: tempArrayCount;
+      uint[] memory unsettledMarkets =  new uint[](tempArrayCount);
+      //tempArrayCount will now act as a counter for temporary array i.e: unsettledMarkets;
       tempArrayCount = 0;
-      uint[] memory unsettledMarkets =  new uint[](tempArrayLength);
-      for(i = _userData.lastClaimedIndex; i < len && count < maxRecords; i++) {
-        (uint claimed, uint tempTokenReward) = claimReturn(_msgSenderAddress, _userData.marketsParticipated[i]);
+      for(i = lastClaimedIndex; i < len && count < maxRecords; i++) {
+        (uint claimed, uint tempTokenReward) = claimReturn(_msgSenderAddress, _marketsParticipated[i]);
         if(claimed > 0) {
           tokenReward = tokenReward.add(tempTokenReward);
           count++;
         } else {
-          if(_userData.marketsParticipated[i] > 0) {
-            unsettledMarkets[tempArrayCount] = _userData.marketsParticipated[i];
+          if(_marketsParticipated[i] > 0) {
+            unsettledMarkets[tempArrayCount] = _marketsParticipated[i];
             tempArrayCount++;
           }
         }
@@ -130,7 +139,9 @@ contract AllPlotMarkets_3 is AllPlotMarkets_2 {
       delete _userData.marketsParticipated;
       delete _userData.lastClaimedIndex;
       _userData.marketsParticipated = unsettledMarkets;
-      _userData.marketsParticipated.length = tempArrayCount;
+      if(unsettledMarkets.length != tempArrayCount) {
+        _userData.marketsParticipated.length = tempArrayCount;
+      }
       emit ReturnClaimed(_msgSenderAddress, tokenReward);
       _userData.unusedBalance = _userData.unusedBalance.add(tokenReward.mul(10**predictionDecimalMultiplier));
     }
