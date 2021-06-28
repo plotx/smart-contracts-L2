@@ -961,3 +961,112 @@ contract("Market", async function(users) {
 
 	});
 })
+
+contract("Markets", async function(users) {
+    var mapMarketPair = {};
+    var marketCount;
+    before(async function() {
+        masterInstance = await OwnedUpgradeabilityProxy.deployed();
+        masterInstance = await Master.at(masterInstance.address);
+        plotusToken = await PlotusToken.deployed();
+        timeNow = await latestTime();
+
+        allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
+        cyclicMarkets = await CyclicMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("CM")));
+        referral = await Referral.deployed();
+        disputeResolution = await DisputeResolution.at(await masterInstance.getLatestAddress(web3.utils.toHex("DR")));
+        await increaseTime(5 * 3600);
+        await plotusToken.transfer(users[12],toWei(1000000));
+        await plotusToken.transfer(users[11],toWei(100000));
+
+        let nullAddress = await masterInstance.getLatestAddress("0x00");
+        
+        await plotusToken.transfer(users[11],toWei(20000000));
+        await plotusToken.approve(allMarkets.address,toWei(20000000),{from:users[11]});
+        await cyclicMarkets.setNextOptionPrice(18);
+        await cyclicMarkets.claimRelayerRewards();
+        await cyclicMarkets.whitelistMarketCreator(users[11]);
+        marketCount = (await allMarkets.getTotalMarketsLength())/1;
+        await increaseTime(2*604810);
+        await cyclicMarkets.settleMarket(1,0);
+        await cyclicMarkets.settleMarket(2,0);
+        await cyclicMarkets.settleMarket(3,0);
+        await cyclicMarkets.settleMarket(4,0);
+        await cyclicMarkets.settleMarket(5,0);
+        await cyclicMarkets.settleMarket(6,0);
+        await increaseTime(86400);
+        await allMarkets.emitMarketSettledEvent(1); 
+        await allMarkets.emitMarketSettledEvent(2);
+        await allMarkets.emitMarketSettledEvent(3);
+        await allMarkets.emitMarketSettledEvent(4);
+        await allMarkets.emitMarketSettledEvent(5);
+        await allMarkets.emitMarketSettledEvent(6);
+        await cyclicMarkets.updateMarketType(0, 100, 1, 40*60 , (100 * 10**8))
+        await cyclicMarkets.updateMarketType(1, 200, 1, 4*60*60 , (100 * 10**8))
+        await cyclicMarkets.updateMarketType(2, 500, 1, 28*60*60 , (100 * 10**8))
+    });
+
+    async function createMarket(contractInstance, marketCurrency, marketType, roundId) {
+        if(!mapMarketPair[`${marketCurrency}${marketType}`]) {
+            mapMarketPair[`${marketCurrency}${marketType}`] = [];    
+        }
+        mapMarketPair[`${marketCurrency}${marketType}`].push(marketCount);
+        let tx = await contractInstance.createMarket(marketCurrency, marketType, roundId,{from:users[11]});
+        // console.log(`Gas consumed for market-${marketCount}: ${tx.receipt.gasUsed};`)
+        marketCount++;
+        if(mapMarketPair[`${marketCurrency}${marketType}`].length >2) {
+            let _marketToSettle = mapMarketPair[`${marketCurrency}${marketType}`][mapMarketPair[`${marketCurrency}${marketType}`].length-3];
+            try {
+                await increaseTime(10)
+                await allMarkets.emitMarketSettledEvent(_marketToSettle);
+                // await cyclicMarkets.settleMarket(_marketToSettle, 0);
+            } catch (error) {
+                console.log(`Errorer for Market-${marketCurrency}: ${marketType}> ${_marketToSettle}`)
+
+            }
+        }
+    }
+
+    it("Create markets for 2 weeks, upgrade contract after a week and should work properly", async () => {
+        let z = 7;
+        let allMarketsV3Impl = await AllMarkets_V3.new();
+        // await masterInstance.upgradeMultipleImplementations([toHex("AM")], [allMarketsV3Impl.address]);
+        // allMarkets = await AllMarkets_V3.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
+        for(let i = 0;i<2; i++) {
+            if(i == 1) {
+                await masterInstance.upgradeMultipleImplementations([toHex("AM")], [allMarketsV3Impl.address]);
+                allMarkets = await AllMarkets_V3.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
+                console.log(`Contract upgraded`);
+            }
+            await createMarket(cyclicMarkets, 0, 2, 0);
+            await createMarket(cyclicMarkets, 1, 2, 0);
+            for(j = 0;j<7;j++) {
+                await createMarket(cyclicMarkets, 0, 1, 0);
+                await createMarket(cyclicMarkets, 1, 1, 0);
+                for(k = 0;k<24;k++) {
+                    await createMarket(cyclicMarkets, 0, 0, 0);
+                    await createMarket(cyclicMarkets, 1, 0, 0);
+                    await increaseTime(4*60*60 + 1);
+                }
+            }
+        }
+        
+        await increaseTime(2*604800);
+        let plotBalance = await allMarkets.getUserUnusedBalance(users[0]);
+        // console.log(plotBalance[0]/1e18, plotBalance[1]/1e18);
+        
+        // let allMarketsBalBefore = await plotusToken.balanceOf(allMarkets.address);
+        // console.log(`All Markets Before Withdraw${allMarketsBalBefore/1e18}`);
+
+        // let plotBalBefore = await plotusToken.balanceOf(users[11]);
+        // console.log(plotBalBefore/1e18);
+        let tx;
+        try {
+            tx = await allMarkets.withdraw(plotBalance[0].iadd(plotBalance[1]), 1000)
+            // console.log(`Gas Used : ${tx.receipt.gasUsed}`);
+            
+        } catch (error) {
+            console.log(`Withdraw Errored, ${error}`);
+        }
+    }).timeout(30000000);
+});
