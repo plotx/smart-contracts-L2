@@ -1027,12 +1027,12 @@ contract("Markets", async function(users) {
         }
     }
 
-    it("Create markets for 2 weeks, upgrade contract after a week and should work properly", async () => {
+    it("Create markets for 3 weeks, upgrade contract after a week and should work properly", async () => {
         let z = 7;
         let allMarketsV3Impl = await AllMarkets_V3.new();
         // await masterInstance.upgradeMultipleImplementations([toHex("AM")], [allMarketsV3Impl.address]);
         // allMarkets = await AllMarkets_V3.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
-        for(let i = 0;i<2; i++) {
+        for(let i = 0;i<3; i++) {
             if(i == 1) {
                 await masterInstance.upgradeMultipleImplementations([toHex("AM")], [allMarketsV3Impl.address]);
                 allMarkets = await AllMarkets_V3.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
@@ -1041,9 +1041,10 @@ contract("Markets", async function(users) {
             await createMarket(cyclicMarkets, 0, 2, 0);
             await createMarket(cyclicMarkets, 1, 2, 0);
             for(j = 0;j<7;j++) {
+				console.log(`Week: ${i},Day: ${j}`)
                 await createMarket(cyclicMarkets, 0, 1, 0);
                 await createMarket(cyclicMarkets, 1, 1, 0);
-                for(k = 0;k<24;k++) {
+                for(k = 0;k<6;k++) {
                     await createMarket(cyclicMarkets, 0, 0, 0);
                     await createMarket(cyclicMarkets, 1, 0, 0);
                     await increaseTime(4*60*60 + 1);
