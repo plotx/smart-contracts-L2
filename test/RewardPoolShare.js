@@ -1027,13 +1027,13 @@ contract("Markets", async function(users) {
         }
     }
 
-    it("Create markets for 3 weeks, upgrade contract after a week and should work properly", async () => {
+    it("Create markets for 3 weeks, upgrade contract after two weeks and should work properly", async () => {
         let z = 7;
         let allMarketsV3Impl = await AllMarkets_V3.new();
         // await masterInstance.upgradeMultipleImplementations([toHex("AM")], [allMarketsV3Impl.address]);
         // allMarkets = await AllMarkets_V3.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
         for(let i = 0;i<3; i++) {
-            if(i == 1) {
+            if(i == 2) {
                 await masterInstance.upgradeMultipleImplementations([toHex("AM")], [allMarketsV3Impl.address]);
                 allMarkets = await AllMarkets_V3.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
                 console.log(`Contract upgraded`);
