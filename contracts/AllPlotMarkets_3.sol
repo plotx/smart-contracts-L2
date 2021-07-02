@@ -21,6 +21,12 @@ contract AllPlotMarkets_3 is AllPlotMarkets_2 {
 
     mapping(uint => uint) internal creatorRewardFromRewardPool;
 
+    function _placePrediction(uint _marketId, address _msgSenderAddress, address _asset, uint64 _predictionStake, uint256 _prediction) internal {
+      _withdrawReward(defaultMaxRecords, _msgSenderAddress);
+      super._placePrediction(_marketId, _msgSenderAddress, _asset, _predictionStake, _prediction);
+    }
+
+
     function claimReturn(address _user, uint _marketId) internal view returns(uint256, uint256) {
 
       if(!marketSettleEventEmitted[_marketId]) {
