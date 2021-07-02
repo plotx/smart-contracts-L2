@@ -21,12 +21,26 @@ contract AllPlotMarkets_3 is AllPlotMarkets_2 {
 
     mapping(uint => uint) internal creatorRewardFromRewardPool;
 
+    /**
+    * @dev Place prediction on the available options of the market.
+    * @param _marketId Index of the market
+    * @param _asset The asset used by user during prediction whether it is prediction token address or in Bonus token.
+    * @param _predictionStake The amount staked by user at the time of prediction.
+    * @param _prediction The option on which user placed prediction.
+    * _predictionStake should be passed with 8 decimals, reduced it to 8 decimals to reduce the storage space of prediction data
+    */
     function _placePrediction(uint _marketId, address _msgSenderAddress, address _asset, uint64 _predictionStake, uint256 _prediction) internal {
       _withdrawReward(defaultMaxRecords, _msgSenderAddress);
       super._placePrediction(_marketId, _msgSenderAddress, _asset, _predictionStake, _prediction);
     }
 
 
+    /**
+    * @dev Claim the return amount of the specified address.
+    * @param _user User address
+    * @param _marketId Index of market
+    * @return Flag, if 0:cannot claim, 2: Claimed; Return in prediction token
+    */
     function claimReturn(address _user, uint _marketId) internal view returns(uint256, uint256) {
 
       if(!marketSettleEventEmitted[_marketId]) {
@@ -35,6 +49,14 @@ contract AllPlotMarkets_3 is AllPlotMarkets_2 {
       return (2, getReturn(_user, _marketId));
     }
 
+    /** 
+    * @dev Gets the return amount of the specified address.
+    * @param _user The address to specify the return of
+    * @param _marketId Index of market
+    * @return returnAmount uint[] memory representing the return amount.
+    * @return incentive uint[] memory representing the amount incentive.
+    * @return _incentiveTokens address[] memory representing the incentive tokens.
+    */
     function getReturn(address _user, uint _marketId) public view returns (uint returnAmount){
       if(!marketSettleEventEmitted[_marketId] || getTotalPredictionPoints(_marketId) == 0) {
        return (returnAmount);
@@ -49,6 +71,11 @@ contract AllPlotMarkets_3 is AllPlotMarkets_2 {
       return returnAmount;
     }
 
+    /**
+    * @dev Calculate the result of market.
+    * @param _value The current price of market currency.
+    * @param _marketId Index of market
+    */
     function _postResult(uint256 _value, uint256 _marketId) internal {
       require(now >= marketSettleTime(_marketId));
       require(_value > 0);
@@ -82,6 +109,10 @@ contract AllPlotMarkets_3 is AllPlotMarkets_2 {
       emit MarketResult(_marketId, _marketDataExtended.rewardToDistribute, _winningOption, _value);
     }
 
+    /**
+    * @dev Emit MarketSettled event of given market and transfer if any reward pool share exists
+    * @param _marketId Index of market
+    */
     function emitMarketSettledEvent(uint256 _marketId) external {
       require(marketStatus(_marketId) == PredictionStatus.Settled);
       require(!marketSettleEventEmitted[_marketId]);
@@ -124,6 +155,10 @@ contract AllPlotMarkets_3 is AllPlotMarkets_2 {
       emit Withdrawn(_msgSenderAddress, _token, now);
     }
 
+    /**
+    * @dev Claim the pending return of the market.
+    * @param maxRecords Maximum number of records to claim reward for
+    */
     function _withdrawReward(uint256 maxRecords, address _msgSenderAddress) internal {
       uint256 i;
       UserData storage _userData = userData[_msgSenderAddress];
