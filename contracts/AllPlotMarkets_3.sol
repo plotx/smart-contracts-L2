@@ -20,6 +20,7 @@ import "./AllPlotMarkets_2.sol";
 contract AllPlotMarkets_3 is AllPlotMarkets_2 {
 
     mapping(uint => uint) internal creatorRewardFromRewardPool;
+    uint internal constant maxPendingClaims = 100;
 
     /**
     * @dev Place prediction on the available options of the market.
@@ -30,7 +31,9 @@ contract AllPlotMarkets_3 is AllPlotMarkets_2 {
     * _predictionStake should be passed with 8 decimals, reduced it to 8 decimals to reduce the storage space of prediction data
     */
     function _placePrediction(uint _marketId, address _msgSenderAddress, address _asset, uint64 _predictionStake, uint256 _prediction) internal {
-      _withdrawReward(defaultMaxRecords, _msgSenderAddress);
+      if(userData[_msgSenderAddress].marketsParticipated.length > maxPendingClaims) {
+        _withdrawReward(defaultMaxRecords, _msgSenderAddress);
+      }
       super._placePrediction(_marketId, _msgSenderAddress, _asset, _predictionStake, _prediction);
     }
 
