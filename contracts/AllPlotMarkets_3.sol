@@ -131,7 +131,7 @@ contract AllPlotMarkets_3 is AllPlotMarkets_2 {
       if(lastClaimedIndex == 0) {
         tempArrayCount = len;
       } else {
-        tempArrayCount = len - lastClaimedIndex;
+        tempArrayCount = len.sub(lastClaimedIndex);
       }
       // uint tempArrayLength = len < tempArrayCount? len: tempArrayCount;
       uint[] memory unsettledMarkets =  new uint[](tempArrayCount);
