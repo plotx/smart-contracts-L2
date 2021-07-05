@@ -29,6 +29,11 @@ contract IMaster {
     function getLatestAddress(bytes2 _module) public view returns(address);
 }
 
+contract IWMatic {
+  function deposit() public payable;
+  function withdraw(uint wad) public;
+}
+
 contract AllPlotMultiCurrMarkets is IAuth, NativeMetaTransaction {
     using SafeMath32 for uint32;
     using SafeMath64 for uint64;
@@ -144,6 +149,10 @@ contract AllPlotMultiCurrMarkets is IAuth, NativeMetaTransaction {
       nextCurrencyIndex = 1;
     }
 
+    function () external payable{
+      // may restrict this function to only WMatic contract
+    }
+
     /**
     * @dev Function to initialize the dependancies
     */
@@ -155,11 +164,11 @@ contract AllPlotMultiCurrMarkets is IAuth, NativeMetaTransaction {
 
     function addPredictionCurrency(address _asset, address _feedAdd, bool isNativeCurr) external onlyAuthorized {
       require(currencyIndex[_asset] == 0);
-      require(_asset != address(0)); // may except this condition for native curr as null address
+      require(_asset != address(0)); 
       require(_feedAdd != address(0));
       if(isNativeCurr) {
         require(nativeCurrencyAddress == address(0));
-        nativeCurrencyAddress = _asset;
+        nativeCurrencyAddress = _asset; // should pass address of wrapped native currency(ie., WMatic)
       }
       currencyIndex[_asset] = nextCurrencyIndex;
       predictionCurrencies[nextCurrencyIndex++] = PredictionCurrency(_asset,_feedAdd);
@@ -203,7 +212,6 @@ contract AllPlotMultiCurrMarkets is IAuth, NativeMetaTransaction {
       if(predictionCurrencies[_predictionCurrencyIndex].token != nativeCurrencyAddress) {
         require(msg.value == 0);
       }
-      
       _checkForValidMarketTimes(_marketTimes);
       _checkForValidOptionRanges(_optionRanges);
       _marketIndex = uint64(marketBasicData.length);
@@ -265,14 +273,20 @@ contract AllPlotMultiCurrMarkets is IAuth, NativeMetaTransaction {
     * @param _recipient The address to transfer the asset of
     * @param _amount The amount which is transfer.
     */
-    function _transferAsset(address _asset, address _recipient, uint256 _amount) internal {
+    function _transferAsset(address _asset, address _recipient, uint256 _amount, bool _bit) internal {
       if(_amount > 0) { 
         if(_asset == nativeCurrencyAddress)
         {
-          address payable _recipientAdd = address(uint160(_recipient));
-          _recipientAdd.transfer(_amount);
-          return;
+          if(_bit){
+            // If user wants reward in native currency (ie, Matic)
+            IWMatic(_asset).withdraw(_amount);
+            address payable _recipientAdd = address(uint160(_recipient));
+            _recipientAdd.transfer(_amount);
+            return;
+          }
+          
         }
+        // If user wants reward in non native currency (ie, WMatic,Plot,USDC)
         require(IToken(_asset).transfer(_recipient, _amount));
       }
     }
@@ -336,9 +350,14 @@ contract AllPlotMultiCurrMarkets is IAuth, NativeMetaTransaction {
     * @param _amount Amount of prediction token to deposit
     */
     function _deposit(uint _amount, address _msgSenderAddress, address _asset) internal {
-      if(_asset == nativeCurrencyAddress) {
+      if(_asset == nativeCurrencyAddress && msg.value > 0) {
+        // paying with native currency (ie., Matic)
         require(msg.value == _amount);
+        address payable _nativeCurr = address(uint160(_asset));
+        _nativeCurr.transfer(_amount); // fallback function will call deposit()
+        // IWMatic(_asset).deposit.value(_amount)();
       } else {
+        // paying with ERC20 tokens (ie., WMatic, USDC, Plot etc)
         _transferTokenFrom(_asset, _msgSenderAddress, address(this), _amount);
       }
       UserData storage _userData = userData[_msgSenderAddress];
@@ -351,11 +370,11 @@ contract AllPlotMultiCurrMarkets is IAuth, NativeMetaTransaction {
     * @param _token Amount of prediction token to withdraw
     * @param _maxRecords Maximum number of records to check
     */
-    function withdraw(uint _token, uint _maxRecords, address _asset) public {
+    function withdraw(uint _token, uint _maxRecords, address _asset, bool _bit) public {
       address payable _msgSenderAddress = _msgSender();
       (uint _tokenLeft, uint _tokenReward) = getUserUnusedBalance(_msgSenderAddress, _asset);
       _tokenLeft = _tokenLeft.add(_tokenReward);
-      _withdraw(_token, _maxRecords, _tokenLeft, _msgSenderAddress, _asset);
+      _withdraw(_token, _maxRecords, _tokenLeft, _msgSenderAddress, _asset, _bit);
     }
 
     /**
@@ -364,11 +383,11 @@ contract AllPlotMultiCurrMarkets is IAuth, NativeMetaTransaction {
     * @param _maxRecords Maximum number of records to check
     * @param _tokenLeft Amount of prediction token left unused for user
     */
-    function _withdraw(uint _token, uint _maxRecords, uint _tokenLeft, address _msgSenderAddress, address _asset) internal {
+    function _withdraw(uint _token, uint _maxRecords, uint _tokenLeft, address _msgSenderAddress, address _asset, bool _bit) internal {
       _withdrawReward(_maxRecords, _msgSenderAddress);
       userData[_msgSenderAddress].assetwiseUnusedBalance[_asset] = _tokenLeft.sub(_token);
       require(_token > 0);
-      _transferAsset(_asset, _msgSenderAddress, _token);
+      _transferAsset(_asset, _msgSenderAddress, _token, _bit);
       emit Withdrawn(_msgSenderAddress, _asset, _token, now);
     }
 
@@ -489,7 +508,7 @@ contract AllPlotMultiCurrMarkets is IAuth, NativeMetaTransaction {
       }
       (, uint _cummulativeFeePercent)= IALLCurrMarket(marketDataExtended[_marketId].marketCreatorContract).getUintParameters("CMFP");
       _fee = _calculateAmulBdivC(uint64(_cummulativeFeePercent), _amount, 10000);
-      _transferAsset(_asset, marketDataExtended[_marketId].marketCreatorContract, (10**predictionDecimalMultiplier).mul(_fee));
+      _transferAsset(_asset, marketDataExtended[_marketId].marketCreatorContract, (10**predictionDecimalMultiplier).mul(_fee), false); // false because don't need to send Matic to contract.(sending WMatic or any other ERC20)
       IALLCurrMarket(marketDataExtended[_marketId].marketCreatorContract).handleFee(_marketId, _fee, _msgSenderAddress, _relayer, _asset);
       _amountPostFee = _amount.sub(_fee);
     }
@@ -573,7 +592,7 @@ contract AllPlotMultiCurrMarkets is IAuth, NativeMetaTransaction {
     function _pushMarketTotalRewards(uint _marketId, uint32 _winningOption) internal returns(uint[] memory) {
       MarketDataExtended storage _marketDataExtended = marketDataExtended[_marketId];
       uint _nextCurrIndex = nextCurrencyIndex;
-      uint[] memory allCurrTotalRewards= new uint[](_nextCurrIndex.sub(2));
+      uint[] memory allCurrTotalRewards= new uint[](_nextCurrIndex.sub(1));
       for(uint i = 1; i < _nextCurrIndex; i++) {
          address _asset = predictionCurrencies[i].token;
          uint _reward = _calculateRewardTally(_marketId, _winningOption, _asset);
@@ -720,13 +739,14 @@ contract AllPlotMultiCurrMarkets is IAuth, NativeMetaTransaction {
     * @return _incentiveTokens address[] memory representing the incentive tokens.
     */
     function getReturn(address _user, uint _marketId) public view returns (uint[] memory returnAmount){
+      uint _nextCurrIndex = nextCurrencyIndex;
+      returnAmount = new uint[](_nextCurrIndex);
       if(marketStatus(_marketId) != PredictionStatus.Settled || getTotalPredictionPoints(_marketId) == 0) {
        return (returnAmount);
       }
       uint256 _winningOption = marketDataExtended[_marketId].WinningOption;
       UserData storage _userData = userData[_user];
-      uint _nextCurrIndex = nextCurrencyIndex;
-      returnAmount = new uint[](_nextCurrIndex);
+      
       for(uint i=1;i<_nextCurrIndex;i++) {
         address _asset = predictionCurrencies[i].token;
         returnAmount[i.sub(1)] = _userData.userMarketData[_marketId].predictionData[_winningOption].assetwiseAmountStaked[_asset];
@@ -759,15 +779,15 @@ contract AllPlotMultiCurrMarkets is IAuth, NativeMetaTransaction {
       return _a.mul(_b).div(_c);
     }
 //=================need to fix===================//
-    // /**
-    // * @dev Returns total assets staked in market in PLOT value
-    // * @param _marketId Index of market
-    // * @return tokenStaked Total prediction token staked on market value in PLOT
-    // */
-    // function getTotalStakedWorthInPLOT(uint256 _marketId) public view returns(uint256 _tokenStakedWorth) {
-    //   return (marketDataExtended[_marketId].totalStaked).mul(10**predictionDecimalMultiplier);
-    //   // return (marketDataExtended[_marketId].totalStaked).mul(conversionRate[plotToken]).mul(10**predictionDecimalMultiplier);
-    // }
+    /**
+    * @dev Returns total assets staked in market in PLOT value
+    * @param _marketId Index of market
+    * @return tokenStaked Total prediction token staked on market value in PLOT
+    */
+    function getTotalStakedWorthInPLOT(uint256 _marketId) public view returns(uint256 _tokenStakedWorth) {
+      return (marketDataExtended[_marketId].assetwiseTotalStaked[plotToken]).mul(10**predictionDecimalMultiplier);
+      // return (marketDataExtended[_marketId].totalStaked).mul(conversionRate[plotToken]).mul(10**predictionDecimalMultiplier);
+    }
 
     /**
     * @dev Returns total prediction points allocated to users
@@ -849,10 +869,10 @@ contract AllPlotMultiCurrMarkets is IAuth, NativeMetaTransaction {
     // * @return uint[] memory representing the reward to be distributed.
     // * @return uint256 representing the prediction token staked on winning option.
     
-    // function getMarketResults(uint256 _marketId) external view returns(uint256 _winningOption, uint256, uint256, uint256) {
-    //   _winningOption = marketDataExtended[_marketId].WinningOption;
-    //   return (_winningOption, marketOptionsAvailable[_marketId][_winningOption].predictionPoints, marketDataExtended[_marketId].rewardToDistribute, marketOptionsAvailable[_marketId][_winningOption].amountStaked);
-    // }
+    function getMarketResults(uint256 _marketId) external view returns(uint256 _winningOption/*, uint256, uint256, uint256*/) {
+      _winningOption = marketDataExtended[_marketId].WinningOption;
+      return (_winningOption/*, marketOptionsAvailable[_marketId][_winningOption].predictionPoints, marketDataExtended[_marketId].rewardToDistribute, marketOptionsAvailable[_marketId][_winningOption].amountStaked*/);
+    }
 
     /**
     * @dev Internal function set market status
@@ -899,7 +919,7 @@ contract AllPlotMultiCurrMarkets is IAuth, NativeMetaTransaction {
 
     function getEquivalentTokens(uint _amount, uint _currencyIndex) public view returns(uint) {
       // need to handle overflow
-      return  _amount.mul(10**8).div(IOracle(predictionCurrencies[_currencyIndex].token).getLatestPrice());
+      return  _amount.mul(10**8).div(IOracle(predictionCurrencies[_currencyIndex]._priceFeed).getLatestPrice());
 
     }
 

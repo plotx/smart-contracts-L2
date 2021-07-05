@@ -48,6 +48,8 @@ contract IAllCurrencyMarkets {
     function postMarketResult(uint256 _marketId, uint256 _marketSettleValue) external;
 
     function getTotalOptions(uint256 _marketId) external view returns(uint);
+
+    address public nativeCurrencyAddress;
  
     // function getTotalStakedByUser(address _user) external view returns(uint);
 

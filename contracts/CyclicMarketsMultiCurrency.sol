@@ -15,7 +15,12 @@ contract IMaster {
     function getLatestAddress(bytes2 _module) public view returns(address);
 }
 
-contract CyclicMarkets is IAuth, NativeMetaTransaction {
+contract IWMatic {
+  function deposit() public payable;
+  function withdraw(uint wad) public;
+}
+
+contract CyclicMarketsMultiCurr is IAuth, NativeMetaTransaction {
     using SafeMath32 for uint32;
     using SafeMath64 for uint64;
     using SafeMath128 for uint128;
@@ -140,6 +145,10 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       authorizedAddress = _defaultAuthorizedAddress;
       authorized = _authorizedMultiSig;
       _initializeEIP712("MC");
+    }
+
+    function () external payable{
+      // may restrict this function to only WMatic contract
     }
 
     /**
@@ -347,7 +356,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
     * @param _ethFeed Feed Address of initial eth/usd market
     * @param _btcFeed Feed Address of btc/usd market
     */
-    function addInitialMarketTypesAndStart(uint32 _marketStartTime, address _ethFeed, address _btcFeed) external onlyAuthorizedUsers {
+    function addInitialMarketTypesAndStart(uint32 _marketStartTime, address _ethFeed, address _btcFeed, uint _currIndex) external onlyAuthorizedUsers {
       require(_ethFeed != address(0));
       require(_btcFeed != address(0));
       require(marketTypeArray.length == 0);
@@ -374,10 +383,10 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       _addMarketCurrency("ETH/USD", _ethFeed, 8, 1, _marketStartTime);
       _addMarketCurrency("BTC/USD", _btcFeed, 8, 25, _marketStartTime);
 
+
       for(uint32 i = 0;i < marketTypeArray.length; i++) {
-        // need to fix -  fetch plot index dynamically
-          createMarket(0, i, 0, 1);
-          createMarket(1, i, 0, 1);
+          createMarket(0, i, 0, _currIndex);
+          createMarket(1, i, 0, _currIndex);
       }
     }
 
@@ -424,17 +433,19 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       uint64 _marketIndex = allMarkets.getTotalMarketsLength();
       marketPricingData[_marketIndex] = PricingData(stakingFactorMinStake, stakingFactorWeightage, currentPriceWeightage, _marketType.minTimePassed);
       marketData[_marketIndex] = MarketData(_marketTypeIndex, _marketCurrencyIndex, _msgSenderAddress);
-      allMarkets.createMarket(_marketTimes, _optionRanges, _msgSenderAddress, getEquivalentTokens(_marketType.initialLiquidity, _initialLiquidityAssetIndex), _initialLiquidityAssetIndex);
-      
+      uint retAmount =  getEquivalentTokens(_marketType.initialLiquidity, _initialLiquidityAssetIndex);
+      require(retAmount == uint64(retAmount), "Value overflow");
+      allMarkets.createMarket(_marketTimes, _optionRanges, _msgSenderAddress, uint64(retAmount), _initialLiquidityAssetIndex);
       (_marketCreationData.penultimateMarket, _marketCreationData.latestMarket) =
        (_marketCreationData.latestMarket, _marketIndex);
       
       emit MarketParams(_marketIndex, _msgSenderAddress, _marketTypeIndex, _marketCurrency.currencyName, stakingFactorMinStake,stakingFactorWeightage,currentPriceWeightage,_marketType.minTimePassed);
     }
 
-    function getEquivalentTokens(uint _amount, uint _currencyIndex) public view returns(uint64) {
+    function getEquivalentTokens(uint _amount, uint _currencyIndex) public view returns(uint) {
       (,address _feedAdd) = allMarkets.predictionCurrencies(_currencyIndex);
-      return  uint64(_amount.mul(10**8).div(IOracle(_feedAdd).getLatestPrice()));
+      uint retAmount = _amount.mul(10**8).div(IOracle(_feedAdd).getLatestPrice());
+      return  retAmount;
 
     }
 
@@ -518,7 +529,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       uint _nextCurr = allMarkets.nextCurrencyIndex();
       for(uint i=1;i<_nextCurr;i++) {
         (address _asset,) = allMarkets.predictionCurrencies(i);
-        _transferAsset(_asset, masterAddress, (10**predictionDecimalMultiplier).mul(marketFeeParams.daoFee[_marketId][_asset]));
+        _transferAsset(_asset, masterAddress, (10**predictionDecimalMultiplier).mul(marketFeeParams.daoFee[_marketId][_asset]), false);
         delete marketFeeParams.daoFee[_marketId][_asset];
         marketCreationReward[_marketCreator][_asset] = marketCreationReward[_marketCreator][_asset].add((10**predictionDecimalMultiplier).mul(marketFeeParams.marketCreatorFee[_marketId][_asset]));
         delete marketFeeParams.marketCreatorFee[_marketId][_asset];
@@ -541,7 +552,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
       _isEligibleForReferralReward = referral.setReferralRewardData(_msgSenderAddress, _asset, _referrerFee, _refereeFee);
       }
       if(_isEligibleForReferralReward){
-        _transferAsset(_asset, address(referral), (10**predictionDecimalMultiplier).mul(_referrerFee.add(_refereeFee)));
+        _transferAsset(_asset, address(referral), (10**predictionDecimalMultiplier).mul(_referrerFee.add(_refereeFee)), false);
       } else {
         _refereeFee = 0;
         _referrerFee = 0;
@@ -622,7 +633,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
     /**
     * @dev Claim fees earned by the relayer address
     */
-    function claimRelayerRewards() external {
+    function claimRelayerRewards(bool _bit) external {
       //==== handle for all assets === //
       uint _nextCurr = allMarkets.nextCurrencyIndex();
       uint _decimalMultiplier = 10**predictionDecimalMultiplier;
@@ -634,7 +645,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
         delete relayerFeeEarned[_relayer][_asset];
         if(_fee>0){
 
-          _transferAsset(_asset, _relayer, _fee);
+          _transferAsset(_asset, _relayer, _fee, _bit);
         }
       }
       // require(_fee > 0);
@@ -653,7 +664,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
     /**
     * @dev function to reward user for initiating market creation calls as per the new incetive calculations
     */
-    function claimCreationReward() external {
+    function claimCreationReward(bool _bit) external {
       // handle for all assets
       uint _nextCurr = allMarkets.nextCurrencyIndex();
       address payable _msgSenderAddress = _msgSender();
@@ -664,7 +675,7 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
         // require(rewardEarned > 0, "No pending");
         if(rewardEarned>0){
 
-          _transferAsset(_asset, _msgSenderAddress, rewardEarned);
+          _transferAsset(_asset, _msgSenderAddress, rewardEarned, _bit);
           emit ClaimedMarketCreationReward(_msgSenderAddress, rewardEarned, _asset);
         }
       }
@@ -676,8 +687,14 @@ contract CyclicMarkets is IAuth, NativeMetaTransaction {
     * @param _recipient The address to transfer the asset of
     * @param _amount The amount which is transfer.
     */
-    function _transferAsset(address _asset, address _recipient, uint256 _amount) internal {
+    function _transferAsset(address _asset, address _recipient, uint256 _amount, bool _bit) internal {
       if(_amount > 0) { 
+          if(_bit && _asset == allMarkets.nativeCurrencyAddress()) {
+            IWMatic(_asset).withdraw(_amount);
+            address payable _recipientAdd = address(uint160(_recipient));
+            _recipientAdd.transfer(_amount);
+            return;
+          }
           require(IToken(_asset).transfer(_recipient, _amount));
       }
     }
