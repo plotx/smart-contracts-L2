@@ -76,7 +76,7 @@ module.exports = function(deployer, network, accounts){
     var date = Date.now();
     date = Math.round(date/1000);
  
-    await cm.addInitialMarketTypesAndStart(date, ethChainlinkOracle.address, ethChainlinkOracle.address);
+    // await cm.addInitialMarketTypesAndStart(date, ethChainlinkOracle.address, ethChainlinkOracle.address);
     let rf = await deployer.deploy(Referral, master.address);
     let ul = await deployer.deploy(UserLevels, master.address);
     await cm.setReferralContract(rf.address);
