@@ -19,12 +19,48 @@ import "./CyclicMarkets.sol";
 
 contract CyclicMarkets_2 is CyclicMarkets {
 
-  event MarketCreatorRewardPoolShare(address marketCreator, uint256 marketIndex, uint256 rewardEarned);
+    struct EarlyParticipantMultiplier {
+      uint64 cutoffTime;
+      uint64 multiplierPerc;
+    }
 
-	mapping(address=>uint) public rewardPoolShareForMarketCreator;
+    event MarketCreatorRewardPoolShare(address marketCreator, uint256 marketIndex, uint256 rewardEarned);
 
-	uint64 public rewardPoolSharePercForMarketCreator;
+    mapping(address => uint) public rewardPoolShareForMarketCreator;
+    mapping(uint => EarlyParticipantMultiplier) public earlyParticipantMultiplier;
 
+    uint64 public rewardPoolSharePercForMarketCreator;
+
+    /**
+    * @dev Set multiplier% and cutoff time for early participant of given market type 
+    * @param _marketType Index of market type
+    * @param _cutoffTime Time before to provide multiplier
+    * @param _multiplierPercent Multiplier to be given in percent
+    */
+    function setEarlyParticipantMultiplier(uint _marketType, uint64 _cutoffTime, uint64 _multiplierPercent) external onlyAuthorized {
+      earlyParticipantMultiplier[_marketType] = EarlyParticipantMultiplier(_cutoffTime, _multiplierPercent);
+    }
+
+    /**
+    * @dev Internal function to calculate prediction points
+    * @param _marketId Index of the market
+    * @param _prediction Option predicted by the user
+    * @param _user User Address
+    * @param _multiplierApplied Flag defining if user had already availed multiplier
+    * @param _predictionStake Amount staked by the user
+    */
+    function calculatePredictionPoints(uint _marketId, uint256 _prediction, address _user, bool _multiplierApplied, uint _predictionStake) internal view returns(uint64 predictionPoints, bool isMultiplierApplied) {
+      (predictionPoints, isMultiplierApplied) = super.calculatePredictionPoints(_marketId, _prediction, _user, _multiplierApplied, _predictionStake);
+    	uint _marketType = marketData[_marketId].marketTypeIndex;
+      EarlyParticipantMultiplier memory _multiplierData = earlyParticipantMultiplier[_marketType];
+      uint _startTime = calculateStartTimeForMarket(uint32(_marketType), uint32(marketData[_marketId].marketCurrencyIndex));
+      uint _timePassed = uint(now).sub(_startTime);
+      if(_timePassed <= _multiplierData.cutoffTime) {
+        uint64 _muliplier = 100;
+        _muliplier = _muliplier + 10;
+        predictionPoints = (predictionPoints.mul(_muliplier).div(100));
+      }
+    }
 
     /**
     * @dev function to update integer parameters
