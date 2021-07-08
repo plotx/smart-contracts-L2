@@ -57,7 +57,7 @@ contract CyclicMarkets_2 is CyclicMarkets {
       uint _timePassed = uint(now).sub(_startTime);
       if(_timePassed <= _multiplierData.cutoffTime) {
         uint64 _muliplier = 100;
-        _muliplier = _muliplier + 10;
+        _muliplier = _muliplier + _multiplierData.multiplierPerc;
         predictionPoints = (predictionPoints.mul(_muliplier).div(100));
       }
     }
