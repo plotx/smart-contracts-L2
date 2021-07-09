@@ -53,11 +53,11 @@ contract CyclicMarkets_2 is CyclicMarkets {
       (predictionPoints, isMultiplierApplied) = super.calculatePredictionPoints(_marketId, _prediction, _user, _multiplierApplied, _predictionStake);
     	uint _marketType = marketData[_marketId].marketTypeIndex;
       EarlyParticipantMultiplier memory _multiplierData = earlyParticipantMultiplier[_marketType];
-      uint _startTime = calculateStartTimeForMarket(uint32(_marketType), uint32(marketData[_marketId].marketCurrencyIndex));
+      uint _startTime = calculateStartTimeForMarket(uint32(marketData[_marketId].marketCurrencyIndex), uint32(_marketType));
       uint _timePassed = uint(now).sub(_startTime);
       if(_timePassed <= _multiplierData.cutoffTime) {
         uint64 _muliplier = 100;
-        _muliplier = _muliplier + _multiplierData.multiplierPerc;
+        _muliplier = _muliplier.add(_multiplierData.multiplierPerc);
         predictionPoints = (predictionPoints.mul(_muliplier).div(100));
       }
     }
