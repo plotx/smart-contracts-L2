@@ -46,8 +46,8 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
         });
         it("1.0 Upgrade cyclic markets contract", async () => {
             let cyclicMarketsV2Impl = await CyclicMarkets_V2.new();
-			await masterInstance.upgradeMultipleImplementations([toHex("CM")], [cyclicMarketsV2Impl.address]);
-			cyclicMarkets = await CyclicMarkets_V2.at(await masterInstance.getLatestAddress(web3.utils.toHex("CM")));
+            await masterInstance.upgradeMultipleImplementations([toHex("CM")], [cyclicMarketsV2Impl.address]);
+            cyclicMarkets = await CyclicMarkets_V2.at(await masterInstance.getLatestAddress(web3.utils.toHex("CM")));
         })
         it("1.1 Position without multiplier", async () => {
             await plotusToken.transfer(user1, toWei("100"));
@@ -143,9 +143,13 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
             assert.equal(~~(balanceAfter/1e15), balanceBefore/1e15  + creationReward*1e3);
         });
 
-        // it("Activate early participant multiplier for all market types", async () => {
-        //   await cyclicMarkets.setEarlyParticipantMultiplier(0, 10*60, 10);
-        // })
+        it("Cutoff time should be greater than zero", async () => {
+          await assertRevert(cyclicMarkets.setEarlyParticipantMultiplier(0, 0, 10));
+        });
+
+        it("Should not be able to set if invalid market type is passed", async () => {
+          await assertRevert(cyclicMarkets.setEarlyParticipantMultiplier(20, 10*60, 10));
+        })
 
         it("1.2 Positions After activating early participant multiplier", async () => {
             let starttime = await cyclicMarkets.calculateStartTimeForMarket(0,0);
@@ -169,8 +173,8 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
 
             await cyclicMarkets.setNextOptionPrice(18);
             assert.equal((await cyclicMarkets.getOptionPrice(marketId, 2)) / 1, 18);
-            await increaseTime(5*60);
-            //Predict after 5 minutes of starttime and Multiplier is not set
+            await increaseTime(2*60);
+            //Predict after 2 minutes of starttime and Multiplier is not set
             functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", toWei(100), marketId, plotusToken.address, to8Power("100"), 2);
             await signAndExecuteMetaTx(
               privateKeyList[1],
@@ -180,7 +184,7 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
               "AM"
             );
             await cyclicMarkets.setEarlyParticipantMultiplier(0, 10*60, 10);
-            //Predict after 7 minutes of starttime and user should get 1.1X multiplier 
+            //Predict after 4 minutes of starttime and user should get 1.1X multiplier 
             await increaseTime(2*60);
             functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", toWei(400), marketId, plotusToken.address, to8Power("400"), 2);
             await signAndExecuteMetaTx(
@@ -193,7 +197,7 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
 
             await cyclicMarkets.setNextOptionPrice(9);
             assert.equal((await cyclicMarkets.getOptionPrice(marketId, 1)) / 1, 9);
-            //Predict after 9 minutes of starttime and user should get 1.1X multiplier 
+            //Predict after 6 minutes of starttime and user should get 1.1X multiplier 
             await increaseTime(2*60);
             functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", toWei(100), marketId, plotusToken.address, to8Power("100"), 1);
             await signAndExecuteMetaTx(
@@ -204,8 +208,8 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
               "AM"
             );
 
-            //Predict after 20 minutes of starttime and user should now get multiplier 
-            await increaseTime(11*60);
+            //Predict after 20 minutes of starttime and user should not get multiplier 
+            await increaseTime(14*60);
             await cyclicMarkets.setNextOptionPrice(27);
             assert.equal((await cyclicMarkets.getOptionPrice(marketId, 3)) / 1, 27);
             functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", toWei(100), marketId, plotusToken.address, to8Power("100"), 3);
@@ -216,7 +220,7 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
               allMarkets,
               "AM"
             );
-            //Predict after 30 minutes of starttime and user should now get multiplier 
+            //Predict after 30 minutes of starttime and user should not get multiplier 
             await increaseTime(10*60);
             functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", toWei(1000), marketId, plotusToken.address, to8Power("1000"), 3);
             await signAndExecuteMetaTx(
