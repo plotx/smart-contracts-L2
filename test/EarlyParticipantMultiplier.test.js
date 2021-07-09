@@ -143,12 +143,12 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
             assert.equal(~~(balanceAfter/1e15), balanceBefore/1e15  + creationReward*1e3);
         });
 
-        it("Cutoff time should be greater than zero", async () => {
-          await assertRevert(cyclicMarkets.setEarlyParticipantMultiplier(0, 0, 10));
-        });
-
         it("Should not be able to set if invalid market type is passed", async () => {
           await assertRevert(cyclicMarkets.setEarlyParticipantMultiplier(20, 10*60, 10));
+        })
+
+        it("Cutoff time should not be greater than prediction time", async () => {
+          await assertRevert(cyclicMarkets.setEarlyParticipantMultiplier(0, 604800, 10));
         })
 
         it("1.2 Positions After activating early participant multiplier", async () => {
