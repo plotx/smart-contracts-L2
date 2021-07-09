@@ -38,6 +38,7 @@ contract CyclicMarkets_2 is CyclicMarkets {
     * @param _multiplierPercent Multiplier to be given in percent
     */
     function setEarlyParticipantMultiplier(uint _marketType, uint64 _cutoffTime, uint64 _multiplierPercent) external onlyAuthorized {
+      require(_cutoffTime > 0 && _cutoffTime <= marketTypeArray[_marketType].predictionTime);
       earlyParticipantMultiplier[_marketType] = EarlyParticipantMultiplier(_cutoffTime, _multiplierPercent);
     }
 
