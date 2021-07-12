@@ -7,7 +7,10 @@ contract MockPLOT is ERC20 {
         string memory symbol_,
         uint8 decimals_,
         address _operator,
-        address childChainManager) public ERC20(name_,symbol_) {
+        address childChainManager) public {
+        _name = name_;
+        _symbol = symbol_;
+        _setupDecimals(18);
     }
 
     function mint(address user, uint amount) public returns(bool) {
