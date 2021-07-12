@@ -1,6 +1,7 @@
 const Master = artifacts.require('Master');
 const AllMarkets = artifacts.require('MockAllMarkets');
 const CyclicMarkets = artifacts.require('CyclicMarkets');
+const CyclicMarkets_2 = artifacts.require('CyclicMarkets_2');
 const AcyclicMarkets = artifacts.require('AcyclicMarkets');
 const DisputeResolution = artifacts.require('DisputeResolution');
 const PlotusToken = artifacts.require("MockPLOT");
@@ -38,6 +39,7 @@ contract('Configure Global Parameters', accounts => {
       snapshotId = await takeSnapshot();
       ms = await OwnedUpgradeabilityProxy.deployed();
       ms = await Master.at(ms.address);
+
       allMarkets = await AllMarkets.at(await ms.getLatestAddress(toHex('AM')));
       cyclicMarkets = await CyclicMarkets.at(await ms.getLatestAddress(toHex('CM')));
       acyclicMarkets = await AcyclicMarkets.at(await ms.getLatestAddress(toHex('AC')));
@@ -210,6 +212,77 @@ contract('Configure Global Parameters', accounts => {
       });
       it('Should not update if Current price weightage > 100', async function() {
         await updateInvalidParameter('CPW', cyclicMarkets, 'uint', '200');
+      });
+    });
+
+    describe('Update Cyclic Markets Parameters in new contract', async function() {
+      it('Upgrade contract', async function() {
+        let cyclicMarketsV2Impl = await CyclicMarkets_2.new();
+        await ms.upgradeMultipleImplementations([toHex("CM")], [cyclicMarketsV2Impl.address]);
+        cyclicMarkets = await CyclicMarkets_2.at(await ms.getLatestAddress(web3.utils.toHex("CM")));  
+      });
+      it('Should update Cummulative fee percent', async function() {
+        await updateParameter( 'CMFP', cyclicMarkets, 'uint', '5300');
+        let confirmedBy = await multiSigWallet.getConfirmations(0);
+        for(let i = 0; i<3;i++) {
+          assert.equal(confirmedBy[i],accounts[i]);
+        }
+      });
+      it('Should update DAO fee percent', async function() {
+        await updateParameter( 'DAOF', cyclicMarkets, 'uint', '2500');
+        let transactions = await multiSigWallet.getTransactionIds(0,2, true, true);
+        assert.equal(transactions.length,2);
+      });
+      it('Should update Market creator fee percent', async function() {
+        await updateParameter( 'MCF', cyclicMarkets, 'uint', '1000');
+      });
+      it('Should update Referrer fee percent', async function() {
+        await updateParameter( 'RFRRF', cyclicMarkets, 'uint', '2600');
+      });
+      it('Should update Referee fee percent', async function() {
+        await updateParameter( 'RFREF', cyclicMarkets, 'uint', '1500');
+      });
+      it('Should update minimum prediction amount', async function() {
+        await updateParameter( 'MINP', cyclicMarkets, 'uint', '123');
+      });
+      it('Should update maximum prediction amount', async function() {
+        await updateParameter( 'MAXP', cyclicMarkets, 'uint', '123');
+      });
+      it('Should update Current price weightage', async function() {
+        await updateParameter( 'CPW', cyclicMarkets, 'uint', '23');
+      });
+      it('Should update Staking factor min stake', async function() {
+        await updateParameter( 'SFMS', cyclicMarkets, 'uint', '123');
+      });
+      it('Should update reward pool share', async function() {
+        await updateParameter( 'RPS', cyclicMarkets, 'uint', '20');
+      });
+      // it('Should update Multisig address', async function() {
+      //   await updateParameter(26, 2, 'MULSIG', allMarkets, 'address', allMarkets.address, "authorizedMultiSig()", true);
+      // });
+      // it('Should not update Multisig address if invalid code passed', async function() {
+      //   await updateParameter(26, 2, 'BULSIG', allMarkets, 'address', tc.address, "authorizedMultiSig()", false);
+      // });
+      it('Should not update if Cummulative fee percent is >= 100', async function() {
+        await updateInvalidParameter('CMFP', cyclicMarkets, 'uint', '11000');
+      });
+      it('Should not update if total fee percents >= 100', async function() {
+        await updateInvalidParameter('DAOF', cyclicMarkets, 'uint', '8000');
+      });
+      it('Should not update if total fee percents >= 100', async function() {
+        await updateInvalidParameter('MCF', cyclicMarkets, 'uint', '7000');
+      });
+      it('Should not update if parameter code is incorrect', async function() {
+        await updateInvalidParameter('EPTIM', cyclicMarkets, 'uint', '2');
+      });
+      it('Should not update if parameter code is incorrect', async function() {
+        await updateInvalidParameter('EPTIM', cyclicMarkets, 'uint', '2');
+      });
+      it('Should not update if Current price weightage > 100', async function() {
+        await updateInvalidParameter('CPW', cyclicMarkets, 'uint', '200');
+      });
+      it('Should not update if reward pool share > 100', async function() {
+        await updateInvalidParameter('RPS', cyclicMarkets, 'uint', '200');
       });
     });
 
