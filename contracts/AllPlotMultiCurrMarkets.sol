@@ -442,7 +442,7 @@ contract AllPlotMultiCurrMarkets is IAuth, NativeMetaTransaction {
     */
     function depositAndPlacePrediction(uint _tokenDeposit, uint _marketId, address _asset, uint64 _predictionStake, uint256 _prediction) external payable {
       uint _currIndex = currencyIndex[_asset];
-      require(_currIndex > 0 && _currIndex < nextCurrencyIndex); // valid prediction currency
+      require(_currIndex > 0 && _currIndex < nextCurrencyIndex || _asset == address(bPLOTInstance)); // valid prediction currency // need to handle bplot correctly
       address payable _msgSenderAddress = _msgSender();
       // for depositing native currency, user need to call the function. otherwise, it will not enter into deposit function
       if(_tokenDeposit > 0) {
