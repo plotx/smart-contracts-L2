@@ -15,9 +15,9 @@ pragma solidity 0.5.7;
 import "./interfaces/IToken.sol";
 
 
-contract PLOTMigration {
+contract QuickBridge {
     
-    address public PLOTToken; 
+    address[] public tokens; 
     address public authController;
     address public migrationController; 
     /**
@@ -29,19 +29,25 @@ contract PLOTMigration {
     }
     
     mapping(bytes32 => MigrationStatus) public migrationStatus;
+    mapping(address => TokenStatus) public tokenStatus;
     
     struct MigrationStatus{
         bool initiated;
         bool completed;
     }
+    
+    struct TokenStatus{
+        bool whitelisted;
+        bool enabled;
+    }
 
     event MigrationAuthorised(bytes hash, address indexed to, address indexed from, uint256 value);
     event MigrationCompleted(bytes hash, address indexed to, address indexed from, uint256 value);
 
-    constructor(address _PLOTToken, address _authController, address _migrationController) public {
-        PLOTToken = _PLOTToken;
+    constructor(address[] memory _tokens, address _authController, address _migrationController) public {
         authController = _authController;
         migrationController = _migrationController;
+        whitelistNewToken(_tokens);
     }
     
     /**
@@ -59,8 +65,10 @@ contract PLOTMigration {
         address _to,
         address _from,
         uint256 _timestamp,
-        uint256 _amount
+        uint256 _amount,
+        address _token
     ) public onlyAuthorized returns (bytes32) {
+        require(tokenStatus[_token].enabled,"Token should be enabled for migration");
         require(migrationStatus[ migrationHash(_hash, _to, _from, _timestamp,_amount)].initiated == false, "Migration already initiated");
         
         migrationStatus[ migrationHash(_hash, _to, _from, _timestamp,_amount)].initiated = true;
@@ -68,6 +76,7 @@ contract PLOTMigration {
 
         return migrationHash(_hash, _to, _from, _timestamp,_amount);        
     }    
+    
    
     /**
      * @dev Transfers bPlots as per whitelisted transaction.
@@ -78,17 +87,38 @@ contract PLOTMigration {
         address _to,
         address _from,
         uint256 _timestamp,
-        uint256 _amount
+        uint256 _amount,
+        address _token
     ) public returns (bool){
         require(msg.sender == migrationController, "sender is not migration controller");
+        require(tokenStatus[_token].enabled,"Token should be enabled for migration");
         require(migrationStatus[ migrationHash(_hash, _to, _from, _timestamp,_amount)].initiated == true, "Migration not initiated");
         require(migrationStatus[ migrationHash(_hash, _to, _from, _timestamp,_amount)].completed == false, "Migration already completed");
-        require(IToken(PLOTToken).transfer( _to, _amount));
+        require(IToken(_token).transfer( _to, _amount));
         
         migrationStatus[ migrationHash(_hash, _to, _from, _timestamp,_amount)].completed = true;
         emit MigrationCompleted(_hash,_to, _from,_amount);
 
         return true;
+    }
+    
+     function whitelistNewToken(address[] memory _tokens) public onlyAuthorized{
+        for(uint8 i = 0; i<_tokens.length;i++){
+            require(_tokens[i] != address(0),"Token should be non-zero address");
+            require(tokenStatus[_tokens[i]].whitelisted == false,"Token exists in whitelist");
+            
+            tokens.push(_tokens[i]);
+            tokenStatus[_tokens[i]].whitelisted = true;
+            tokenStatus[_tokens[i]].enabled = true;
+        }
+       
+    }
+    
+     function updateTokenMigrationStatus(address _token) public onlyAuthorized{
+        require(_token != address(0));
+        require(tokenStatus[_token].whitelisted == true,"Token not whitelisted");
+        
+        tokenStatus[_token].enabled = !tokenStatus[_token].enabled;
     }
    
     
