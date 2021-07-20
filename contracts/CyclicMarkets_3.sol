@@ -22,6 +22,7 @@ contract CyclicMarkets_3 is CyclicMarkets_2 {
 
     mapping(uint => address) public optionPricingContracts;
     mapping(uint => uint) public marketTypeOptionPricing;
+    mapping(uint => uint32) public marketTypeSettlementTime;
     mapping(uint => uint) public marketOptionPricing;
 
     /**
@@ -52,15 +53,17 @@ contract CyclicMarkets_3 is CyclicMarkets_2 {
     * @param _minTimePassed Minimum amount of time to be passed for the time factor to be kicked in while calculating option price
     * @param _initialLiquidity Initial liquidity to be provided by the market creator for the market.
     */
-    function newMarketType(uint _optionLength, uint32 _predictionTime, uint32 _optionRangePerc, uint32 _marketStartTime, uint32 _marketCooldownTime, uint32 _minTimePassed, uint64 _initialLiquidity) external onlyAuthorized {
+    function newMarketType(uint _optionLength, uint32 _predictionTime, uint32 _optionRangePerc, uint32 _marketStartTime, uint32 _marketSettleTime, uint32 _marketCooldownTime, uint32 _minTimePassed, uint64 _initialLiquidity) external onlyAuthorized {
       require(marketTypeArray[marketType[_predictionTime]].predictionTime != _predictionTime);
       require(_predictionTime > 0);
       require(_optionRangePerc > 0);
       require(_marketCooldownTime > 0);
+      require(_marketSettleTime > 0);
       require(_minTimePassed > 0);
       require(optionPricingContracts[_optionLength] != address(0));
       uint32 index = _addMarketType(_predictionTime, _optionRangePerc, _marketCooldownTime, _minTimePassed, _initialLiquidity);
       marketTypeOptionPricing[index] = _optionLength;
+      marketTypeSettlementTime[index] = _marketSettleTime;
       for(uint32 i = 0;i < marketCurrencies.length; i++) {
           marketCreationData[index][i].initialStartTime = _marketStartTime;
       }
@@ -79,13 +82,15 @@ contract CyclicMarkets_3 is CyclicMarkets_2 {
     * @param _minTimePassed Minimum amount of time to be passed for the time factor to be kicked in while calculating option price
     * @param _initialLiquidity Initial liquidity to be provided by the market creator for the market.
     */
-    function alterMarketType(uint32 _marketType, uint _optionLength, uint32 _optionRangePerc, uint32 _marketCooldownTime, uint32 _minTimePassed, uint64 _initialLiquidity) external onlyAuthorized {
+    function alterMarketType(uint32 _marketType, uint _optionLength, uint32 _optionRangePerc, uint32 _marketSettleTime, uint32 _marketCooldownTime, uint32 _minTimePassed, uint64 _initialLiquidity) external onlyAuthorized {
       require(_optionRangePerc > 0);
       require(_marketCooldownTime > 0);
+      require(_marketSettleTime > 0);
       require(_minTimePassed > 0);
       require(optionPricingContracts[_optionLength] != address(0));
       MarketTypeData storage _marketTypeArray = marketTypeArray[_marketType];
       marketTypeOptionPricing[_marketType] = _optionLength;
+      marketTypeSettlementTime[_marketType] = _marketSettleTime;
       require(_marketTypeArray.predictionTime != 0);
       _marketTypeArray.optionRangePerc = _optionRangePerc;
       _marketTypeArray.cooldownTime = _marketCooldownTime;
@@ -116,7 +121,7 @@ contract CyclicMarkets_3 is CyclicMarkets_2 {
       _optionRanges = _calculateOptionRanges(marketOptionPricing[_marketIndex], _marketType.optionRangePerc, _marketCurrency.decimals, _marketCurrency.roundOfToNearest, _marketCurrency.marketFeed);
       _marketTimes[0] = _startTime; 
       _marketTimes[1] = _marketType.predictionTime;
-      _marketTimes[2] = _marketType.predictionTime*2;
+      _marketTimes[2] = marketTypeSettlementTime[_marketTypeIndex];
       _marketTimes[3] = _marketType.cooldownTime;
       marketPricingData[_marketIndex] = PricingData(stakingFactorMinStake, stakingFactorWeightage, currentPriceWeightage, _marketType.minTimePassed);
       marketData[_marketIndex] = MarketData(_marketTypeIndex, _marketCurrencyIndex, _msgSenderAddress);
