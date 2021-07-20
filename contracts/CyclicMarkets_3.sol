@@ -18,7 +18,7 @@ pragma solidity 0.5.7;
 import "./CyclicMarkets.sol";
 import "./interfaces/IOptionPricing.sol";
 
-contract CyclicMarkets_2 is CyclicMarkets {
+contract CyclicMarkets_3 is CyclicMarkets {
 
     mapping(uint => address) public optionPricingContracts;
     mapping(uint => uint) public marketTypeOptionPricing;
