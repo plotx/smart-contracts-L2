@@ -115,7 +115,7 @@ contract CyclicMarkets_3 is CyclicMarkets_2 {
       _closePreviousMarketWithRoundId( _marketTypeIndex, _marketCurrencyIndex, _roundId);
       uint32 _startTime = calculateStartTimeForMarket(_marketCurrencyIndex, _marketTypeIndex);
       uint32[] memory _marketTimes = new uint32[](4);
-      uint64[] memory _optionRanges = new uint64[](2);
+      uint64[] memory _optionRanges = new uint64[](marketTypeOptionPricing[_marketTypeIndex]);
       uint64 _marketIndex = allMarkets.getTotalMarketsLength();
       marketOptionPricing[_marketIndex] = marketTypeOptionPricing[_marketTypeIndex];
       _optionRanges = _calculateOptionRanges(marketOptionPricing[_marketIndex], _marketType.optionRangePerc, _marketCurrency.decimals, _marketCurrency.roundOfToNearest, _marketCurrency.marketFeed);
@@ -152,6 +152,11 @@ contract CyclicMarkets_3 is CyclicMarkets_2 {
      * @return  option price
      **/
     function getOptionPrice(uint _marketId, uint256 _prediction) public view returns(uint64) {
+      //For the markets which are created before the upgrade
+      if(marketOptionPricing[_marketId] == 0) {
+        return super.getOptionPrice(_marketId, _prediction);
+      }
+
       uint _marketCurr = marketData[_marketId].marketCurrencyIndex;
 
       uint[] memory _marketPricingDataArray = new uint[](4);
@@ -174,8 +179,12 @@ contract CyclicMarkets_3 is CyclicMarkets_2 {
      * @return _optionPrices array consisting of prices for all available options
      **/
     function getAllOptionPrices(uint _marketId) external view returns(uint64[] memory _optionPrices) {
-      _optionPrices = new uint64[](marketOptionPricing[_marketId]);
-      for(uint i=0; i< marketOptionPricing[_marketId]; i++) {
+      uint _optionLength = marketOptionPricing[_marketId];
+      if(_optionLength == 0) {
+        _optionLength = 3;
+      }
+      _optionPrices = new uint64[](_optionLength);
+      for(uint i=0; i< _optionLength; i++) {
         _optionPrices[i] = getOptionPrice(_marketId,i+1);
       }
 
