@@ -35,6 +35,7 @@ contract CyclicMarkets_3 is CyclicMarkets_2 {
       require(_optionPricingContracts.length == _optionLengths.length);
       for(uint i = 0;i<_optionLengths.length; i++) {
         require(_optionPricingContracts[i] != address(0) && _optionLengths[i] > 1);
+        require(IOptionPricing(_optionPricingContracts[i]).optionLength() == _optionLengths[i]);
         optionPricingContracts[_optionLengths[i]] = _optionPricingContracts[i];
       }
     }
