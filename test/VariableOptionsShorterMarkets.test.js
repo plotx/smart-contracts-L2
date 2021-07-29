@@ -29,6 +29,7 @@ contract("Market", async function ([user1, user2, user3, user4]) {
     MockchainLinkInstance = await MockchainLinkBTC.deployed();
     allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
     cyclicMarkets = await CyclicMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("CM")));
+    nullAddress = await masterInstance.getLatestAddress("0x00");
 
     await cyclicMarkets.setNextOptionPrice(0);
 
@@ -90,6 +91,11 @@ contract("Market", async function ([user1, user2, user3, user4]) {
 
       let optionPricing3 = await OptionPricing3.new();
       await cyclicMarkets.setOptionPricingContract([3], [optionPricing3.address]);
+      await assertRevert(cyclicMarkets.setOptionPricingContract([3,4], [optionPricing3.address]));
+      await assertRevert(cyclicMarkets.setOptionPricingContract([2], [optionPricing3.address]));
+      await assertRevert(cyclicMarkets.setOptionPricingContract([1], [optionPricing3.address]));
+      await assertRevert(cyclicMarkets.setOptionPricingContract([3], [nullAddress]));
+      await assertRevert(cyclicMarkets.updateMarketType(0, 100, 60 * 60, 40 * 60, 120 * 1e8));
       await cyclicMarkets.alterMarketType(0, 3, 100, 8 * 60 * 60, 60 * 60, 40 * 60, 120 * 1e8);
     });
 
@@ -172,6 +178,12 @@ contract("Market", async function ([user1, user2, user3, user4]) {
 
       let optionPricing3 = await OptionPricing3.new();
       await cyclicMarkets.setOptionPricingContract([3], [optionPricing3.address]);
+      await assertRevert(cyclicMarkets.alterMarketType(0, 4, 100, 8 * 60 * 60, 60 * 60, 40 * 60, 120 * 1e8));
+      await assertRevert(cyclicMarkets.alterMarketType(0, 3, 0, 8 * 60 * 60, 60 * 60, 40 * 60, 120 * 1e8));
+      await assertRevert(cyclicMarkets.alterMarketType(0, 3, 100, 0, 60 * 60, 40 * 60, 120 * 1e8));
+      await assertRevert(cyclicMarkets.alterMarketType(0, 3, 100, 8 * 60 * 60, 0, 40 * 60, 120 * 1e8));
+      await assertRevert(cyclicMarkets.alterMarketType(0, 3, 100, 8 * 60 * 60, 60 * 60, 0, 120 * 1e8));
+      await assertRevert(cyclicMarkets.alterMarketType(10, 3, 100, 8 * 60 * 60, 60 * 60, 40 * 60, 120*1e8));
       await cyclicMarkets.alterMarketType(0, 3, 100, 8 * 60 * 60, 60 * 60, 40 * 60, 120 * 1e8);
     });
 
@@ -438,7 +450,7 @@ contract("2 Option market", async function (users) {
       await plotusToken.transfer(users[11], toWei(100000));
       // await plotusToken.transfer(marketIncentives.address,toWei(500));
 
-      let nullAddress = "0x0000000000000000000000000000";
+      let nullAddress = await masterInstance.getLatestAddress("0x00");
 
       await plotusToken.transfer(users[11], toWei(100));
       await plotusToken.approve(allMarkets.address, toWei(200000), { from: users[11] });
@@ -459,6 +471,14 @@ contract("2 Option market", async function (users) {
       let optionPricing2 = await OptionPricing2.new();
       let optionPricing3 = await OptionPricing3.new();
       await cyclicMarkets.setOptionPricingContract([2, 3], [optionPricing2.address, optionPricing3.address]);
+      await assertRevert(cyclicMarkets.addMarketType(4 * 60 * 61, 100, Math.trunc(Date.now() / 1000), 60 * 60, 40 * 60, 100 * 1e8));
+      await assertRevert(cyclicMarkets.newMarketType(2, 4 * 60 * 60, 100, Math.trunc(Date.now() / 1000), 8 * 60 * 60, 60 * 60, 40 * 60, 100 * 1e8));
+      await assertRevert(cyclicMarkets.newMarketType(2, 0, 100, Math.trunc(Date.now() / 1000), 8 * 60 * 60, 60 * 60, 40 * 60, 100 * 1e8));
+      await assertRevert(cyclicMarkets.newMarketType(2, 4 * 60 * 61, 0, Math.trunc(Date.now() / 1000), 8 * 60 * 60, 60 * 60, 40 * 60, 100 * 1e8));
+      await assertRevert(cyclicMarkets.newMarketType(2, 4 * 60 * 61, 100, Math.trunc(Date.now() / 1000), 8 * 60 * 60, 0, 40 * 60, 100 * 1e8));
+      await assertRevert(cyclicMarkets.newMarketType(2, 4 * 60 * 61, 100, Math.trunc(Date.now() / 1000), 0, 60 * 60, 40 * 60, 100 * 1e8));
+      await assertRevert(cyclicMarkets.newMarketType(2, 4 * 60 * 61, 100, Math.trunc(Date.now() / 1000), 8 * 60 * 60, 60 * 60, 0, 100 * 1e8));
+      await assertRevert(cyclicMarkets.newMarketType(4, 4 * 60 * 61, 100, Math.trunc(Date.now() / 1000), 8 * 60 * 60, 60 * 60, 40 * 60, 100 * 1e8));
       await cyclicMarkets.newMarketType(2, 4 * 60 * 61, 100, Math.trunc(Date.now() / 1000), 8 * 60 * 60, 60 * 60, 40 * 60, 100 * 1e8);
     });
 
