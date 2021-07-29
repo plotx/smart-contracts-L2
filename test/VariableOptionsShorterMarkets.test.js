@@ -362,10 +362,6 @@ contract("3 Option market", async function ([user1, user2, user3, user4]) {
     let expireTim = await allMarkets.getMarketData(9);
     await increaseTimeTo(expireTim[3] / 1 - 4 * 3600 + 41 * 60);
 
-    console.log(expireTim[2] / 1);
-    console.log((await allMarkets.getMarketOptionPricingParams(9, 1))[1] / 1);
-    console.log(await latestTime());
-
     // let optionPricePaams = await allMarkets.getMarketOptionPricingParams(9,1);
     // await increaseTimeTo(optionPricePaams[1]/1+41*60);
 
