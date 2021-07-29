@@ -23,7 +23,7 @@ contract CyclicMarkets_3 is CyclicMarkets_2 {
     mapping(uint => address) public optionPricingContracts;
     mapping(uint => uint) public marketTypeOptionPricing;
     mapping(uint => uint32) public marketTypeSettlementTime;
-    mapping(uint => uint) public marketOptionPricing;
+    mapping(uint => address) public marketOptionPricing;
 
     /**
     * @dev Set the option pricing contract for the market types which are already defined
@@ -34,7 +34,7 @@ contract CyclicMarkets_3 is CyclicMarkets_2 {
     function setOptionPricingContract(uint[] memory _optionLengths, address[] memory _optionPricingContracts) public onlyAuthorized {
       require(_optionPricingContracts.length == _optionLengths.length);
       for(uint i = 0;i<_optionLengths.length; i++) {
-        require(_optionPricingContracts[i] != address(0));
+        require(_optionPricingContracts[i] != address(0) && _optionLengths[i] > 1);
         optionPricingContracts[_optionLengths[i]] = _optionPricingContracts[i];
       }
     }
@@ -117,7 +117,7 @@ contract CyclicMarkets_3 is CyclicMarkets_2 {
       uint32[] memory _marketTimes = new uint32[](4);
       uint64[] memory _optionRanges = new uint64[](marketTypeOptionPricing[_marketTypeIndex]);
       uint64 _marketIndex = allMarkets.getTotalMarketsLength();
-      marketOptionPricing[_marketIndex] = marketTypeOptionPricing[_marketTypeIndex];
+      marketOptionPricing[_marketIndex] = optionPricingContracts[marketTypeOptionPricing[_marketTypeIndex]];
       _optionRanges = _calculateOptionRanges(marketOptionPricing[_marketIndex], _marketType.optionRangePerc, _marketCurrency.decimals, _marketCurrency.roundOfToNearest, _marketCurrency.marketFeed);
       _marketTimes[0] = _startTime; 
       _marketTimes[1] = _marketType.predictionTime;
@@ -140,9 +140,9 @@ contract CyclicMarkets_3 is CyclicMarkets_2 {
      * @param _roundOfToNearest Round of the option range to the nearest multiple
      * @param _marketFeed Market Feed address
      */
-    function _calculateOptionRanges(uint _optionLength, uint _optionRangePerc, uint64 _decimals, uint8 _roundOfToNearest, address _marketFeed) internal view returns(uint64[] memory _optionRanges) {
+    function _calculateOptionRanges(address _optionPricingContract, uint _optionRangePerc, uint64 _decimals, uint8 _roundOfToNearest, address _marketFeed) internal view returns(uint64[] memory _optionRanges) {
       uint currentPrice = IOracle(_marketFeed).getLatestPrice();
-      _optionRanges = IOptionPricing(optionPricingContracts[_optionLength]).calculateOptionRanges(currentPrice, _optionRangePerc, _decimals, _roundOfToNearest);
+      _optionRanges = IOptionPricing(_optionPricingContract).calculateOptionRanges(currentPrice, _optionRangePerc, _decimals, _roundOfToNearest);
     }
 
     /**
@@ -153,7 +153,7 @@ contract CyclicMarkets_3 is CyclicMarkets_2 {
      **/
     function getOptionPrice(uint _marketId, uint256 _prediction) public view returns(uint64) {
       //For the markets which are created before the upgrade
-      if(marketOptionPricing[_marketId] == 0) {
+      if(marketOptionPricing[_marketId] == address(0)) {
         return super.getOptionPrice(_marketId, _prediction);
       }
 
@@ -169,7 +169,7 @@ contract CyclicMarkets_3 is CyclicMarkets_2 {
       // Fetching current price
       uint currentPrice = IOracle(marketCurrencies[_marketCurr].marketFeed).getLatestPrice();
 
-      return IOptionPricing(optionPricingContracts[marketOptionPricing[_marketId]]).getOptionPrice(_marketId, currentPrice, _prediction, _marketPricingDataArray, address(allMarkets));
+      return IOptionPricing(marketOptionPricing[_marketId]).getOptionPrice(_marketId, currentPrice, _prediction, _marketPricingDataArray, address(allMarkets));
 
     }
 
@@ -179,8 +179,10 @@ contract CyclicMarkets_3 is CyclicMarkets_2 {
      * @return _optionPrices array consisting of prices for all available options
      **/
     function getAllOptionPrices(uint _marketId) external view returns(uint64[] memory _optionPrices) {
-      uint _optionLength = marketOptionPricing[_marketId];
-      if(_optionLength == 0) {
+      uint _optionLength;
+      if(marketOptionPricing[_marketId] != address(0)) {
+        _optionLength = IOptionPricing(marketOptionPricing[_marketId]).optionLength();
+      } else {
         _optionLength = 3;
       }
       _optionPrices = new uint64[](_optionLength);

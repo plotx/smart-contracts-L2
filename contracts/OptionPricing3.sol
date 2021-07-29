@@ -10,7 +10,11 @@ contract OptionPricing3 is IOptionPricing {
     using SafeMath128 for uint128;
     using SafeMath for uint;
 
-    uint public constant OptionLength = 3;
+    uint internal constant _optionLength = 3;
+
+    function optionLength() public view returns(uint) {
+      return _optionLength;
+    }
 
     function calculateOptionRanges(uint currentPrice, uint _optionRangePerc, uint64 _decimals, uint8 _roundOfToNearest) public pure returns(uint64[] memory _optionRanges) {
         uint optionRangePerc = currentPrice.mul(_optionRangePerc.div(2)).div(10000);

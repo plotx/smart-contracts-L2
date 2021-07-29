@@ -16,6 +16,9 @@
 pragma solidity 0.5.7;
 
 contract IOptionPricing {
+
+    function optionLength() public view returns(uint);
+
     function calculateOptionRanges(uint currentPrice, uint _optionRangePerc, uint64 _decimals, uint8 _roundOfToNearest) public pure returns(uint64[] memory _optionRanges);
     
     function getOptionPrice(uint _marketId, uint _currentPrice, uint _prediction, uint[] memory _marketPricingData, address _allMarketsAddress) public view returns(uint64);

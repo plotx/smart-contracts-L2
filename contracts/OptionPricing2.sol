@@ -10,11 +10,17 @@ contract OptionPricing2 is IOptionPricing {
     using SafeMath128 for uint128;
     using SafeMath for uint;
 
-    uint public constant OptionLength = 2;
+    uint internal constant _optionLength = 2;
+
+    function optionLength() public view returns(uint) {
+      return _optionLength;
+    }
 
     function calculateOptionRanges(uint currentPrice, uint _optionRangePerc, uint64 _decimals, uint8 _roundOfToNearest) public pure returns(uint64[] memory _optionRanges) {
-        _optionRanges = new uint64[](1);
-        _optionRanges[0] =  uint64((ceil(currentPrice.div(_roundOfToNearest), 10**_decimals)).mul(_roundOfToNearest)); 
+        _optionRanges = new uint64[](_optionLength - 1);
+        uint _option = (ceil(currentPrice.div(_roundOfToNearest), 10**_decimals)).mul(_roundOfToNearest);
+        require(_option == uint64(_option), "Uint 64 Overflow");
+        _optionRanges[0] = uint64(_option);
     }
 
     /**
@@ -34,7 +40,9 @@ contract OptionPricing2 is IOptionPricing {
         return uint64(uint(100000).div(optionLen));
 
       } else {
-        return uint64(uint(100000).mul(_optionPricingParams[0]).div(_optionPricingParams[1]));
+        uint _value = uint(100000).mul(_optionPricingParams[0]).div(_optionPricingParams[1]);
+        require(_value == uint64(_value), "Uint 64 Overflow");
+        return uint64(_value);
       }
 
 
