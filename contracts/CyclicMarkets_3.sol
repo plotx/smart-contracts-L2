@@ -135,6 +135,20 @@ contract CyclicMarkets_3 is CyclicMarkets_2 {
     }
 
     /**
+    * @dev Internal function to if the previous market is live or not
+    * @param _marketTypeIndex Index of the market type
+    * @param _marketCurrencyIndex Index of the market currency
+    * @param _roundId RoundId of the feed for the settlement price
+    */
+    function _closePreviousMarketWithRoundId(uint64 _marketTypeIndex, uint64 _marketCurrencyIndex, uint80 _roundId) internal {
+      MarketCreationData storage _marketCreationData = marketCreationData[_marketTypeIndex][_marketCurrencyIndex];
+      uint64 currentMarket = _marketCreationData.latestMarket;
+      if(currentMarket != 0) {
+        require(uint(allMarkets.marketStatus(currentMarket)) >= uint(PredictionStatus.InSettlement));
+      }
+    }
+
+    /**
      * @dev Internal function to calculate option ranges for the market
      * @param _optionRangePerc Defined Option percent
      * @param _decimals Decimals of the given feed address
