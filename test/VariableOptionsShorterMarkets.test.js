@@ -104,7 +104,21 @@ contract("Market", async function ([user1, user2, user3, user4]) {
       assert.equal(optionPrices[0] / 1, 25000);
       assert.equal(optionPrices[1] / 1, 50000);
       assert.equal(optionPrices[2] / 1, 25000);
-    })
+    });
+
+    it("Should not allow to create when previous market is live", async () => {
+      await assertRevert(cyclicMarkets.createMarket(0,0,0));
+    });
+
+    it("Creating a market will not settle previous markets", async() => {
+      await increaseTime(4*60*60);
+      await cyclicMarkets.createMarket(0, 0, 1);
+      await increaseTime(4*60*60);
+      await cyclicMarkets.createMarket(0, 0, 1);
+      assert.equal((await allMarkets.marketStatus(7))/1, 1);
+      await cyclicMarkets.settleMarket(7,1);
+      assert.equal((await allMarkets.marketStatus(7))/1, 2);
+    });
 
   });
 });
