@@ -25,6 +25,8 @@ contract CyclicMarkets_3 is CyclicMarkets_2 {
     mapping(uint => uint32) public marketTypeSettlementTime;
     mapping(uint => address) public marketOptionPricing;
 
+    mapping(uint => uint) public marketCreationPreBuffer;
+
     /**
     * @dev Set the option pricing contract for the market types which are already defined
     * Should be allowed to call only once by authorized address
@@ -37,6 +39,20 @@ contract CyclicMarkets_3 is CyclicMarkets_2 {
         require(_optionPricingContracts[i] != address(0) && _optionLengths[i] > 1);
         require(IOptionPricing(_optionPricingContracts[i]).optionLength() == _optionLengths[i]);
         optionPricingContracts[_optionLengths[i]] = _optionPricingContracts[i];
+      }
+    }
+
+    /**
+    * @dev Set the pre buffer time for creating market of given type
+    * @param _marketTypes Market type array
+    * @param _preBufferTime Pre buffer time to allow market creation when a market is already live
+    */
+    function setMarketCreationPreBuffer(uint[] memory _marketTypes, uint[] memory _preBufferTime) public onlyAuthorized {
+      require(_marketTypes.length == _preBufferTime.length);
+      for(uint i = 0;i<_marketTypes.length; i++) {
+        require(_marketTypes[i] < marketTypeArray.length);
+        require(_preBufferTime[i] < marketTypeArray[_marketTypes[i]].predictionTime);
+        marketCreationPreBuffer[_marketTypes[i]] = _preBufferTime[i];
       }
     }
 
@@ -113,8 +129,8 @@ contract CyclicMarkets_3 is CyclicMarkets_2 {
       MarketCurrency storage _marketCurrency = marketCurrencies[_marketCurrencyIndex];
       MarketCreationData storage _marketCreationData = marketCreationData[_marketTypeIndex][_marketCurrencyIndex];
       require(!_marketType.paused && !_marketCreationData.paused);
-      _closePreviousMarketWithRoundId( _marketTypeIndex, _marketCurrencyIndex, _roundId);
-      uint32 _startTime = calculateStartTimeForMarket(_marketCurrencyIndex, _marketTypeIndex);
+      uint32 _startTime = _checkPreviousMarketAndGetStartTime( _marketTypeIndex, _marketCurrencyIndex, _marketType.predictionTime);
+      // uint32 _startTime = calculateStartTimeForMarket(_marketCurrencyIndex, _marketTypeIndex);
       uint32[] memory _marketTimes = new uint32[](4);
       uint64[] memory _optionRanges = new uint64[](marketTypeOptionPricing[_marketTypeIndex]);
       uint64 _marketIndex = allMarkets.getTotalMarketsLength();
@@ -138,13 +154,19 @@ contract CyclicMarkets_3 is CyclicMarkets_2 {
     * @dev Internal function to if the previous market is live or not
     * @param _marketTypeIndex Index of the market type
     * @param _marketCurrencyIndex Index of the market currency
-    * @param _roundId RoundId of the feed for the settlement price
+    * @param _predictionTime Prediction time of the given market type
     */
-    function _closePreviousMarketWithRoundId(uint64 _marketTypeIndex, uint64 _marketCurrencyIndex, uint80 _roundId) internal {
+    function _checkPreviousMarketAndGetStartTime(uint32 _marketTypeIndex, uint32 _marketCurrencyIndex, uint32 _predictionTime) internal view returns(uint32 _startTime) {
       MarketCreationData storage _marketCreationData = marketCreationData[_marketTypeIndex][_marketCurrencyIndex];
-      uint64 currentMarket = _marketCreationData.latestMarket;
-      if(currentMarket != 0) {
-        require(uint(allMarkets.marketStatus(currentMarket)) >= uint(PredictionStatus.InSettlement));
+      uint64 latestMarket = _marketCreationData.latestMarket;
+      uint64 penultimateMarket = _marketCreationData.penultimateMarket;
+      if(penultimateMarket != 0) {
+        require(uint(allMarkets.marketStatus(penultimateMarket)) >= uint(PredictionStatus.InSettlement));
+      }
+      _startTime = calculateStartTimeForMarket(_marketCurrencyIndex, _marketTypeIndex);
+      if(uint(allMarkets.marketStatus(latestMarket)) == uint(PredictionStatus.Live)) {
+        _startTime = _startTime.add(_predictionTime);
+        require(_startTime >= marketCreationPreBuffer[_marketTypeIndex].add(now));
       }
     }
 
