@@ -26,6 +26,10 @@ contract AllPlotMarkets_4 is AllPlotMarkets_3 {
      */
     function _placeInitialPrediction(uint64 _marketId, address _msgSenderAddress, uint64 _initialLiquidity, uint64 _totalOptions) internal {
       uint256 _defaultAmount = (10**predictionDecimalMultiplier).mul(_initialLiquidity);
+      if(userData[_msgSenderAddress].marketsParticipated.length > maxPendingClaims) {
+        _withdrawReward(defaultMaxRecords, _msgSenderAddress);
+      }
+
       (uint _tokenLeft, uint _tokenReward) = getUserUnusedBalance(_msgSenderAddress);
       uint _balanceAvailable = _tokenLeft.add(_tokenReward);
       if(_balanceAvailable < _defaultAmount) {
