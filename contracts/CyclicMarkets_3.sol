@@ -44,16 +44,13 @@ contract CyclicMarkets_3 is CyclicMarkets_2 {
 
     /**
     * @dev Set the pre buffer time for creating market of given type
-    * @param _marketTypes Market type array
+    * @param _marketType Market type
     * @param _preBufferTime Pre buffer time to allow market creation when a market is already live
     */
-    function setMarketCreationPreBuffer(uint[] memory _marketTypes, uint[] memory _preBufferTime) public onlyAuthorized {
-      require(_marketTypes.length == _preBufferTime.length);
-      for(uint i = 0;i<_marketTypes.length; i++) {
-        require(_marketTypes[i] < marketTypeArray.length);
-        require(_preBufferTime[i] < marketTypeArray[_marketTypes[i]].predictionTime);
-        marketCreationPreBuffer[_marketTypes[i]] = _preBufferTime[i];
-      }
+    function setMarketCreationPreBuffer(uint _marketType, uint _preBufferTime) public onlyAuthorized {
+      require(_marketType < marketTypeArray.length);
+      require(_preBufferTime < marketTypeArray[_marketType].predictionTime);
+      marketCreationPreBuffer[_marketType] = _preBufferTime;
     }
 
     function addMarketType(uint32 _predictionTime, uint32 _optionRangePerc, uint32 _marketStartTime, uint32 _marketCooldownTime, uint32 _minTimePassed, uint64 _initialLiquidity) external onlyAuthorized {
@@ -166,7 +163,7 @@ contract CyclicMarkets_3 is CyclicMarkets_2 {
       _startTime = calculateStartTimeForMarket(_marketCurrencyIndex, _marketTypeIndex);
       if(uint(allMarkets.marketStatus(latestMarket)) == uint(PredictionStatus.Live)) {
         _startTime = _startTime.add(_predictionTime);
-        require(_startTime >= marketCreationPreBuffer[_marketTypeIndex].add(now));
+        require(_startTime <= marketCreationPreBuffer[_marketTypeIndex].add(now));
       }
     }
 
