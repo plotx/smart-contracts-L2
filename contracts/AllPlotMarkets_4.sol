@@ -65,7 +65,6 @@ contract AllPlotMarkets_4 is AllPlotMarkets_3 {
         unusedBalance = _userData.unusedBalance;
         unusedBalance = unusedBalance.div(decimalMultiplier);
       }
-      require(_predictionStake <= unusedBalance); // Redundant check, can be removed
       _userData.unusedBalance = (unusedBalance.sub(_predictionStake)).mul(decimalMultiplier);
       _predictionStakePostDeduction = _deductFee(_marketId, _predictionStake, _msgSenderAddress);
       
