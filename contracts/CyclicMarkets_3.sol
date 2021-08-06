@@ -53,8 +53,8 @@ contract CyclicMarkets_3 is CyclicMarkets_2 {
       marketCreationPreBuffer[_marketType] = _preBufferTime;
     }
 
-    function addMarketType(uint32 _predictionTime, uint32 _optionRangePerc, uint32 _marketStartTime, uint32 _marketCooldownTime, uint32 _minTimePassed, uint64 _initialLiquidity) external onlyAuthorized {
-      revert("Deprecated");
+    function addMarketType(uint32 _predictionTime, uint32 _optionRangePerc, uint32 _marketStartTime, uint32 _marketCooldownTime, uint32 _minTimePassed, uint64 _initialLiquidity) external {
+      revert("DEPR");
     }
 
     /**
@@ -83,8 +83,8 @@ contract CyclicMarkets_3 is CyclicMarkets_2 {
       }
     }
 
-    function updateMarketType(uint32 _marketType, uint32 _optionRangePerc, uint32 _marketCooldownTime, uint32 _minTimePassed, uint64 _initialLiquidity) external onlyAuthorized {
-      revert("Deperecated");
+    function updateMarketType(uint32 _marketType, uint32 _optionRangePerc, uint32 _marketCooldownTime, uint32 _minTimePassed, uint64 _initialLiquidity) external {
+      revert("DEPR");
     }
 
     /**
@@ -191,11 +191,11 @@ contract CyclicMarkets_3 is CyclicMarkets_2 {
       (predictionPoints, isMultiplierApplied) = CyclicMarkets.calculatePredictionPoints(_marketId, _prediction, _user, _multiplierApplied, _predictionStake);
     	uint _marketType = marketData[_marketId].marketTypeIndex;
       EarlyParticipantMultiplier memory _multiplierData = earlyParticipantMultiplier[_marketType];
-      uint _startTime = calculateStartTimeForMarket(uint32(marketData[_marketId].marketCurrencyIndex), uint32(_marketType));
-      uint _timePassed = uint(now).sub(_startTime);
-      // If market is identified as upcoming, then the time passed should be reset 
-      if(_marketId == marketCreationData[_marketType][marketData[_marketId].marketCurrencyIndex].penultimateMarket) {
-        _timePassed = 0;
+      (, uint _startTime) = allMarkets.getMarketOptionPricingParams(_marketId, _prediction);
+      uint _timePassed;
+      // If given market is buffer market, then the time passed should be zero, as start time will not be reached 
+      if(_startTime < now) {
+        _timePassed = uint(now).sub(_startTime);
       }
       if(_timePassed <= _multiplierData.cutoffTime) {
         uint64 _muliplier = 100;
