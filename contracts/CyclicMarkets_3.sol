@@ -180,6 +180,31 @@ contract CyclicMarkets_3 is CyclicMarkets_2 {
     }
 
     /**
+    * @dev Internal function to calculate prediction points
+    * @param _marketId Index of the market
+    * @param _prediction Option predicted by the user
+    * @param _user User Address
+    * @param _multiplierApplied Flag defining if user had already availed multiplier
+    * @param _predictionStake Amount staked by the user
+    */
+    function calculatePredictionPoints(uint _marketId, uint256 _prediction, address _user, bool _multiplierApplied, uint _predictionStake) internal view returns(uint64 predictionPoints, bool isMultiplierApplied) {
+      (predictionPoints, isMultiplierApplied) = CyclicMarkets.calculatePredictionPoints(_marketId, _prediction, _user, _multiplierApplied, _predictionStake);
+    	uint _marketType = marketData[_marketId].marketTypeIndex;
+      EarlyParticipantMultiplier memory _multiplierData = earlyParticipantMultiplier[_marketType];
+      uint _startTime = calculateStartTimeForMarket(uint32(marketData[_marketId].marketCurrencyIndex), uint32(_marketType));
+      uint _timePassed = uint(now).sub(_startTime);
+      // If market is identified as upcoming, then the time passed should be reset 
+      if(_marketId == marketCreationData[_marketType][marketData[_marketId].marketCurrencyIndex].penultimateMarket) {
+        _timePassed = 0;
+      }
+      if(_timePassed <= _multiplierData.cutoffTime) {
+        uint64 _muliplier = 100;
+        _muliplier = _muliplier.add(_multiplierData.multiplierPerc);
+        predictionPoints = (predictionPoints.mul(_muliplier).div(100));
+      }
+    }
+
+    /**
      * @dev Gets price for given market and option
      * @param _marketId  Market ID
      * @param _prediction  prediction option
