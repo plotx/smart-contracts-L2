@@ -44,7 +44,7 @@ contract OptionPricing3 is IOptionPricing {
         optionPrice = (stakingFactorConst.mul(_optionPricingParams[0]).mul(10**18).div(totalStaked)); 
       }
       uint timeElapsed;
-      if(_startTime > now) {
+      if(now > _startTime) {
         timeElapsed= uint(now).sub(_startTime);
       }
       // max(timeElapsed, minTimePassed)
