@@ -121,7 +121,7 @@ contract CyclicMarkets_3 is CyclicMarkets_2 {
     */
     function createMarket(uint32 _marketCurrencyIndex,uint32 _marketTypeIndex, uint80 _roundId) public {
       address _msgSenderAddress = _msgSender();
-      require(isAuthorizedCreator[_msgSenderAddress], "Not authorized");
+      require(isAuthorizedCreator[_msgSenderAddress]);
       MarketTypeData storage _marketType = marketTypeArray[_marketTypeIndex];
       MarketCurrency storage _marketCurrency = marketCurrencies[_marketCurrencyIndex];
       MarketCreationData storage _marketCreationData = marketCreationData[_marketTypeIndex][_marketCurrencyIndex];
