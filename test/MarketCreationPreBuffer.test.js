@@ -224,7 +224,7 @@ contract("2 Option market", async function ([user0, user1, user2, user3, user4, 
         predictionPointsBeforeCreator2 = (await allMarkets.getUserPredictionPoints(userMarketCreator, marketId, 2)/1e5);
         predictionPointsBeforeCreator3 = (await allMarkets.getUserPredictionPoints(userMarketCreator, marketId, 3)/1e5);
         
-        const expectedPredictionPoints = [5988.88888, 23955.55556, 11977.77778, 3629.62963, 36296.2963, 1996.296296, 1996.296296, 1996.296296];
+        const expectedPredictionPoints = [5988.88888, 23955.55556, 11977.77778, 3629.62963, 36296.2963, 2037.037037, 2037.037037, 2037.037037];
         const predictionPointArray = [
             predictionPointsBeforeUser1,
             predictionPointsBeforeUser2,
@@ -251,9 +251,9 @@ contract("2 Option market", async function ([user0, user1, user2, user3, user4, 
         let daobalanceAfter = await plotusToken.balanceOf(masterInstance.address);
         daobalanceAfter = daobalanceAfter*1;
         let commission = 0;
-        let daoCommission = 3.5999;
+        let daoCommission = 3.4;
         assert.equal(Math.trunc(daobalanceAfter/1e15), Math.trunc((((daobalanceBefore/1e14))  + daoCommission*1e4)/10));
-        let creationReward = 14.3999;
+        let creationReward = 13.6;
         let balanceBefore = await plotusToken.balanceOf(userMarketCreator);
         await cyclicMarkets.claimCreationReward({ from: userMarketCreator });
         let balanceAfter = await plotusToken.balanceOf(userMarketCreator);

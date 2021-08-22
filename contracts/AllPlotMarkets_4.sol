@@ -53,7 +53,6 @@ contract AllPlotMarkets_4 is AllPlotMarkets_3 {
     * _predictionStake should be passed with 8 decimals, reduced it to 8 decimals to reduce the storage space of prediction data
     */
     function _provideLiquidity(uint _marketId, address _msgSenderAddress, address _asset, uint64 _predictionStake, uint256 _prediction) internal {
-      uint64 _predictionStakePostDeduction = _predictionStake;
       uint decimalMultiplier = 10**predictionDecimalMultiplier;
       UserData storage _userData = userData[_msgSenderAddress];
       
@@ -66,12 +65,11 @@ contract AllPlotMarkets_4 is AllPlotMarkets_3 {
         unusedBalance = unusedBalance.div(decimalMultiplier);
       }
       _userData.unusedBalance = (unusedBalance.sub(_predictionStake)).mul(decimalMultiplier);
-      _predictionStakePostDeduction = _deductFee(_marketId, _predictionStake, _msgSenderAddress);
-      
-      uint64 predictionPoints = IMarket(marketDataExtended[_marketId].marketCreatorContract).calculatePredictionPointsAndMultiplier(_msgSenderAddress, _marketId, _prediction, _predictionStakePostDeduction);
+   
+      uint64 predictionPoints = IMarket(marketDataExtended[_marketId].marketCreatorContract).calculatePredictionPointsAndMultiplier(_msgSenderAddress, _marketId, _prediction, _predictionStake);
       require(predictionPoints > 0);
 
-      _storePredictionData(_marketId, _prediction, _msgSenderAddress, _predictionStakePostDeduction, predictionPoints);
+      _storePredictionData(_marketId, _prediction, _msgSenderAddress, _predictionStake, predictionPoints);
       emit PlacePrediction(_msgSenderAddress, _predictionStake, predictionPoints, _asset, _prediction, _marketId);
     }
 }
