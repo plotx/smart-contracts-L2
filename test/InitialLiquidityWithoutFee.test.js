@@ -48,7 +48,6 @@ contract("2 Option market", async function ([user0, user1, user2, user3, user4, 
         timeNow = await latestTime();
   
         allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
-        cyclicMarkets = await CyclicMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("CM")));
         await increaseTime(5 * 3600);
         await plotusToken.transfer(user7, toWei(100000));
         await plotusToken.transfer(user6, toWei(100000));
@@ -68,69 +67,22 @@ contract("2 Option market", async function ([user0, user1, user2, user3, user4, 
   
         await MockchainLinkInstance.setLatestAnswer(1195000000000);
   
-        let cyclicMarketsV3Impl = await CyclicMarkets_3.new();
         let allMarketsV3Impl = await AllPlotMarkets_4.new();
-        await masterInstance.upgradeMultipleImplementations([toHex("CM"), toHex("AM")], [cyclicMarketsV3Impl.address, allMarketsV3Impl.address]);
-        cyclicMarkets = await CyclicMarkets_3.at(await masterInstance.getLatestAddress(web3.utils.toHex("CM")));
+        await masterInstance.upgradeMultipleImplementations([toHex("AM")], [allMarketsV3Impl.address]);
         allMarkets = await AllPlotMarkets_4.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
   
-        let optionPricing2 = await OptionPricing2.new();
-        let optionPricing3 = await OptionPricing3.new();
-        await cyclicMarkets.setOptionPricingContract([2, 3], [optionPricing2.address, optionPricing3.address]);
-        marketStartTime = await latestTime();
-        await cyclicMarkets.newMarketType(2, 15*60, 100, marketStartTime, 60 * 60, 5 * 60, 15 * 60, 100 * 1e8);
-      });
-  
-      it("Should not allow to create buffer market if pre-buffer time is not set", async () => {
-        marketId = await allMarkets.getTotalMarketsLength();
-        await increaseTime(marketStartTime/1 - (await latestTime()));
-        await cyclicMarkets.alterMarketType(0, 3, 100, 8 * 60 * 60, 60 * 60, 40 * 60, 100 * 1e8);
-        await cyclicMarkets.createMarket(0, 3, 0);
-        await increaseTime(10*60);
-        await assertRevert(cyclicMarkets.createMarket(0, 3, 0));
-        await increaseTime(5*60);
-      });
-      
-      it("Pre buffer time should not be greater than prediction time", async() => {
-        await assertRevert(cyclicMarkets.setMarketCreationPreBuffer(3,20*60));
       });
 
-      it("Set pre buffer time for 15 min market", async() => {
-        await cyclicMarkets.setMarketCreationPreBuffer(3,600);
-        await cyclicMarkets.createMarket(0, 3, 0);
-      });
-
-      it("Should not allow to create buffer market befor pre-buffer times", async () => {
-        await assertRevert(cyclicMarkets.createMarket(0, 3, 0));
-      });
-
-      it("Should allow to create buffer market after pre-buffer time", async () => {
-        await increaseTime(11*60);
-        await cyclicMarkets.createMarket(0, 3, 0);
-      });
-
-      it("Should not allow to create more than one buffer market", async () => {
-        await assertRevert(cyclicMarkets.createMarket(0, 3, 0));
-      });
-
-      it("Set pre buffer time for 3 option market", async() => {
-        await cyclicMarkets.setMarketCreationPreBuffer(0,600);
+      it("Should be able to create market", async() => {
         let starttime = await cyclicMarkets.calculateStartTimeForMarket(0,0);
         await increaseTime((await latestTime())/1 -  starttime*1 + 10);
-        marketId = await allMarkets.getTotalMarketsLength();
-        await cyclicMarkets.createMarket(0, 0, 0);
-        marketData = await allMarkets.getMarketData(marketId);
-        await increaseTime(marketData[3]/1 - await latestTime() - 540);
-      });
 
-      it("Should be able to create buffer market", async() => {
-        await cyclicMarkets.setEarlyParticipantMultiplier(0, 10*60, 10);
         marketId = await allMarkets.getTotalMarketsLength();
         await cyclicMarkets.setNextOptionPrice(18);
         await cyclicMarkets.createMarket(0, 0, 0, { from: userMarketCreator })
       });
 
-      it("Positions After activating early participant multiplier", async () => {
+      it("Positions", async () => {
         await plotusToken.transfer(user1, toWei("100"));
         await plotusToken.transfer(user2, toWei("400"));
         await plotusToken.transfer(user3, toWei("100"));
@@ -144,18 +96,6 @@ contract("2 Option market", async function ([user0, user1, user2, user3, user4, 
         await plotusToken.approve(allMarkets.address, toWei("10000"), { from: user5 });
 
         assert.equal((await cyclicMarkets.getOptionPrice(marketId, 2)) / 1, 18);
-        functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", toWei(100), marketId, plotusToken.address, to8Power("100"), 2);
-        //Should revert if predicted before market creation time
-        await assertRevert(signAndExecuteMetaTx(
-          privateKeyList[1],
-          user1,
-          functionSignature,
-          allMarkets,
-          "AM"
-        ));
-        
-        marketData = await allMarkets.getMarketData(marketId);
-        await increaseTime((marketData[3]/1 - marketData[2]/1) - await latestTime());
 
         // await increaseTime(9*60 + 1);
         await increaseTime(2*60);
@@ -224,7 +164,7 @@ contract("2 Option market", async function ([user0, user1, user2, user3, user4, 
         predictionPointsBeforeCreator2 = (await allMarkets.getUserPredictionPoints(userMarketCreator, marketId, 2)/1e5);
         predictionPointsBeforeCreator3 = (await allMarkets.getUserPredictionPoints(userMarketCreator, marketId, 3)/1e5);
         
-        const expectedPredictionPoints = [5988.88888, 23955.55556, 11977.77778, 3629.62963, 36296.2963, 2037.037037, 2037.037037, 2037.037037];
+        const expectedPredictionPoints = [5444.444444, 21777.77777, 10888.88888, 3629.62963, 36296.2963, 1851.851852, 1851.851852, 1851.851852];
         const predictionPointArray = [
             predictionPointsBeforeUser1,
             predictionPointsBeforeUser2,
@@ -258,157 +198,6 @@ contract("2 Option market", async function ([user0, user1, user2, user3, user4, 
         await cyclicMarkets.claimCreationReward({ from: userMarketCreator });
         let balanceAfter = await plotusToken.balanceOf(userMarketCreator);
         assert.equal(~~(balanceAfter/1e15), ~~((balanceBefore/1e14  + creationReward*1e4)/10));
-    });
-
-    it("Create a buffer market to check option pricing", async() => {
-        marketStartTime = await latestTime();
-        await cyclicMarkets.newMarketType(3, 4*60*60+1, 100, marketStartTime, 8 * 60 * 60, 60 * 60, 40 * 60, 120 * 1e8);
-        await cyclicMarkets.setMarketCreationPreBuffer(4,600);
-        await cyclicMarkets.createMarket(0,4, 0);
-        await increaseTime(4*60*60+1 - 540);
-        await cyclicMarkets.setNextOptionPrice(0);
-        marketId = await allMarkets.getTotalMarketsLength();
-        await cyclicMarkets.createMarket(0,4, 0);
-        await MockchainLinkInstance.setLatestAnswer(1195000000000);
-        let optionPrices = await cyclicMarkets.getAllOptionPrices(marketId);
-        assert.equal(optionPrices[0] / 1, 25000);
-        assert.equal(optionPrices[1] / 1, 50000);
-        assert.equal(optionPrices[2] / 1, 25000);
-        await MockchainLinkInstance.setLatestAnswer(1);
-        optionPrices = await cyclicMarkets.getAllOptionPrices(marketId);
-        assert.equal(optionPrices[0] / 1, 50000);
-        assert.equal(optionPrices[1] / 1, 33333);
-        assert.equal(optionPrices[2] / 1, 16666);
-        await MockchainLinkInstance.setLatestAnswer(1195000000000);
-    });
-    
-    it("1.Scenario 1 - Stake < minstakes and time passed < min time passed", async () => {
-      await increaseTime(540);
-
-      await increaseTime(360);
-
-      await plotusToken.transfer(user2, toWei(10000));
-      await plotusToken.approve(allMarkets.address, toWei(100000), { from: user2 });
-      await allMarkets.depositAndPlacePrediction(toWei(10000), marketId, plotusToken.address, 10000 * 1e8, 1, {from: user2});
-
-      await plotusToken.transfer(user3, toWei(2000));
-      await plotusToken.approve(allMarkets.address, toWei(100000), { from: user3 });
-      await allMarkets.depositAndPlacePrediction(toWei(2000), marketId, plotusToken.address, 2000 * 1e8, 2, {from: user3});
-
-      await plotusToken.transfer(user4, toWei(5000));
-      await plotusToken.approve(allMarkets.address, toWei(100000), { from: user4 });
-      await allMarkets.depositAndPlacePrediction(toWei(5000), marketId, plotusToken.address, 5000 * 1e8, 3, {from: user4});
-
-      let optionPrices = await cyclicMarkets.getAllOptionPrices(marketId);
-      assert.equal(optionPrices[0] / 1, 25000);
-      assert.equal(optionPrices[1] / 1, 50000);
-      assert.equal(optionPrices[2] / 1, 25000);
-      await MockchainLinkInstance.setLatestAnswer(1);
-      optionPrices = await cyclicMarkets.getAllOptionPrices(marketId);
-      assert.equal(optionPrices[0] / 1, 50000);
-      assert.equal(optionPrices[1] / 1, 33333);
-      assert.equal(optionPrices[2] / 1, 16666);
-      await MockchainLinkInstance.setLatestAnswer(1195000000000);
-    });
-
-    it("2.Scenario 2 - Stake > minstakes and time passed < min time passed", async () => {
-
-      let expireT = await allMarkets.getMarketData(marketId);
-      await increaseTime(14401 - 360 -540);
-
-      await cyclicMarkets.createMarket(0, 4, 0);
-      marketId++;
-
-      await increaseTime(540);
-
-
-      await plotusToken.transfer(user2, toWei(10000));
-      await plotusToken.approve(allMarkets.address, toWei(100000), { from: user2 });
-      await allMarkets.depositAndPlacePrediction(toWei(10000), marketId, plotusToken.address, 10000 * 1e8, 1, {from: user2});
-
-      await plotusToken.transfer(user3, toWei(5000));
-      await plotusToken.approve(allMarkets.address, toWei(100000), { from: user3 });
-      await allMarkets.depositAndPlacePrediction(toWei(5000), marketId, plotusToken.address, 5000 * 1e8, 2, {from: user3});
-
-      await plotusToken.transfer(user4, toWei(40000));
-      await plotusToken.approve(allMarkets.address, toWei(100000), { from: user4 });
-      await allMarkets.depositAndPlacePrediction(toWei(40000), marketId, plotusToken.address, 40000 * 1e8, 3, {from: user4});
-
-      let expireTim = await allMarkets.getMarketData(marketId);
-      await increaseTimeTo(expireTim[5] / 1 - 4 * 3600 + 360);
-
-      assert.equal(truncNumber((await cyclicMarkets.getOptionPrice(marketId, 1)) / 1e5), 0.19);
-      assert.equal(truncNumber((await cyclicMarkets.getOptionPrice(marketId, 2)) / 1e5), 0.16);
-      assert.equal(truncNumber((await cyclicMarkets.getOptionPrice(marketId, 3)) / 1e5), 0.63);
-    });
-
-    it("3.Scenario 3 - Stake > minstakes and time passed > min time passed", async () => {
-
-      let expireT = await allMarkets.getMarketData(8);
-
-      await increaseTime(14401 - 360 - 540);
-
-      await assertRevert(allMarkets.postMarketResult(7, 10000000000));
-
-      await cyclicMarkets.createMarket(0, 0, 3);
-      marketId++;
-
-      await increaseTime(540);
-
-      await plotusToken.transfer(user2, toWei(10000));
-      await plotusToken.approve(allMarkets.address, toWei(100000), { from: user2 });
-      await allMarkets.depositAndPlacePrediction(toWei(10000), marketId, plotusToken.address, 10000 * 1e8, 1, {from: user2});
-
-      await plotusToken.transfer(user3, toWei(5000));
-      await plotusToken.approve(allMarkets.address, toWei(100000), { from: user3 });
-      await allMarkets.depositAndPlacePrediction(toWei(5000), marketId, plotusToken.address, 5000 * 1e8, 2, {from: user3});
-
-      await plotusToken.transfer(user4, toWei(40000));
-      await plotusToken.approve(allMarkets.address, toWei(100000), { from: user4 });
-      await allMarkets.depositAndPlacePrediction(toWei(40000), marketId, plotusToken.address, 40000 * 1e8, 3, {from: user4});
-
-      let expireTim = await allMarkets.getMarketData(marketId);
-      await increaseTimeTo(expireTim[3] / 1 - 4 * 3600 + 41 * 60);
-
-      assert.equal(truncNumber((await cyclicMarkets.getOptionPrice(marketId, 1)) / 1e5), 0.19);
-      assert.equal(truncNumber((await cyclicMarkets.getOptionPrice(marketId, 2)) / 1e5), 0.16);
-      assert.equal(truncNumber((await cyclicMarkets.getOptionPrice(marketId, 3)) / 1e5), 0.63);
-    });
-
-    it("4.Scenario 4 - Stake > minstakes and time passed > min time passed max distance = 2", async () => {
-      let expireT = await allMarkets.getMarketData(9);
-
-      await increaseTime(14401 - 41*60 - 540);
-
-      await cyclicMarkets.createMarket(0, 0, 3);
-      marketId++;
-      await increaseTime(540);
-
-      await plotusToken.transfer(user2, toWei(10000));
-      await plotusToken.approve(allMarkets.address, toWei(100000), { from: user2 });
-      await allMarkets.depositAndPlacePrediction(toWei(10000), marketId, plotusToken.address, 10000 * 1e8, 1, {from: user2});
-
-      await plotusToken.transfer(user3, toWei(5000));
-      await plotusToken.approve(allMarkets.address, toWei(100000), { from: user3 });
-      await allMarkets.depositAndPlacePrediction(toWei(5000), marketId, plotusToken.address, 5000 * 1e8, 2, {from: user3});
-
-      await plotusToken.transfer(user4, toWei(40000));
-      await plotusToken.approve(allMarkets.address, toWei(100000), { from: user4 });
-      await allMarkets.depositAndPlacePrediction(toWei(40000), marketId, plotusToken.address, 40000 * 1e8, 3, {from: user4});
-
-      await MockchainLinkInstance.setLatestAnswer(1222000000000);
-
-      let expireTim = await allMarkets.getMarketData(marketId);
-      await increaseTimeTo(expireTim[5] / 1 - 4 * 3600 + 41 * 60);
-
-      assert.equal(truncNumber((await cyclicMarkets.getOptionPrice(marketId, 1)) / 1e5), 0.17);
-      assert.equal(truncNumber((await cyclicMarkets.getOptionPrice(marketId, 2)) / 1e5), 0.13);
-      assert.equal(truncNumber((await cyclicMarkets.getOptionPrice(marketId, 3)) / 1e5), 0.68);
-    });
-
-      // it("Should revert if try to fetch option price for invalid marketId", async () => {
-      // 	await assertRevert(cyclicMarkets.getAllOptionPrices(2)); // marketId 2 is cyclic market
-      // });
-  
-    });
-  });
+      });
+    })
+})
