@@ -26,18 +26,21 @@ import "./interfaces/IAuth.sol";
 contract Referral is IAuth, NativeMetaTransaction {
 
     event ReferralLog(address indexed referrer, address indexed referee, uint256 referredOn);
+    event ReferralFeeLog(address indexed referrer, address indexed referee, uint256 referrerFee, uint256 refereeFee);
     event ClaimedReferralReward(address indexed user, address token, uint256 amount);
 
     struct UserData {
       mapping(address => uint256) referrerFee; // Fee earned by referring another user for a given token
       mapping(address => uint256) refereeFee; // Fee earned after being referred by another user for a given token
-      address referrer; // Address of the referrer 
+      address referrer; // Address of the referrer
+      uint validity;
     }
 
     IAllMarkets internal allMarkets;
     address internal masterAddress;
     
     uint internal predictionDecimalMultiplier;
+    uint public referralValidity;
 
     mapping (address => UserData) public userData;
 
@@ -56,8 +59,18 @@ contract Referral is IAuth, NativeMetaTransaction {
       masterAddress = _masterAddress;
       allMarkets = IAllMarkets(ms.getLatestAddress("AM"));
       predictionDecimalMultiplier = 10;
+      referralValidity = 90 days;
       _initializeEIP712("RF");
     }
+
+    /**
+    * @dev Set time upto which both referrer and referee can earn fee for refferral
+    * @param _referralValidity Time in seconds
+    */
+    function setReferralValidity(uint _referralValidity) public onlyAuthorized {
+      require(_referralValidity > 0);
+      referralValidity = _referralValidity;
+    } 
 
     /**
     * @dev Set referrer address of a user, can be set only by the authorized users
@@ -70,6 +83,7 @@ contract Referral is IAuth, NativeMetaTransaction {
       require(allMarkets.getTotalStakedByUser(_referee) == 0);
       require(_userData.referrer == address(0));
       _userData.referrer = _referrer;
+      _userData.validity = referralValidity.add(now);
       emit ReferralLog(_referrer, _referee, now);
     }
 
@@ -84,12 +98,13 @@ contract Referral is IAuth, NativeMetaTransaction {
     function setReferralRewardData(address _referee, address _token, uint _referrerFee, uint _refereeFee) external onlyInternal returns(bool _isEligible) {
       UserData storage _userData = userData[_referee];
       address _referrer = _userData.referrer;
-      if(_referrer != address(0)) {
+      if(_referrer != address(0) && _userData.validity >= now) {
         _isEligible = true;
         //Commission for referee
         _userData.refereeFee[_token] = _userData.refereeFee[_token].add(_refereeFee);
         //Commission for referrer
         userData[_referrer].referrerFee[_token] = userData[_referrer].referrerFee[_token].add(_referrerFee);
+        emit ReferralFeeLog(_referrer, _referee, _referrerFee, _refereeFee);
       }
     }
 
@@ -125,9 +140,8 @@ contract Referral is IAuth, NativeMetaTransaction {
     * @param _amount The amount which is transfer.
     */
     function _transferAsset(address _asset, address _recipient, uint256 _amount) internal {
-      if(_amount > 0) { 
-          require(IToken(_asset).transfer(_recipient, _amount));
-      }
+      require(_amount > 0);
+      require(IToken(_asset).transfer(_recipient, _amount));
     }
 
 }

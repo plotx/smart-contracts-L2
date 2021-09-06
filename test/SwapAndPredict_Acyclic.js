@@ -260,6 +260,7 @@ contract("Rewards-Market", async function(users) {
 				assert.equal(reward/1,referralRewardPlot[i-1]*1e8);
 				let plotBalBefore = await plotusToken.balanceOf(users[i]);
 				functionSignature = encode3("claimReferralFee(address,address)", users[i], plotusToken.address);
+                if(reward > 0)
 				await signAndExecuteMetaTx(
 			      privateKeyList[i],
 			      users[i],
