@@ -20,6 +20,7 @@ import "./external/proxy/OwnedUpgradeabilityProxy.sol";
 import "./external/NativeMetaTransaction.sol";
 import "./interfaces/IMaster.sol";
 import "./interfaces/IAllMarkets.sol";
+import "./interfaces/IbPLOTToken.sol";
 import "./interfaces/IToken.sol";
 import "./interfaces/IAuth.sol";
 
@@ -37,7 +38,9 @@ contract Referral is IAuth, NativeMetaTransaction {
     }
 
     IAllMarkets internal allMarkets;
+    IbPLOTToken internal bPLOTToken;
     address internal masterAddress;
+    address internal plotToken;
     
     uint internal predictionDecimalMultiplier;
     uint public referralValidity;
@@ -58,9 +61,26 @@ contract Referral is IAuth, NativeMetaTransaction {
       authorized = ms.authorized();
       masterAddress = _masterAddress;
       allMarkets = IAllMarkets(ms.getLatestAddress("AM"));
+      bPLOTToken = IbPLOTToken(ms.getLatestAddress("BL"));
+      plotToken = ms.dAppToken();
       predictionDecimalMultiplier = 10;
       referralValidity = 90 days;
       _initializeEIP712("RF");
+    }
+
+    /**
+    * @dev Approves Plot tokens to bPLOT contract to use PLOT for minting bPLOT
+    * @param _amount amount of plot tokens
+    */ 
+    function approveToBPLOT(uint _amount) external onlyAuthorized {
+        require(IToken(plotToken).approve((address(bPLOTToken)),_amount),"ERC20 call Failed");
+    }
+
+    /**
+    * @dev Renounce this contract as minter
+     */
+    function renounceAsMinter() public onlyAuthorized {
+      bPLOTToken.renounceMinter();
     }
 
     /**
@@ -130,6 +150,7 @@ contract Referral is IAuth, NativeMetaTransaction {
       uint256 _refereeFee = _userData.refereeFee[_token];
       delete _userData.refereeFee[_token];
       uint _tokenToTransfer = (_refereeFee.add(_referrerFee)).mul(10**predictionDecimalMultiplier);
+      require(_tokenToTransfer > 0);
       _transferAsset(_token, _user, _tokenToTransfer);
       emit ClaimedReferralReward(_user, _token, _tokenToTransfer);
     }
@@ -140,8 +161,11 @@ contract Referral is IAuth, NativeMetaTransaction {
     * @param _amount The amount which is transfer.
     */
     function _transferAsset(address _asset, address _recipient, uint256 _amount) internal {
-      require(_amount > 0);
-      require(IToken(_asset).transfer(_recipient, _amount));
+      if(_asset == plotToken) {
+        require(bPLOTToken.mint(_recipient, _amount));
+      } else {
+        require(IToken(_asset).transfer(_recipient, _amount));
+      }
     }
 
 }
