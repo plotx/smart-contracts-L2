@@ -27,7 +27,7 @@ import "./interfaces/IAuth.sol";
 contract Referral is IAuth, NativeMetaTransaction {
 
     event ReferralLog(address indexed referrer, address indexed referee, uint256 referredOn);
-    event ReferralFeeLog(address indexed referrer, address indexed referee, uint256 referrerFee, uint256 refereeFee);
+    event ReferralFeeLog(address indexed referrer, address indexed referee, address token, uint256 referrerFee, uint256 refereeFee);
     event ClaimedReferralReward(address indexed user, address token, uint256 amount);
 
     struct UserData {
