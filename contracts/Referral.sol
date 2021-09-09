@@ -124,7 +124,7 @@ contract Referral is IAuth, NativeMetaTransaction {
         _userData.refereeFee[_token] = _userData.refereeFee[_token].add(_refereeFee);
         //Commission for referrer
         userData[_referrer].referrerFee[_token] = userData[_referrer].referrerFee[_token].add(_referrerFee);
-        emit ReferralFeeLog(_referrer, _referee, _referrerFee, _refereeFee);
+        emit ReferralFeeLog(_referrer, _referee, _token, _referrerFee, _refereeFee);
       }
     }
 
