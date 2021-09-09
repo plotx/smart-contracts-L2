@@ -48,7 +48,7 @@ contract Referral is IAuth, NativeMetaTransaction {
     mapping (address => UserData) public userData;
 
     modifier onlyInternal {
-      IMaster(masterAddress).isInternal(msg.sender);
+      require(IMaster(masterAddress).isInternal(msg.sender));
       _;
     }
 
