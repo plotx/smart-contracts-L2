@@ -26,7 +26,7 @@ import "./interfaces/IAuth.sol";
 
 contract Referral is IAuth, NativeMetaTransaction {
 
-    event ReferralLog(address indexed referrer, address indexed referee, uint256 referredOn);
+    event ReferralLog(address indexed referrer, address indexed referee, uint256 referredOn, uint256 validity);
     event ReferralFeeLog(address indexed referrer, address indexed referee, address token, uint256 referrerFee, uint256 refereeFee);
     event ClaimedReferralReward(address indexed user, address token, uint256 amount);
 
@@ -104,7 +104,7 @@ contract Referral is IAuth, NativeMetaTransaction {
       require(_userData.referrer == address(0));
       _userData.referrer = _referrer;
       _userData.validity = referralValidity.add(now);
-      emit ReferralLog(_referrer, _referee, now);
+      emit ReferralLog(_referrer, _referee, now, _userData.validity);
     }
 
     /**
