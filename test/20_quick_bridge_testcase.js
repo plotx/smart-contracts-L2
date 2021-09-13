@@ -21,11 +21,21 @@ contract('QuickBridge' ,async function([user1,user2,user3,user4]){
     rootToken2 = await ERC20.new("RT2","RT2");
     rootToken3 = await ERC20.new("RT3","RT3");
     rootDummyToken = await DummyTokenMock.new("rootDummy","rootDummy");
+    childToken1 = await ERC20.new("CT1","CT1");
     childToken2 = await ERC20.new("CT2","CT2");
+    childToken3 = await ERC20.new("CT3","CT3");
     childDummyToken = await DummyTokenMock.new("childDummy","childDummy");
+    +await childChainManager.setRootToChildToken(rootToken1.address,childToken1.address);
     await childChainManager.setRootToChildToken(rootToken2.address,childToken2.address);
+    await childChainManager.setRootToChildToken(rootToken3.address,childToken3.address);
     await childChainManager.setRootToChildToken(rootDummyToken.address,childDummyToken.address);
     quickBridge = await QuickBridge.new([rootToken1.address,rootToken2.address,rootDummyToken.address],user2,childChainManager.address);
+
+    // revert while trying to set auth and migration controller same address
+    await assertRevert(QuickBridge.new([rootToken1.address,rootToken2.address,rootDummyToken.address],user1,childChainManager.address));
+
+    // to check how code behaves for null child address while migrating
+    await childChainManager.setRootToChildToken(rootToken1.address,ZERO_ADDRESS);
 
     await childToken2.mint(quickBridge.address,toWei(1000));
     });
@@ -85,10 +95,10 @@ contract('QuickBridge' ,async function([user1,user2,user3,user4]){
         it('Authorised account should be able to change authorised account', async function () {
           assert.equal(await quickBridge.authController(),user1);
 
-          await quickBridge.updateAuthController(user2);
+          await quickBridge.updateAuthController(user3);
 
-          assert.equal(await quickBridge.authController(),user2);
-          await quickBridge.updateAuthController(user1,{from:user2});
+          assert.equal(await quickBridge.authController(),user3);
+          await quickBridge.updateAuthController(user1,{from:user3});
           assert.equal(await quickBridge.authController(),user1);
         });
 
@@ -112,6 +122,11 @@ contract('QuickBridge' ,async function([user1,user2,user3,user4]){
           await assertRevert(quickBridge.updateAuthController(user2,{from:user2}));
         });
 
+        it('should revert if  tries to set auth and migration controller as same address', async function () {
+          await assertRevert(quickBridge.updateAuthController(user2));
+          await assertRevert(quickBridge.updateMigrationController(user1,{from:user2}));
+        });
+
         it('should revert if non-migrator tries to call migrator specific functions', async function () {
           await assertRevert(quickBridge.migrate(hash,user4,user3,timestamp,toWei(1000),rootToken2.address,{from:user1}));
           await assertRevert(quickBridge.updateMigrationController(user2,{from:user1}));
@@ -124,12 +139,21 @@ contract('QuickBridge' ,async function([user1,user2,user3,user4]){
 
         it('should revert if tries to add null token or existing token', async function () {
           await assertRevert(quickBridge.whitelistNewToken([ZERO_ADDRESS]));
-          await assertRevert(quickBridge.whitelistNewToken([rootToken1.address]));
+          await assertRevert(quickBridge.whitelistNewToken([rootToken2.address]));
         });
 
         it('should revert if tries to remove null token or non-existing token', async function () {
           await assertRevert(quickBridge.disableToken(ZERO_ADDRESS));
           await assertRevert(quickBridge.disableToken(rootToken3.address));
+        });
+
+        it('should revert if tries to add token with no child token', async function () {
+          await childChainManager.setRootToChildToken(rootToken3.address,ZERO_ADDRESS);
+          await assertRevert(quickBridge.whitelistNewToken([rootToken3.address]));
+        });
+
+        it('should revert if tries to remove token with pending balance in contract', async function () {
+          await assertRevert(quickBridge.disableToken(rootToken2.address));
         });
 
         it('should revert if tries to whitelist migration with invalid arguments', async function () {

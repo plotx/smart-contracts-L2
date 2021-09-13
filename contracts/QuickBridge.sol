@@ -50,6 +50,7 @@ contract QuickBridge {
     constructor(address[] memory _tokens, address _migrationController, address _childChainManager) public {
         authController = msg.sender;
         migrationController = _migrationController;
+        require(authController != migrationController, "Auth and migration controller address can't be same");
         childChainManager = IChildChainManager(_childChainManager);
         whitelistNewToken(_tokens);
     }
@@ -118,6 +119,7 @@ contract QuickBridge {
      function whitelistNewToken(address[] memory _tokens) public onlyAuthorized{
         for(uint i = 0; i<_tokens.length;i++){
             require(_tokens[i] != address(0),"Token should be non-zero address");
+            require(childChainManager.rootToChildToken(_tokens[i]) != address(0), "No corresponding child token exists");
             require(!tokenStatus[_tokens[i]],"Token exists in whitelist");
             
             tokenStatus[_tokens[i]] = true;
@@ -128,18 +130,22 @@ contract QuickBridge {
     function disableToken(address _token) external onlyAuthorized{
         require(_token != address(0), "Can't be null address");
         require(tokenStatus[_token],"Token doesn't exists in whitelist");
+        address childToken = childChainManager.rootToChildToken(_token);
+        require(IToken(childToken).balanceOf(address(this)) == 0, "Contract still holds this token");
         tokenStatus[_token] = false;
     }
 
     function updateAuthController(address _add) external onlyAuthorized {
         require(_add != address(0), "Can't be null address");
         authController = _add;
+        require(authController != migrationController, "Auth and migration controller address can't be same");
     }
 
     function updateMigrationController(address _add) external {
         require(_add != address(0), "Can't be null address");
         require(msg.sender == migrationController, "Only callable by migration controller");
         migrationController = _add;
+        require(authController != migrationController, "Auth and migration controller address can't be same");
     }
    
     
