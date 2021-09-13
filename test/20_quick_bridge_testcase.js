@@ -190,6 +190,14 @@ contract('QuickBridge' ,async function([user1,user2,user3,user4]){
           
         });
 
+        it('should revert if tries to deploy with null address', async function () {
+
+          await assertRevert(QuickBridge.new([],ZERO_ADDRESS,childChainManager.address));
+          await assertRevert(QuickBridge.new([],user1,ZERO_ADDRESS));
+          
+          
+        });
+
     });
     });
 

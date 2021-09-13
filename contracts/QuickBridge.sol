@@ -49,6 +49,8 @@ contract QuickBridge {
 
     constructor(address[] memory _tokens, address _migrationController, address _childChainManager) public {
         authController = msg.sender;
+        require(_migrationController != address(0), "Can't be null");
+        require(_childChainManager != address(0), "Can't be null");
         migrationController = _migrationController;
         require(authController != migrationController, "Auth and migration controller address can't be same");
         childChainManager = IChildChainManager(_childChainManager);
@@ -66,13 +68,13 @@ contract QuickBridge {
      * @dev Whitelist transaction to transfer bPlots.
      */
     function whitelistMigration(
-        bytes memory _hash,
+        bytes calldata _hash,
         address _to,
         address _from,
         uint256 _timestamp,
         uint256 _amount,
         address _token
-    ) public onlyAuthorized returns (bytes32) {
+    ) external onlyAuthorized returns (bytes32) {
         require(_to != address(0), "Can't be null address");
         require(_from != address(0), "Can't be null address");
         require(_timestamp != 0, "Can't be Zero");
@@ -94,13 +96,13 @@ contract QuickBridge {
      *
      */
     function migrate(
-        bytes memory _hash,
+        bytes calldata _hash,
         address _to,
         address _from,
         uint256 _timestamp,
         uint256 _amount,
         address _token
-    ) public returns (bool){
+    ) external returns (bool){
         bytes32 hash =  migrationHash(_hash, _to, _from, _timestamp,_amount,_token);
         require(msg.sender == migrationController, "sender is not migration controller");
         require(tokenStatus[_token],"Token should be enabled for migration");
