@@ -5,6 +5,7 @@ const Master = artifacts.require("Master");
 const PlotusToken = artifacts.require("MockPLOT");
 const AllMarkets = artifacts.require("AllPlotMarkets_2");
 const AllMarkets_V3 = artifacts.require("AllPlotMarkets_3");
+const BLOT = artifacts.require("BPLOT");
 const CyclicMarkets = artifacts.require("MockCyclicMarkets");
 const CyclicMarkets_V2 = artifacts.require("MockCyclicMarkets_2");
 const MockUniswapRouter = artifacts.require('MockUniswapRouter');
@@ -56,6 +57,7 @@ contract("Rewards-Market", async function(users) {
 			plotusToken = await PlotusToken.deployed();
 			timeNow = await latestTime();
             router = await MockUniswapRouter.deployed();
+			bPlotInstance = await BLOT.at(await masterInstance.getLatestAddress(web3.utils.toHex("BL")));
 			allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
 			cyclicMarkets = await CyclicMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("CM")));
 			referral = await Referral.deployed();
@@ -282,6 +284,8 @@ contract("Rewards-Market", async function(users) {
 
         it("Check referral fee", async () => {
 			let referralRewardPlot = [9.932, 0.8, 0.42, 0.246, 1, 1.4, 0.4, 0.1, 0.6, 0];
+			await bPlotInstance.addMinter(referral.address);
+			await referral.approveToBPLOT(toWei(100000000));
 
 			for(i=1;i<11;i++)
 			{
@@ -292,8 +296,9 @@ contract("Rewards-Market", async function(users) {
 					reward = reward[1];
 				}
 				assert.equal(reward/1,referralRewardPlot[i-1]*1e8);
-				let plotBalBefore = await plotusToken.balanceOf(users[i]);
+				let plotBalBefore = await bPlotInstance.balanceOf(users[i]);
 				functionSignature = encode3("claimReferralFee(address,address)", users[i], plotusToken.address);
+                if(reward > 0)
 				await signAndExecuteMetaTx(
 			      privateKeyList[i],
 			      users[i],
@@ -301,7 +306,7 @@ contract("Rewards-Market", async function(users) {
 			      referral,
               		"RF"
 			      );
-				let plotBalAfter = await plotusToken.balanceOf(users[i]);
+				let plotBalAfter = await bPlotInstance.balanceOf(users[i]);
 				assert.equal(Math.round((plotBalAfter/1e13-plotBalBefore/1e13)),reward/1e3);
 			}
 		})
@@ -500,6 +505,7 @@ contract("Market", async function(users) {
 			plotusToken = await PlotusToken.deployed();
 			timeNow = await latestTime();
             router = await MockUniswapRouter.deployed();
+			bPlotInstance = await BLOT.at(await masterInstance.getLatestAddress(web3.utils.toHex("BL")));
 			allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
 			cyclicMarkets = await CyclicMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("CM")));
 			referral = await Referral.deployed();
@@ -725,6 +731,8 @@ contract("Market", async function(users) {
 
         it("Check referral fee", async () => {
 			let referralRewardPlot = [9.932, 0.8, 0.42, 0.246, 1, 1.4, 0.4, 0.1, 0.6, 0];
+			await bPlotInstance.addMinter(referral.address);
+			await referral.approveToBPLOT(toWei(100000000));
 
 			for(i=1;i<11;i++)
 			{
@@ -735,8 +743,9 @@ contract("Market", async function(users) {
 					reward = reward[1];
 				}
 				assert.equal(reward/1,referralRewardPlot[i-1]*1e8);
-				let plotBalBefore = await plotusToken.balanceOf(users[i]);
+				let plotBalBefore = await bPlotInstance.balanceOf(users[i]);
 				functionSignature = encode3("claimReferralFee(address,address)", users[i], plotusToken.address);
+                if(reward > 0)
 				await signAndExecuteMetaTx(
 			      privateKeyList[i],
 			      users[i],
@@ -744,7 +753,7 @@ contract("Market", async function(users) {
 			      referral,
               		"RF"
 			      );
-				let plotBalAfter = await plotusToken.balanceOf(users[i]);
+				let plotBalAfter = await bPlotInstance.balanceOf(users[i]);
 				assert.equal(Math.round((plotBalAfter/1e13-plotBalBefore/1e13)),reward/1e3);
 			}
 		})

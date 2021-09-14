@@ -3,9 +3,9 @@ const { assert } = require("chai");
 const OwnedUpgradeabilityProxy = artifacts.require("OwnedUpgradeabilityProxy");
 const Master = artifacts.require("Master");
 const PlotusToken = artifacts.require("MockPLOT");
-const BLOT = artifacts.require("BPLOT");
 const AllMarkets = artifacts.require("MockAllMarkets");
 const CyclicMarkets = artifacts.require("MockCyclicMarkets");
+const BLOT = artifacts.require("BPLOT");
 const Referral = artifacts.require("Referral");
 const DisputeResolution = artifacts.require('DisputeResolution');
 const BigNumber = require("bignumber.js");
@@ -79,6 +79,11 @@ contract("Rewards-Market", async function(users) {
     		await assertRevert(cyclicMarkets.handleFee(100, 1, users[0], users[0], {from:users[10]}));
 			// await marketIncentives.claimCreationReward(100,{from:users[11]});
 		});
+
+        it("Should be able to set referral validity", async() => {
+            await assertRevert(referral.setReferralValidity(0));
+            await referral.setReferralValidity(24 * 60*60);//24 hours
+        });
 
 		it("Scenario 1: Few user wins", async () => {
 			let i;
@@ -161,58 +166,13 @@ contract("Rewards-Market", async function(users) {
             await cyclicMarkets.claimCreationReward({ from: users[11] });
             let balanceAfter = await plotusToken.balanceOf(users[11]);
             assert.equal(~~(balanceAfter/1e15), ~~((balanceBefore/1e14  + marketCreatoFee*1e4)/10));
-
-			// assert.equal((daoBalanceAfter/1e18).toFixed(2), (daoBalanceBefore/1e18 + marketCreatoFee+daoFee).toFixed(2));
-			await plotusToken.transfer(users[12], "700000000000000000000");
-			await plotusToken.approve(disputeResolution.address, "500000000000000000000", {
-				from: users[12],
-			});
-			await disputeResolution.raiseDispute(7, "500000000000000000000", "", {from: users[12]});
-			await increaseTime(604810);
-			await disputeResolution.declareResult(7);
-			
-			await increaseTime(60*61);
-
-			let userRewardPlot = [0,0,0,0,0,1118.14308219,1565.400315,0,0,0,0];
-			for(i=1;i<11;i++)
-			{
-				let reward = await allMarkets.getReturn(users[i],7);
-				// assert.equal(Math.round(reward/1e2),userRewardPlot[i]*1e6);
-				let plotBalBefore = await plotusToken.balanceOf(users[i]);
-				let plotEthUnused = await allMarkets.getUserUnusedBalance(users[i]);
-				functionSignature = encode3("withdraw(uint,uint)", plotEthUnused[0].iadd(plotEthUnused[1]), 100);
-				await signAndExecuteMetaTx(
-			      privateKeyList[i],
-			      users[i],
-			      functionSignature,
-			      allMarkets,
-              		"AM"
-			      );
-				let plotBalAfter = await plotusToken.balanceOf(users[i]);
-				assert.equal(Math.round((plotBalAfter-plotBalBefore)/1e18),Math.round((totalDepositedPlot/1e18-predictionVal[i])/1+reward/1e8));
-			}
-
-			// let plotBalBeforeCreator = await plotusToken.balanceOf(users[11]);
-			// functionSignature = encode3("claimCreationReward()");
-            // await signAndExecuteMetaTx(
-            //     privateKeyList[11],
-            //     users[11],
-            //     functionSignature,
-            //     cyclicMarkets,
-            //     "CM"
-            //     );
-
-			// let plotBalAfterCreator = await plotusToken.balanceOf(users[11]);
-
-			// assert.equal(Math.round((plotBalAfterCreator-plotBalBeforeCreator)/1e11),226640000);
-
-				
 		});
 
 		it("Check referral fee", async () => {
 			let referralRewardPlot = [9.932, 0.8, 0.42, 0.246, 1, 1.4, 0.4, 0.1, 0.6, 0];
 			await bPlotInstance.addMinter(referral.address);
 			await referral.approveToBPLOT(toWei(100000000));
+
 			for(i=1;i<11;i++)
 			{
 				let reward = await referral.getReferralFees(users[i], plotusToken.address);
@@ -235,276 +195,55 @@ contract("Rewards-Market", async function(users) {
 				let plotBalAfter = await bPlotInstance.balanceOf(users[i]);
 				assert.equal(Math.round((plotBalAfter/1e13-plotBalBefore/1e13)),reward/1e3);
 			}
-		})
-	});
-});
-
-contract("Rewards-Market Stake less than 1 ether", async function(users) {
-	describe("Scenario1", async () => {
-		it("0.0", async () => {
-			masterInstance = await OwnedUpgradeabilityProxy.deployed();
-			masterInstance = await Master.at(masterInstance.address);
-			plotusToken = await PlotusToken.deployed();
-			timeNow = await latestTime();
-			
-			cyclicMarkets = await CyclicMarkets.at(await masterInstance.getLatestAddress(toHex("CM")));
-			allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
-			await increaseTime(5 * 3600);
-            await plotusToken.transfer(users[12],toWei(100000));
-            await plotusToken.transfer(users[11],toWei(100000));
-            await plotusToken.transfer(masterInstance.address,toWei(500));
-            
-			let nullAddress = "0x0000000000000000000000000000";
-         
-            await plotusToken.transfer(users[11],toWei(100));
-            await plotusToken.approve(allMarkets.address,toWei(200000),{from:users[11]});
-			await cyclicMarkets.setNextOptionPrice(18);
-			await cyclicMarkets.claimRelayerRewards();
-            await cyclicMarkets.whitelistMarketCreator(users[11]);
-            await cyclicMarkets.createMarket(0, 0, 0,{from:users[11],gasPrice:500000});
-            // await marketIncentives.claimCreationReward(100,{from:users[11]});
 		});
 
-		it("Scenario 1: Few user wins", async () => {
-			let i;
-			let totalDepositedPlot = toWei(100);
-			let predictionVal  = [100];
-			let options=[1, 2, 3];
+        it("Increase time > referral validity", async() => {
+            await increaseTime(24*60*60);
+        });
 
-			let relayerBalBefore = await plotusToken.balanceOf(users[0]);
-			await assertRevert(cyclicMarkets.claimRelayerRewards());
-			let relayerBalAfter = await plotusToken.balanceOf(users[0]);
-
-			assert.equal(((relayerBalAfter-relayerBalBefore)/1e18),0);
-
-			relayerBalBefore = await plotusToken.balanceOf(users[11]);
-			await cyclicMarkets.claimRelayerRewards({from:users[11]});
-			relayerBalAfter = await plotusToken.balanceOf(users[11]);
-
-			assert.equal(~~((relayerBalAfter-relayerBalBefore)/1e10),100000002);
-
-
-			let betpoints = [1814.81481, 1814.81481, 1814.81481];
-
-
-			for(i=0;i<3;i++)
-			{
-				let betPointUser = (await allMarkets.getUserPredictionPoints(users[11],7,options[i]))/1e5;
-				assert.equal(betPointUser,betpoints[i]);
-			}
-			let unusedBal = await allMarkets.getUserUnusedBalance(users[11]);
-			assert.equal(totalDepositedPlot/1e18-unusedBal[0]/1e18,100);
-
-			await increaseTime(8*60*60);
-
-			await cyclicMarkets.settleMarket(7, 0);
-			await plotusToken.transfer(users[12], "700000000000000000000");
-			await plotusToken.approve(allMarkets.address, "500000000000000000000", {
-				from: users[12],
-			});
-
-			await increaseTime(4*60*61);
-
-			let reward = await allMarkets.getReturn(users[11],7);
-			// assert.equal(Math.round(reward/1e2),userRewardPlot[i]*1e6);
-			let plotBalBefore = await plotusToken.balanceOf(users[11]);
-			let plotEthUnused = await allMarkets.getUserUnusedBalance(users[11]);
-			// await allMarkets.withdraw(plotEthUnused[0].iadd(plotEthUnused[1]), 100, {from: users[11]});
-			functionSignature = encode3("withdraw(uint,uint)", plotEthUnused[0].iadd(plotEthUnused[1]), 100);
-			await signAndExecuteMetaTx(
-		      privateKeyList[11],
-		      users[11],
-		      functionSignature,
-		      allMarkets,
-              "AM"
-		      );
-			let plotBalAfter = await plotusToken.balanceOf(users[11]);
-			assert.equal(Math.round((plotBalAfter-plotBalBefore)/1e18),Math.round(reward/1e8));
-			let marketCreatorReward = await cyclicMarkets.getPendingMarketCreationRewards(users[11]);
-			assert.equal(8000000,Math.round(marketCreatorReward/1e11));
-
-			let plotBalBeforeCreator = await plotusToken.balanceOf(users[11]);
-
-			functionSignature = encode3("claimCreationReward()");
-            await signAndExecuteMetaTx(
-                privateKeyList[11],
-                users[11],
-                functionSignature,
-                cyclicMarkets,
-              	"CM"
-                );
-
-			let plotBalAfterCreator = await plotusToken.balanceOf(users[11]);
-
-			assert.equal(Math.round((plotBalAfterCreator-plotBalBeforeCreator)/1e11),8000000);
-
-				
-		});
-
-	});
-});
-
-contract("Rewards-Market Raise dispute and pass the proposal ", async function(users) {
-	describe("Scenario1", async () => {
-		it("0.0", async () => {
-			masterInstance = await OwnedUpgradeabilityProxy.deployed();
-			masterInstance = await Master.at(masterInstance.address);
-			plotusToken = await PlotusToken.deployed();
-			timeNow = await latestTime();
-
-			bPlotInstance = await BLOT.at(await masterInstance.getLatestAddress(web3.utils.toHex("BL")));
-			cyclicMarkets = await CyclicMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("CM")));
-			allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
-			disputeResolution = await DisputeResolution.at(await masterInstance.getLatestAddress(web3.utils.toHex("DR")));
-            await increaseTime(5 * 3600);
-            await plotusToken.transfer(users[12],toWei(100000));
-            await plotusToken.transfer(users[11],toWei(100000));
-            await plotusToken.transfer(masterInstance.address,toWei(500));
-            
-			let nullAddress = "0x0000000000000000000000000000";
-         
-            await plotusToken.transfer(users[11],toWei(100));
-            await plotusToken.approve(allMarkets.address,toWei(200000),{from:users[11]});
-			await cyclicMarkets.setNextOptionPrice(18);
-			await cyclicMarkets.claimRelayerRewards();
-            await cyclicMarkets.whitelistMarketCreator(users[11]);
-            await cyclicMarkets.createMarket(0, 0, 0,{from:users[11],gasPrice:500000});
-            await assertRevert(cyclicMarkets.claimCreationReward({from:users[11]}));
-		});
-
-		it("Scenario 1: Few user wins", async () => {
+        it("Above scenario with referral validity being expired", async () => {
+            await cyclicMarkets.createMarket(0,0,0, {from:users[11]});
 			let i;
 			let totalDepositedPlot = toWei(1000);
 			let predictionVal  = [0,100, 400, 210, 123, 500, 700, 200, 50, 300, 150];
 			let options=[0,2,2,2,3,1,1,2,3,3,2,1];
-			let daoCommissions = [0, 1.8, 6.4, 3.36, 1.968, 8, 11.2, 3.2, 0.8, 4.8, 2.4];
+			const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 			for(i=1; i<11;i++){
-				if(i>1) {
-					await referral.setReferrer(users[1], users[i]);
-					//SHould not add referrer if already set
-					await assertRevert(referral.setReferrer(users[1], users[i]));
-				}
 				await plotusToken.transfer(users[i], toWei(2000));
 			    await plotusToken.approve(allMarkets.address, toWei(1000000), { from: users[i] });
-			    let functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", totalDepositedPlot, 7, plotusToken.address, predictionVal[i]*1e8, options[i]);
+			    let functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", totalDepositedPlot, 8, plotusToken.address, predictionVal[i]*1e8, options[i]);
 				await cyclicMarkets.setNextOptionPrice(options[i]*9);
-				// let daoBalanceBefore = await plotusToken.balanceOf(masterInstance.address);
+				// let daoBalanceBefore = await plotusToken.balanceOf(marketIncentives.address);
 				// await allMarkets.depositAndPlacePrediction(totalDepositedPlot, 7, plotusToken.address, predictionVal[i]*1e8, options[i]);
 				await signAndExecuteMetaTx(
 			      privateKeyList[i],
 			      users[i],
 			      functionSignature,
 			      allMarkets,
-              		"AM"
+              	   "AM"
 			      );
-				// let daoBalanceAfter = await plotusToken.balanceOf(marketIncentives.address);
-				// assert.equal(daoBalanceAfter - daoBalanceBefore, daoCommissions[i]*1e18);
 			}
 
-			//SHould not add referrer if already placed prediction
-			await assertRevert(referral.setReferrer(users[1], users[2]));
-			let relayerBalBefore = await plotusToken.balanceOf(users[0]);
-			await cyclicMarkets.claimRelayerRewards();
-			let relayerBalAfter = await plotusToken.balanceOf(users[0]);
-
-			assert.equal(Math.round((relayerBalAfter-relayerBalBefore)/1e15),11.532*1e3);
-
-
-			let betpoints = [0,5444.44444, 21777.77777, 11433.33333, 4464.44444, 54444.44444, 76222.22222, 10888.88888, 1814.81481, 10888.88888, 8166.66666, 1814.81481, 1814.81481, 1814.81481];
-
-
-			for(i=1;i<=11;i++)
-			{
-				let betPointUser = (await allMarkets.getUserPredictionPoints(users[i],7,options[i]))/1e5;
-				if(i == 11) {
-					let betPointUser1 = (await allMarkets.getUserPredictionPoints(users[i],7,2))/1e5;
-					assert.equal(betPointUser1,betpoints[i+1]);
-					let betPointUser2 = (await allMarkets.getUserPredictionPoints(users[i],7,3))/1e5;
-					assert.equal(betPointUser2,betpoints[i+1]);
-				}
-				assert.equal(betPointUser,betpoints[i]);
-				let unusedBal = await allMarkets.getUserUnusedBalance(users[i]);
-				if(i != 11)
-				assert.equal(totalDepositedPlot/1e18-unusedBal[0]/1e18,predictionVal[i]);
-			}
-
+			await cyclicMarkets.settleMarket(8,0);
 			await increaseTime(8*60*60);
 
-			await cyclicMarkets.settleMarket(7, 0);
-			await plotusToken.transfer(users[12], "700000000000000000000");
-			await plotusToken.approve(disputeResolution.address, "500000000000000000000", {
-				from: users[12],
-			});
-
-			await disputeResolution.raiseDispute(7, "5000000000000000000000000", "", {from: users[12]});
-			
-			await plotusToken.transfer(users[13], "20000000000000000000000");
-			await plotusToken.transfer(users[14], "20000000000000000000000");
-			await plotusToken.transfer(users[15], "20000000000000000000000");
-			
-			await plotusToken.approve(disputeResolution.address, "20000000000000000000000", {
-				from: users[13],
-			});
-			await plotusToken.approve(disputeResolution.address, "20000000000000000000000", {
-				from: users[14],
-			});
-			await plotusToken.approve(disputeResolution.address, "20000000000000000000000", {
-				from: users[15],
-			});
-			await disputeResolution.submitVote(7, "20000000000000000000000", 1, {from:users[13]});
-		    await disputeResolution.submitVote(7, "20000000000000000000000", 1, {from:users[14]});
-		    await disputeResolution.submitVote(7, "20000000000000000000000", 1, {from:users[15]});
-		    await increaseTime(604810);
-			await disputeResolution.declareResult(7);
-			// await increaseTime(604800);
-			// await governance.closeProposal(proposalId/1);
-
-			await increaseTime(60*61);
-		    assert.equal((await allMarkets.getMarketResults(7))[0]/1, 3);
-
-			let userRewardPlot = [0, 0, 0, 0, 166.6424219, 0, 0, 0, 67.74082192, 406.4449315, 0];
-			for(i=1;i<11;i++)
-			{
-				let reward = await allMarkets.getReturn(users[i],7);
-				// assert.equal(Math.round(reward/1e2),userRewardPlot[i]*1e6);
-				let plotBalBefore = await plotusToken.balanceOf(users[i]);
-				let plotEthUnused = await allMarkets.getUserUnusedBalance(users[i]);
-				functionSignature = encode3("withdraw(uint,uint)", plotEthUnused[0].iadd(plotEthUnused[1]), 100);
-				await signAndExecuteMetaTx(
-			      privateKeyList[i],
-			      users[i],
-			      functionSignature,
-			      allMarkets,
-              		"AM"
-			      );
-				let plotBalAfter = await plotusToken.balanceOf(users[i]);
-				assert.equal(Math.round((plotBalAfter-plotBalBefore)/1e18),Math.round((totalDepositedPlot/1e18-predictionVal[i])/1+reward/1e8));
-			}
-
+			let daoBalanceBefore = await plotusToken.balanceOf(masterInstance.address);
+			await cyclicMarkets.settleMarket(8,0);
+			let daoFee = 5.666;
+			let daoBalanceAfter = await plotusToken.balanceOf(masterInstance.address);
+			assert.equal((daoBalanceAfter/1e18).toFixed(2), (daoBalanceBefore/1e18 + daoFee).toFixed(2));
 			let marketCreatorReward = await cyclicMarkets.getPendingMarketCreationRewards(users[11]);
 			assert.equal(226640000,Math.round(marketCreatorReward/1e11));
 
-			let plotBalBeforeCreator = await plotusToken.balanceOf(users[11]);
-
-			functionSignature = encode3("claimCreationReward()");
-            await signAndExecuteMetaTx(
-                privateKeyList[11],
-                users[11],
-                functionSignature,
-                cyclicMarkets,
-                "CM"
-                );
-
-			let plotBalAfterCreator = await plotusToken.balanceOf(users[11]);
-
-			assert.equal(Math.round((plotBalAfterCreator-plotBalBeforeCreator)/1e11),226640000);
-
-				
+			// let creationReward = 14.3999;
+			let marketCreatoFee = 22.664;
+            let balanceBefore = await plotusToken.balanceOf(users[11]);
+            await cyclicMarkets.claimCreationReward({ from: users[11] });
+            let balanceAfter = await plotusToken.balanceOf(users[11]);
+            assert.equal(~~(balanceAfter/1e15), ~~((balanceBefore/1e14  + marketCreatoFee*1e4)/10));
 		});
-
-		it("Check referral fee", async () => {
-			let referralRewardPlot = [10.532, 0.8, 0.42, 0.246, 1, 1.4, 0.4, 0.1, 0.6, 0.3];
-			await bPlotInstance.addMinter(referral.address);
+        
+        it("Users should not get referral fee", async () => {
 			await referral.approveToBPLOT(toWei(100000000));
 
 			for(i=1;i<11;i++)
@@ -515,20 +254,19 @@ contract("Rewards-Market Raise dispute and pass the proposal ", async function(u
 				} else {
 					reward = reward[1];
 				}
-				assert.equal(reward/1,referralRewardPlot[i-1]*1e8);
+				assert.equal(reward/1,0);
 				let plotBalBefore = await bPlotInstance.balanceOf(users[i]);
 				functionSignature = encode3("claimReferralFee(address,address)", users[i], plotusToken.address);
-                if(reward > 0)
-				await signAndExecuteMetaTx(
+				await assertRevert(signAndExecuteMetaTx(
 			      privateKeyList[i],
 			      users[i],
 			      functionSignature,
 			      referral,
               		"RF"
-			      );
+			      ));
 				let plotBalAfter = await bPlotInstance.balanceOf(users[i]);
 				assert.equal(Math.round((plotBalAfter/1e13-plotBalBefore/1e13)),reward/1e3);
 			}
-		})
+		});
 	});
 });

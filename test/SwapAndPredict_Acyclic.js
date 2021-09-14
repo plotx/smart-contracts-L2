@@ -57,6 +57,7 @@ contract("Rewards-Market", async function(users) {
 			BLOTInstance = await BLOT.deployed();
 			timeNow = await latestTime();
 
+			bPlotInstance = await BLOT.at(await masterInstance.getLatestAddress(web3.utils.toHex("BL")));
 			allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
 			acyclicMarkets = await AcyclicMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AC")));
 			referral = await Referral.deployed();
@@ -248,6 +249,8 @@ contract("Rewards-Market", async function(users) {
 
 		it("Check referral fee", async () => {
 			let referralRewardPlot = [10.532, 0.8, 0.42, 0.246, 1, 1.4, 0.4, 0.1, 0.6, 0.3];
+			await bPlotInstance.addMinter(referral.address);
+			await referral.approveToBPLOT(toWei(100000000));
 
 			for(i=1;i<11;i++)
 			{
@@ -258,8 +261,9 @@ contract("Rewards-Market", async function(users) {
 					reward = reward[1];
 				}
 				assert.equal(reward/1,referralRewardPlot[i-1]*1e8);
-				let plotBalBefore = await plotusToken.balanceOf(users[i]);
+				let plotBalBefore = await bPlotInstance.balanceOf(users[i]);
 				functionSignature = encode3("claimReferralFee(address,address)", users[i], plotusToken.address);
+                if(reward > 0)
 				await signAndExecuteMetaTx(
 			      privateKeyList[i],
 			      users[i],
@@ -267,7 +271,7 @@ contract("Rewards-Market", async function(users) {
 			      referral,
               		"RF"
 			      );
-				let plotBalAfter = await plotusToken.balanceOf(users[i]);
+				let plotBalAfter = await bPlotInstance.balanceOf(users[i]);
 				assert.equal(Math.round((plotBalAfter/1e13-plotBalBefore/1e13)),reward/1e3);
 			}
 		})
