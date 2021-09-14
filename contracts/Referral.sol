@@ -28,7 +28,7 @@ contract Referral is IAuth, NativeMetaTransaction {
 
     event ReferralLog(address indexed referrer, address indexed referee, uint256 referredOn, uint256 validity);
     event ReferralFeeLog(address indexed referrer, address indexed referee, address token, uint256 referrerFee, uint256 refereeFee);
-    event ClaimedReferralReward(address indexed user, address token, uint256 amount);
+    event ClaimedReferralReward(address indexed user, address token, uint256 referrerFee, uint256 refereeFee);
 
     struct UserData {
       mapping(address => uint256) referrerFee; // Fee earned by referring another user for a given token
@@ -152,7 +152,7 @@ contract Referral is IAuth, NativeMetaTransaction {
       uint _tokenToTransfer = (_refereeFee.add(_referrerFee)).mul(10**predictionDecimalMultiplier);
       require(_tokenToTransfer > 0);
       _transferAsset(_token, _user, _tokenToTransfer);
-      emit ClaimedReferralReward(_user, _token, _tokenToTransfer);
+      emit ClaimedReferralReward(_user, _token, _referrerFee, _refereeFee);
     }
 
     /**
