@@ -43,7 +43,7 @@ contract AllPlotMarkets_5 is AllPlotMarkets_4 {
       marketDataExtended[_marketIndex].marketCreatorContract = msg.sender;
       emit MarketQuestion(_marketIndex, _marketTimes[0], _marketTimes[1], _marketTimes[3], _marketTimes[2], _optionRanges, msg.sender);
     //   if(_initialLiquidity > 0) {
-        _placeInitialPrediction(_marketIndex, _marketCreator, _initialLiquidities, uint64(_optionRanges.length + 1));
+        _initialPredictionWithVariableLiquidity(_marketIndex, _marketCreator, _initialLiquidities, uint64(_optionRanges.length + 1));
     //   }
       return _marketIndex;
     }
@@ -53,7 +53,7 @@ contract AllPlotMarkets_5 is AllPlotMarkets_4 {
      * @param _marketId Index of the market to place prediction
      * @param _msgSenderAddress Address of the user who is placing the prediction
      */
-    function _placeInitialPrediction(uint64 _marketId, address _msgSenderAddress, uint64[] memory _initialLiquidities, uint64 _totalOptions) internal {
+    function _initialPredictionWithVariableLiquidity(uint64 _marketId, address _msgSenderAddress, uint64[] memory _initialLiquidities, uint64 _totalOptions) internal {
       uint64 _initialLiquidity;
       for(uint i = 0;i < _initialLiquidities.length; i++) {
         _initialLiquidity = _initialLiquidity.add(_initialLiquidities[i]);
@@ -70,7 +70,9 @@ contract AllPlotMarkets_5 is AllPlotMarkets_4 {
       }
       address _predictionToken = predictionToken;
       for(uint i = 1;i <= _totalOptions; i++) {
-        _provideLiquidity(_marketId, _msgSenderAddress, _predictionToken, _initialLiquidities[i-1], i);
+        if(_initialLiquidities[i-1] > 0) {
+          _provideLiquidity(_marketId, _msgSenderAddress, _predictionToken, _initialLiquidities[i-1], i);
+        }
       }
     }
 
