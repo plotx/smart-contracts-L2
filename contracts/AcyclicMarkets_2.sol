@@ -158,4 +158,21 @@ contract AcyclicMarkets_2 is AcyclicMarkets {
         }
       }
     }
+
+    /**
+     * @dev Gets price for given market and option
+     * @param _marketId  Market ID
+     * @param _prediction  prediction option
+     * @return  option price
+     **/
+    function getOptionPrice(uint _marketId, uint256 _prediction) public view returns(uint64) {
+      uint64 optionPice = super.getOptionPrice(_marketId,_prediction);
+      if(optionPice < 1000)
+      {
+        optionPice = 1000;
+      }
+
+      return optionPice;
+    }
+
 }
