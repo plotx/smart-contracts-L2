@@ -68,6 +68,7 @@ contract AllPlotMarkets_5 is AllPlotMarkets_4 {
       if(_balanceAvailable < _defaultAmount) {
         _deposit(_defaultAmount.sub(_balanceAvailable), _msgSenderAddress);
       }
+      require(_totalOptions == _initialLiquidities.length);
       address _predictionToken = predictionToken;
       for(uint i = 1;i <= _totalOptions; i++) {
         if(_initialLiquidities[i-1] > 0) {
