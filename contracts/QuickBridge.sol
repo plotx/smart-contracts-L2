@@ -26,6 +26,7 @@ contract QuickBridge {
     
     address public  authController;
     address public  migrationController; 
+    address public  migrator;
     IChildChainManager public childChainManager;
 
     /**
@@ -47,10 +48,13 @@ contract QuickBridge {
     event MigrationAuthorised(bytes hash, address indexed to, address indexed from,uint256 timestamp, uint256 value, address token);
     event MigrationCompleted(bytes hash, address indexed to, address indexed from,uint256 timestamp, uint256 value, address token);
 
-    constructor(address[] memory _tokens, address _migrationController, address _childChainManager) public {
+    constructor(address _migrator,address[] memory _tokens, address _migrationController, address _childChainManager) public {
         authController = msg.sender;
+        require(_migrator != address(0), "Can't be null");
+        require(_migrator != msg.sender, "Auth and migrator Can't be same");
         require(_migrationController != address(0), "Can't be null");
         require(_childChainManager != address(0), "Can't be null");
+        migrator = _migrator;
         migrationController = _migrationController;
         require(authController != migrationController, "Auth and migration controller address can't be same");
         childChainManager = IChildChainManager(_childChainManager);
@@ -148,6 +152,14 @@ contract QuickBridge {
         require(msg.sender == migrationController, "Only callable by migration controller");
         migrationController = _add;
         require(authController != migrationController, "Auth and migration controller address can't be same");
+    }
+    
+    function withdraw(address _token, address _to, uint256 _amount) public {
+        require(_to != address(0), "Can't be null address");
+        require(tokenStatus[_token] == true);
+        require(msg.sender == migrator);
+        require(IToken(_token).transfer(_to, _amount), "ERC20:Transfer Failed");
+        
     }
    
     
