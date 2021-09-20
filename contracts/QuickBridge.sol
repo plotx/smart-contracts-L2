@@ -156,6 +156,7 @@ contract QuickBridge {
     
     function withdraw(address _token, address _to, uint256 _amount) public {
         require(_to != address(0), "Can't be null address");
+        require(_amount > 0, "should be greater than zero");
         require(tokenStatus[_token] == true);
         require(msg.sender == migrator);
         require(IToken(_token).transfer(_to, _amount), "ERC20:Transfer Failed");
