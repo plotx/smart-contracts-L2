@@ -12,6 +12,10 @@ contract IAllMarkets {
 
     function createMarket(uint32[] memory _marketTimes, uint64[] memory _optionRanges, address _createdBy, uint64 _initialLiquidity) public returns(uint64 _marketIndex);
 
+    function createMarketWithVariableLiquidity(uint32[] memory _marketTimes, uint64[] memory _optionRanges, address _marketCreator, uint64[] memory _initialLiquidities) 
+    public 
+    returns(uint64 _marketIndex);
+
     function settleMarket(uint256 _marketId, uint256 _value) external;
 
     function addInitialAuthorizedAddress(address _address) external;
