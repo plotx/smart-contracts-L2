@@ -225,7 +225,7 @@ contract ClaimAndPredict is NativeMetaTransaction {
     }
 
     function _verifyAndClaim(ClaimData memory _claimData) internal returns(uint _claimedAmount){
-      require(verifySign(_claimData.user, userClaimNonce[_claimData.user], _claimData.claimAmount, _claimData.v, _claimData.r, _claimData.s));
+      require(verifySign(_claimData.user, userClaimNonce[_claimData.user], _claimData.claimAmount, _claimData.strategyId, _claimData.totalClaimed, _claimData.v, _claimData.r, _claimData.s));
       userClaimNonce[_claimData.user]++;
       uint _maxClaim = maxClaimPerStrategy[_claimData.strategyId];
       if(bonusClaimed[_claimData.user] < _claimData.totalClaimed) {
@@ -252,6 +252,8 @@ contract ClaimAndPredict is NativeMetaTransaction {
         address _user,
         uint _userClaimNonce,
         uint _claimAmount,
+        uint _strategyId,
+        uint _totalClaimed,
         uint8 _v,
         bytes32 _r,
         bytes32 _s
@@ -260,7 +262,7 @@ contract ClaimAndPredict is NativeMetaTransaction {
         view
         returns(bool)
     {
-        bytes32 hash = getEncodedData(_user, _userClaimNonce, _claimAmount);
+        bytes32 hash = getEncodedData(_user, _userClaimNonce, _claimAmount, _totalClaimed, _strategyId);
         return isValidSignature(hash, _v, _r, _s);
     }
 
@@ -270,7 +272,9 @@ contract ClaimAndPredict is NativeMetaTransaction {
     function getEncodedData(
         address _user,
         uint _userClaimNonce,
-        uint _claimAmount
+        uint _claimAmount,
+        uint _totalClaimed,
+        uint _strategyId
     ) 
         public
         view
@@ -281,6 +285,8 @@ contract ClaimAndPredict is NativeMetaTransaction {
                 _user,
                 _userClaimNonce,
                 _claimAmount,
+                _strategyId,
+                _totalClaimed,
                 address(this)
             )
         );
