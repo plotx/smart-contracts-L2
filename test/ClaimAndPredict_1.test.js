@@ -64,18 +64,18 @@ describe("newPlotusWithBlot", () => {
             claimAndPedict = await ClaimAndPredict.new(masterInstance.address, router.address, (await router.WETH()));
             await assertRevert(BLOTInstance.convertToPLOT(users[0], users[1],toWei(100)));
         });
-        it("Add a minter in BLOT", async () => {
+        it("Add claimAndPedict contract as minter in BLOT", async () => {
             await BLOTInstance.addMinter(users[5]);
             await BLOTInstance.addMinter(claimAndPedict.address);
             await plotusToken.transfer(claimAndPedict.address, toWei(100000));
-            await claimAndPedict.updateMaxClaimPerStrategy([1], [toWei(1000)]);
             assert.equal(await BLOTInstance.isMinter(users[5]), true);
+            assert.equal(await BLOTInstance.isMinter(claimAndPedict.address), true);
         });
 
-        it("Renounce a minter in BLOT", async () => {
-            await BLOTInstance.renounceMinter({from:users[5]});
-            assert.equal(await BLOTInstance.isMinter(users[5]), false);
+        it("Set the max claim limit of strategy", async() => {
+            await claimAndPedict.updateMaxClaimPerStrategy([1], [toWei(1000)]);
         });
+
         it("1. Place Prediction", async () => {
 
           let i;
