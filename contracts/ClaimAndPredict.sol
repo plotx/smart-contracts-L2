@@ -70,6 +70,15 @@ contract ClaimAndPredict is NativeMetaTransaction {
       _;
     }
 
+    modifier holdNoFunds(address[] memory _path) {
+      bool _isNativeToken = (_path[0] == nativeCurrencyAddress && msg.value >0);
+      uint _initialFromTokenBalance = getTokenBalance(_path[0], _isNativeToken);
+      uint _initialToTokenBalance = getTokenBalance(_path[_path.length-1], false);
+      _;  
+      require(_initialFromTokenBalance.sub(msg.value) == getTokenBalance(_path[0], _isNativeToken));
+      require(_initialToTokenBalance == getTokenBalance(_path[_path.length-1], false));
+    }
+
     constructor(address _masterAddress, address _router, address _nativeCurrencyAddress) public {
       require(_masterAddress != address(0));
       require(_router != address(0));
@@ -123,8 +132,10 @@ contract ClaimAndPredict is NativeMetaTransaction {
      * @param _recipient Address, indented to recieve the tokens
      * @param _amount Amount of tokens to provide approval for. In Wei
      */
-    function withdrawToken(address _tokenAddress, address _recipient, uint256 _amount) public onlyAuthorized {
-        require(IToken(_tokenAddress).transfer(_recipient, _amount));
+    function withdrawToken(address _tokenAddress, address _recipient, uint256 _amount) public 
+    onlyAuthorized
+    {
+      require(IToken(_tokenAddress).transfer(_recipient, _amount));
     }
 
     /**
@@ -134,11 +145,22 @@ contract ClaimAndPredict is NativeMetaTransaction {
       IbPLOTToken(bPLOTToken).renounceMinter();
     }
 
+    /**
+    * @dev Get contract balance of the given token
+    * @param _token Address of token to query balance for 
+    * @param _isNativeCurrency Falg defining if the balance needed to be fetched for native currency of the network/chain
+    */
+    function getTokenBalance(address _token, bool _isNativeCurrency) public view returns(uint) {
+      if(_isNativeCurrency) {
+        return ((address(this)).balance);
+      }
+      return IToken(_token).balanceOf(address(this));
+    }
+
     function claimAndPredict(
       ClaimData calldata _claimData,
       MetaTxData calldata _txData
     )
-      payable
       external
     {
       require(_txData.userAddress == _claimData.user);
@@ -160,6 +182,7 @@ contract ClaimAndPredict is NativeMetaTransaction {
     )
       payable
       external
+      holdNoFunds(_path)
     {
       _verifyAndClaim(_claimData);
 
@@ -236,6 +259,10 @@ contract ClaimAndPredict is NativeMetaTransaction {
       if(bonusClaimed[_claimData.user].add(_actualClaim) > _maxClaim) {
         _actualClaim = _maxClaim.sub(bonusClaimed[_claimData.user]);
       }
+
+      bonusClaimed[_claimData.user] = bonusClaimed[_claimData.user].add(_actualClaim);
+
+      require(_actualClaim > 0);
 
       _provideApproval(predictionToken, bPLOTToken, _actualClaim);
       require(IToken(bPLOTToken).mint(_claimData.user, _actualClaim));
