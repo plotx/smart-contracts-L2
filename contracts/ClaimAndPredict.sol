@@ -262,16 +262,17 @@ contract ClaimAndPredict is NativeMetaTransaction {
       require(verifySign(_claimData.user, userClaimNonce[_claimData.user], _claimData.claimAmount, _claimData.strategyId, _claimData.totalClaimed, _claimData.v, _claimData.r, _claimData.s));
       userClaimNonce[_claimData.user]++;
       uint _maxClaim = maxClaimPerStrategy[_claimData.strategyId];
-      if(bonusClaimed[_claimData.user] < _claimData.totalClaimed) {
-          bonusClaimed[_claimData.user] = _claimData.totalClaimed;
+      uint _bonusClaimedByUser = bonusClaimed[_claimData.user];
+      if(_bonusClaimedByUser < _claimData.totalClaimed) {
+          _bonusClaimedByUser = _claimData.totalClaimed;
       }
 
       uint _actualClaim = _claimData.claimAmount;
-      if(bonusClaimed[_claimData.user].add(_actualClaim) > _maxClaim) {
-        _actualClaim = _maxClaim.sub(bonusClaimed[_claimData.user]);
+      if(_bonusClaimedByUser.add(_actualClaim) > _maxClaim) {
+        _actualClaim = _maxClaim.sub(_bonusClaimedByUser);
       }
 
-      bonusClaimed[_claimData.user] = bonusClaimed[_claimData.user].add(_actualClaim);
+      bonusClaimed[_claimData.user] = _bonusClaimedByUser.add(_actualClaim);
 
       require(_actualClaim > 0);
 
