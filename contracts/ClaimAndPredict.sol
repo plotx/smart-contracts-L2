@@ -70,15 +70,6 @@ contract ClaimAndPredict is NativeMetaTransaction {
       _;
     }
 
-    modifier holdNoFunds(address[] memory _path) {
-      bool _isNativeToken = (_path[0] == nativeCurrencyAddress && msg.value >0);
-      uint _initialFromTokenBalance = getTokenBalance(_path[0], _isNativeToken);
-      uint _initialToTokenBalance = getTokenBalance(_path[_path.length-1], false);
-      _;  
-      require(_initialFromTokenBalance.sub(msg.value) == getTokenBalance(_path[0], _isNativeToken));
-      require(_initialToTokenBalance == getTokenBalance(_path[_path.length-1], false));
-    }
-
     constructor(address _masterAddress, address _router, address _nativeCurrencyAddress) public {
       require(_masterAddress != address(0));
       require(_router != address(0));
@@ -172,8 +163,8 @@ contract ClaimAndPredict is NativeMetaTransaction {
     }
 
     function claimSwapAndPredict(
-      ClaimData calldata _claimData,
-      address[] calldata _path,
+      ClaimData memory _claimData,
+      address[] memory _path,
       uint _inputAmount,
       uint _marketId,
       uint _prediction,
@@ -181,13 +172,18 @@ contract ClaimAndPredict is NativeMetaTransaction {
       uint _minOutput
     )
       payable
-      external
-      holdNoFunds(_path)
+      public
     {
-      _verifyAndClaim(_claimData);
 
+      bool _isNativeToken = (_path[0] == nativeCurrencyAddress && msg.value >0);
+      uint _initialFromTokenBalance = getTokenBalance(_path[0], _isNativeToken);
+      uint _initialToTokenBalance = getTokenBalance(_path[_path.length-1], false);
+
+      uint _claimAmount = _verifyAndClaim(_claimData);
       _swapAndPlacePrediction(_path, _inputAmount, _minOutput, _claimData.user, _marketId, _prediction, _bPLOTPredictionAmount);
-      
+
+      require(_initialFromTokenBalance.sub(msg.value) == getTokenBalance(_path[0], _isNativeToken));
+      require(_initialToTokenBalance.sub(_claimAmount) == getTokenBalance(_path[_path.length-1], false));
     }
 
     /**
@@ -196,8 +192,10 @@ contract ClaimAndPredict is NativeMetaTransaction {
     * @param _inputAmount Amount of tokens to swap from. In Wei
     * @param _minOutput Minimum output amount expected in swap
     */
-    function _swapAndPlacePrediction(address[] memory _path, uint256 _inputAmount, uint _minOutput, address _predictFor, uint _marketId, uint _prediction, uint64 _bPLOTPredictionAmount) internal {
+    function _swapAndPlacePrediction(address[] memory _path, uint256 _inputAmount, uint _minOutput, address _user, uint _marketId, uint _prediction, uint64 _bPLOTPredictionAmount) internal {
       address payable _msgSenderAddress = _msgSender();
+      require(_msgSenderAddress == _user);
+
       uint[] memory _output; 
       uint deadline = now*2;
       require(_path[_path.length-1] == predictionToken);
@@ -212,7 +210,7 @@ contract ClaimAndPredict is NativeMetaTransaction {
         );
       } else {
         require(msg.value == 0);
-        _transferTokenFrom(_path[0], _msgSenderAddress, address(this), _inputAmount);
+        _transferTokenFrom(_path[0], _user, address(this), _inputAmount);
         _provideApproval(_path[0], address(router), _inputAmount);
         _output = router.swapExactTokensForTokens(
           _inputAmount,
@@ -224,8 +222,8 @@ contract ClaimAndPredict is NativeMetaTransaction {
       }
       require(_output[_output.length - 1] >= _minOutput);
       // return _output[_output.length - 1];
-      _placePrediction(_predictFor, _output[_output.length - 1], _marketId, _prediction, _bPLOTPredictionAmount);
-      emit SwapAndPredictFor(_predictFor, _marketId, _path[0], predictionToken, _inputAmount, _inputAmount);
+      _placePrediction(_user, _output[_output.length - 1], _marketId, _prediction, _bPLOTPredictionAmount);
+      emit SwapAndPredictFor(_user, _marketId, _path[0], predictionToken, _inputAmount, _inputAmount);
     }
 
     /**
