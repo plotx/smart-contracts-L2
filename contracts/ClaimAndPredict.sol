@@ -87,11 +87,20 @@ contract ClaimAndPredict is NativeMetaTransaction {
       _initializeEIP712("CP");
     }
 
+    /**
+     * @dev Update authorized address
+     * @param _newAuth New authorized address 
+     */
     function changeAuthorizedAddress(address _newAuth) external onlyAuthorized {
       require(_newAuth != address(0));
       authorized = _newAuth;
     }
 
+    /**
+     * @dev Update max claim amount for corresponding strategy
+     * @param _strategies Array of strategy Id's to update max claim amount
+     * @param _maxClaim Array of max claim amounts corresponding to the same index of strategies array 
+     */
     function updateMaxClaimPerStrategy(uint[] calldata _strategies, uint[] calldata _maxClaim) external onlyAuthorized {
       for(uint i= 0;i<_strategies.length;i++) {
         maxClaimPerStrategy[_strategies[i]] = _maxClaim[i];
@@ -148,6 +157,9 @@ contract ClaimAndPredict is NativeMetaTransaction {
       return IToken(_token).balanceOf(address(this));
     }
 
+    /**
+    * @dev Function to preform claim operation and 
+    */
     function claimAndPredict(
       ClaimData calldata _claimData,
       MetaTxData calldata _txData
@@ -155,10 +167,11 @@ contract ClaimAndPredict is NativeMetaTransaction {
       external
     {
       require(_txData.userAddress == _claimData.user);
-      _verifyAndClaim(_claimData);
-      //If placePRediction is called plot should be transferred from this contract, not from user 
-      //doMetaTx here
+      uint _initialPlotBalance = getTokenBalance(predictionToken, false);
+      uint _claimAmount = _verifyAndClaim(_claimData);
       NativeMetaTransaction(_txData.targetAddress).executeMetaTransaction(_claimData.user, _txData.functionSignature, _txData.sigR, _txData.sigS, _txData.sigV);
+
+      require(_initialPlotBalance.sub(_claimAmount) == getTokenBalance(predictionToken, false));
       
     }
 
