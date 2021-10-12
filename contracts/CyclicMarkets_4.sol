@@ -66,7 +66,7 @@ contract CyclicMarkets_4 is CyclicMarkets_3 {
       }
       uint64 _optionPrice = getOptionPrice(_marketId, _prediction);
       predictionPoints = uint64(_predictionStake).div(_optionPrice);
-      if(!_multiplierApplied || (marketData[_marketId].marketCreator == _user && initialPredictionFlag)) {
+      if(!_multiplierApplied || (initialPredictionFlag)) {
         uint256 _predictionPoints = predictionPoints;
         if(address(userLevels) != address(0)) {
           (_predictionPoints, isMultiplierApplied) = checkMultiplier(_user,  predictionPoints);
