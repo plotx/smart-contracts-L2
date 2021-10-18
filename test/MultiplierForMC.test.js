@@ -55,10 +55,25 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
             let optionPricing3 = await OptionPricing3.new();
             await cyclicMarkets.setOptionPricingContract([3], [optionPricing3.address]);
             await cyclicMarkets.setNextOptionPrice(18);
-            await cyclicMarkets.alterMarketType(0, 3, 100, 8 * 60 * 60, 60 * 60, 40 * 60, 100 * 1e8);
-            await cyclicMarkets.createMarket(0, 0, 0, { from: userMarketCreator });
-            marketId++;
-          });
+            await cyclicMarkets.alterMarketType(0, 3, 100, 8 * 60 * 60, 60 * 60, 40 * 60, 120 * 1e8);
+        });
+
+        it("Update initial liquidity only for Eth markets", async () => {
+          assert.equal((await cyclicMarkets.getInitialLiquidity(0))/1, 120*1e8);
+          assert.equal((await cyclicMarkets.mcPairInitialLiquidity(0, 0))/1, 0);
+          await cyclicMarkets.setMCPairInitialLiquidity(0,0, 100*1e8);
+          assert.equal((await cyclicMarkets.mcPairInitialLiquidity(0, 0))/1, 100*1e8);
+        });
+
+        it("Create market", async () => {
+          await cyclicMarkets.createMarket(0, 0, 0, { from: userMarketCreator });
+          marketId++;
+          let mcPairInitialLiquidity = 100;
+          let predictionFee = mcPairInitialLiquidity*2/100;
+          let _params = (await allMarkets.getMarketOptionPricingParams(marketId, 0));
+          let initialLiquidityInMarket = _params[0][1]/1e8;
+          assert.equal(initialLiquidityInMarket.toFixed(6),((mcPairInitialLiquidity - predictionFee)).toFixed(6));
+        });
 
         it("1.0 Set user levels", async () => {
 
@@ -193,6 +208,8 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
         it("1.2 Positions After increasing user levels", async () => {
             await increaseTime(4 * 60 * 60 + 1);
 
+            await cyclicMarkets.setMCPairInitialLiquidity(0,0, 100*1e8);
+            await cyclicMarkets.alterMarketType(0, 3, 100, 8 * 60 * 60, 60 * 60, 40 * 60, 100 * 1e8);
             await cyclicMarkets.setNextOptionPrice(18);
             await cyclicMarkets.createMarket(0, 0, 0, { from: userMarketCreator })
             marketId++;
@@ -379,4 +396,318 @@ describe("new_Multiplier 1. Multiplier Sheet PLOT Prediction", () => {
 
         });
     });
+});
+
+describe("Early bird multiplier", () => {
+  let masterInstance,
+      plotusToken,
+      allMarkets;
+  let marketId = 1;
+  let predictionPointsBeforeUser1, predictionPointsBeforeUser2, predictionPointsBeforeUser3, predictionPointsBeforeUser4;
+
+  contract("AllMarkets", async function ([user0, user1, user2, user3, user4, user5, userMarketCreator]) {
+      before(async () => {
+          masterInstance = await OwnedUpgradeabilityProxy.deployed();
+          masterInstance = await Master.at(masterInstance.address);
+          plotusToken = await PlotusToken.deployed();
+          allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
+          cyclicMarkets = await CyclicMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("CM")));
+          userLevels = await UserLevels.deployed();
+          marketId = 6;
+          await increaseTime(4 * 60 * 60 + 1);
+          await plotusToken.transfer(userMarketCreator, toWei(1000));
+          await plotusToken.approve(allMarkets.address, toWei(1000), { from: userMarketCreator });
+          await cyclicMarkets.whitelistMarketCreator(userMarketCreator);
+
+      });
+      it("1.0 Upgrade cyclic markets contract", async () => {
+        
+        await cyclicMarkets.createMarket(0, 0, 0, { from: userMarketCreator });
+        marketId++;
+
+        let cyclicMarketsV4Impl = await CyclicMarkets_4.new();
+        cyclicMarketsV4Impl = await MockCyclicMarkets_4.new();
+        await masterInstance.upgradeMultipleImplementations([toHex("CM")], [cyclicMarketsV4Impl.address]);
+        cyclicMarkets = await MockCyclicMarkets_4.at(await masterInstance.getLatestAddress(web3.utils.toHex("CM")));
+        let optionPricing3 = await OptionPricing3.new();
+        await cyclicMarkets.setOptionPricingContract([3], [optionPricing3.address]);
+        await cyclicMarkets.alterMarketType(0, 3, 100, 8 * 60 * 60, 60 * 60, 40 * 60, 100 * 1e8);
+      })
+
+      it("1.1 Position without multiplier", async () => {
+          await plotusToken.transfer(user1, toWei("100"));
+          await plotusToken.transfer(user2, toWei("400"));
+          await plotusToken.transfer(user3, toWei("100"));
+          await plotusToken.transfer(user4, toWei("100"));
+          await plotusToken.transfer(user5, toWei("1000"));
+
+          await plotusToken.approve(allMarkets.address, toWei("10000"), { from: user1 });
+          await plotusToken.approve(allMarkets.address, toWei("10000"), { from: user2 });
+          await plotusToken.approve(allMarkets.address, toWei("10000"), { from: user3 });
+          await plotusToken.approve(allMarkets.address, toWei("10000"), { from: user4 });
+          await plotusToken.approve(allMarkets.address, toWei("10000"), { from: user5 });
+
+          await cyclicMarkets.setNextOptionPrice(9);
+          assert.equal((await cyclicMarkets.getOptionPrice(marketId, 1)) / 1, 9);
+          let functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", toWei(100), marketId, plotusToken.address, to8Power("100"), 1);
+          await signAndExecuteMetaTx(
+            privateKeyList[3],
+            user3,
+            functionSignature,
+            allMarkets,
+            "AM"
+          );
+          await cyclicMarkets.setNextOptionPrice(18);
+          assert.equal((await cyclicMarkets.getOptionPrice(marketId, 2)) / 1, 18);
+          functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", toWei(100), marketId, plotusToken.address, to8Power("100"), 2);
+          await signAndExecuteMetaTx(
+            privateKeyList[1],
+            user1,
+            functionSignature,
+            allMarkets,
+            "AM"
+          );
+          functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", toWei(400), marketId, plotusToken.address, to8Power("400"), 2);
+          await signAndExecuteMetaTx(
+            privateKeyList[2],
+            user2,
+            functionSignature,
+            allMarkets,
+            "AM"
+          );
+          await cyclicMarkets.setNextOptionPrice(27);
+          assert.equal((await cyclicMarkets.getOptionPrice(marketId, 3)) / 1, 27);
+          functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", toWei(100), marketId, plotusToken.address, to8Power("100"), 3);
+          await signAndExecuteMetaTx(
+            privateKeyList[4],
+            user4,
+            functionSignature,
+            allMarkets,
+            "AM"
+          );
+          functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", toWei(1000), marketId, plotusToken.address, to8Power("1000"), 3);
+          await signAndExecuteMetaTx(
+            privateKeyList[5],
+            user5,
+            functionSignature,
+            allMarkets,
+            "AM"
+          );
+          predictionPointsBeforeUser1 = (await allMarkets.getUserPredictionPoints(user1, marketId, 2)) / 1e5;
+          predictionPointsBeforeUser2 = (await allMarkets.getUserPredictionPoints(user2, marketId, 2)) / 1e5;
+          predictionPointsBeforeUser3 = (await allMarkets.getUserPredictionPoints(user3, marketId, 1)) / 1e5;
+          predictionPointsBeforeUser4 = (await allMarkets.getUserPredictionPoints(user4, marketId, 3)) / 1e5;
+          predictionPointsBeforeUser5 = (await allMarkets.getUserPredictionPoints(user5, marketId, 3)) / 1e5;
+
+          const expectedPredictionPoints = [5444.44444, 21777.77777, 10888.88888, 3629.62963, 36296.2963];
+          const predictionPointArray = [
+              predictionPointsBeforeUser1,
+              predictionPointsBeforeUser2,
+              predictionPointsBeforeUser3,
+              predictionPointsBeforeUser4,
+              predictionPointsBeforeUser5,
+          ];
+          for (let i = 0; i < 5; i++) {
+                  assert.equal(parseInt(expectedPredictionPoints[i]), parseInt(predictionPointArray[i]));
+          }
+
+          await increaseTime(8 * 60 * 60);
+          let daobalanceBefore = await plotusToken.balanceOf(masterInstance.address);
+          daobalanceBefore = daobalanceBefore*1;
+          await cyclicMarkets.settleMarket(7, 0);
+          await increaseTime(8 * 60 * 60);
+          let daobalanceAfter = await plotusToken.balanceOf(masterInstance.address);
+          daobalanceAfter = daobalanceAfter*1;
+          let commission = 0;
+          let daoCommission = 3.599;
+          assert.equal(~~(daobalanceAfter/1e15), daobalanceBefore/1e15  + daoCommission*1e3);
+          let creationReward = 14.399;
+          let balanceBefore = await plotusToken.balanceOf(userMarketCreator);
+          await cyclicMarkets.claimCreationReward({ from: userMarketCreator });
+          let balanceAfter = await plotusToken.balanceOf(userMarketCreator);
+          assert.equal(~~(balanceAfter/1e15), balanceBefore/1e15  + creationReward*1e3);
+      });
+
+      it("Should not be able to set if invalid market type is passed", async () => {
+        await assertRevert(cyclicMarkets.setEarlyParticipantMultiplier(20, 10*60, 10));
+      })
+
+      it("Cutoff time should not be greater than prediction time", async () => {
+        await assertRevert(cyclicMarkets.setEarlyParticipantMultiplier(0, 604800, 10));
+      })
+
+      it("1.2 Positions After activating early participant multiplier", async () => {
+        await plotusToken.transfer(user1, toWei("100"));
+        await plotusToken.transfer(user2, toWei("400"));
+        await plotusToken.transfer(user3, toWei("100"));
+        await plotusToken.transfer(user4, toWei("100"));
+        await plotusToken.transfer(user5, toWei("1000"));
+
+        await plotusToken.approve(allMarkets.address, toWei("10000"), { from: user1 });
+        await plotusToken.approve(allMarkets.address, toWei("10000"), { from: user2 });
+        await plotusToken.approve(allMarkets.address, toWei("10000"), { from: user3 });
+        await plotusToken.approve(allMarkets.address, toWei("10000"), { from: user4 });
+        await plotusToken.approve(allMarkets.address, toWei("10000"), { from: user5 });
+
+        let starttime = await cyclicMarkets.calculateStartTimeForMarket(0,0);
+        await increaseTime(((starttime*1+4*60*60) - await latestTime())/1);
+
+          await cyclicMarkets.createMarket(0, 0, 0, { from: userMarketCreator })
+          marketId++;
+          
+
+          await cyclicMarkets.setNextOptionPrice(18);
+          assert.equal((await cyclicMarkets.getOptionPrice(marketId, 2)) / 1, 18);
+          await increaseTime(2*60);
+          //Predict after 2 minutes of starttime and Multiplier is not set
+          functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", toWei(100), marketId, plotusToken.address, to8Power("100"), 2);
+          await signAndExecuteMetaTx(
+            privateKeyList[1],
+            user1,
+            functionSignature,
+            allMarkets,
+            "AM"
+          );
+          await cyclicMarkets.setEarlyParticipantMultiplier(0, 10*60, 10);
+          //Predict after 4 minutes of starttime and user should get 1.1X multiplier 
+          await increaseTime(2*60);
+          functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", toWei(400), marketId, plotusToken.address, to8Power("400"), 2);
+          await signAndExecuteMetaTx(
+            privateKeyList[2],
+            user2,
+            functionSignature,
+            allMarkets,
+            "AM"
+          );
+
+          await cyclicMarkets.setNextOptionPrice(9);
+          assert.equal((await cyclicMarkets.getOptionPrice(marketId, 1)) / 1, 9);
+          //Predict after 6 minutes of starttime and user should get 1.1X multiplier 
+          await increaseTime(2*60);
+          functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", toWei(100), marketId, plotusToken.address, to8Power("100"), 1);
+          await signAndExecuteMetaTx(
+            privateKeyList[3],
+            user3,
+            functionSignature,
+            allMarkets,
+            "AM"
+          );
+
+          //Predict after 20 minutes of starttime and user should not get multiplier 
+          await increaseTime(14*60);
+          await cyclicMarkets.setNextOptionPrice(27);
+          assert.equal((await cyclicMarkets.getOptionPrice(marketId, 3)) / 1, 27);
+          functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", toWei(100), marketId, plotusToken.address, to8Power("100"), 3);
+          await signAndExecuteMetaTx(
+            privateKeyList[4],
+            user4,
+            functionSignature,
+            allMarkets,
+            "AM"
+          );
+          //Predict after 30 minutes of starttime and user should not get multiplier 
+          await increaseTime(10*60);
+          functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", toWei(1000), marketId, plotusToken.address, to8Power("1000"), 3);
+          await signAndExecuteMetaTx(
+            privateKeyList[5],
+            user5,
+            functionSignature,
+            allMarkets,
+            "AM"
+          );
+          predictionPointsBeforeUser1 = (await allMarkets.getUserPredictionPoints(user1, marketId, 2)) / 1e5;
+          predictionPointsBeforeUser2 = (await allMarkets.getUserPredictionPoints(user2, marketId, 2)) / 1e5;
+          predictionPointsBeforeUser3 = (await allMarkets.getUserPredictionPoints(user3, marketId, 1)) / 1e5;
+          predictionPointsBeforeUser4 = (await allMarkets.getUserPredictionPoints(user4, marketId, 3)) / 1e5;
+          predictionPointsBeforeUser5 = (await allMarkets.getUserPredictionPoints(user5, marketId, 3)) / 1e5;
+          
+          const expectedPredictionPoints = [5444.44444, 23955.55556, 11977.77778, 3629.62963, 36296.2963];
+          const predictionPointArray = [
+              predictionPointsBeforeUser1,
+              predictionPointsBeforeUser2,
+              predictionPointsBeforeUser3,
+              predictionPointsBeforeUser4,
+              predictionPointsBeforeUser5,
+          ];
+          for (let i = 0; i < 5; i++) {
+                  assert.equal(parseInt(expectedPredictionPoints[i]), parseInt(predictionPointArray[i]));
+          }
+
+          await increaseTime(8 * 60 * 60);
+          let daobalanceBefore = await plotusToken.balanceOf(masterInstance.address);
+          daobalanceBefore = daobalanceBefore*1;
+          await cyclicMarkets.settleMarket(marketId, 0);
+          await increaseTime(8 * 60 * 60);
+          let daobalanceAfter = await plotusToken.balanceOf(masterInstance.address);
+          daobalanceAfter = daobalanceAfter*1;
+          let commission = 0;
+          let daoCommission = 3.5999;
+          assert.equal(~~(daobalanceAfter/1e15), ~~((((daobalanceBefore/1e14))  + daoCommission*1e4)/10));
+          let creationReward = 14.3999;
+          let balanceBefore = await plotusToken.balanceOf(userMarketCreator);
+          await cyclicMarkets.claimCreationReward({ from: userMarketCreator });
+          let balanceAfter = await plotusToken.balanceOf(userMarketCreator);
+          assert.equal(~~(balanceAfter/1e15), ~~((balanceBefore/1e14  + creationReward*1e4)/10));
+
+      });
+
+      it("1.3 Should be able to get multiplier twice if predicted before cutoff time", async () => {
+        await cyclicMarkets.newMarketType(3, 3600, 100, (await latestTime())/1, 8 *60*60, 1800, 600, 100*1e8);
+        await cyclicMarkets.setEarlyParticipantMultiplier(3, 60, 10);
+        
+        // let starttime = await cyclicMarkets.calculateStartTimeForMarket(3,0);
+        // console.log(`StartTime: ${starttime};; CurrentTime: ${(await latestTime())/1}`);
+        // console.log((await cyclicMarkets.earlyParticipantMultiplier(3))[0]/1);
+        // await increaseTime(4*60*60 - ((await latestTime())/1 -  starttime*1) + 10);
+          // await increaseTimeTo(starttime + 10);
+        // await increaseTime(4*60*60);
+
+        await cyclicMarkets.createMarket(0, 3, 0, { from: userMarketCreator })
+        marketId++;
+
+        await plotusToken.transfer(user1, toWei("200"));
+
+        await plotusToken.approve(allMarkets.address, toWei("100000"), { from: user1 });
+        
+        await cyclicMarkets.setNextOptionPrice(18);
+        // assert.equal((await allMarkets.getMarketData(marketId))._optionPrice[0] / 1, 9);
+        // await allMarkets.depositAndPlacePrediction(toWei(100), marketId, plotusToken.address, to8Power("100"), 1, { from: user3 });
+        let functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", toWei(100), marketId, plotusToken.address, to8Power("100"), 1);
+        await signAndExecuteMetaTx(
+          privateKeyList[1],
+          user1,
+          functionSignature,
+          allMarkets,
+          "AM"
+        );
+        predictionPointsBeforeUser1 = (await allMarkets.getUserPredictionPoints(user1, marketId, 1)) / 1e5;
+
+        await cyclicMarkets.setNextOptionPrice(18);
+        functionSignature = encode3("depositAndPlacePrediction(uint,uint,address,uint64,uint256)", toWei(100), marketId, plotusToken.address, to8Power("100"), 1);
+        await signAndExecuteMetaTx(
+          privateKeyList[1],
+          user1,
+          functionSignature,
+          allMarkets,
+          "AM"
+        );
+        
+        predictionPointsUser1SecondTime = (await allMarkets.getUserPredictionPoints(user1, marketId, 1)) / 1e5;
+        // console.log( //     predictionPointsBeforeUser1, //     predictionPointsBeforeUser2, //     predictionPointsBeforeUser3, //     predictionPointsBeforeUser4, //     predictionPointsBeforeUser5 // );
+        predictionPointsUser1SecondTime = predictionPointsUser1SecondTime/1 - predictionPointsBeforeUser1/1;
+        const expectedPredictionPoints = [5988.88888, 5988.88888];
+        const predictionPointArray = [
+            predictionPointsBeforeUser1/1,
+            predictionPointsUser1SecondTime/1
+        ];
+        for (let i = 0; i < 2; i++) {
+            try {
+              assert.equal(expectedPredictionPoints[i], predictionPointArray[i]);
+            } catch (error) {
+              console.log(`Errror at index: ${i}: ${expectedPredictionPoints[i]}, ${predictionPointArray[i]}`);                
+            }
+        }
+
+      });
+  });
 });
