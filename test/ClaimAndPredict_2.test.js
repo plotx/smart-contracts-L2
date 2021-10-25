@@ -65,10 +65,10 @@ describe("ClaimAndPredict", () => {
             // await marketIncentives.claimCreationReward(100,{from:users[11]});
             BLOTInstance = await BLOT.at(await masterInstance.getLatestAddress(web3.utils.toHex("BL")));
 
-            claimAndPredict = await ClaimAndPredict.new(masterInstance.address, router.address, (await router.WETH()));
-            await assertRevert(ClaimAndPredict.new(nullAddress, router.address, (await router.WETH())));
-            await assertRevert(ClaimAndPredict.new(masterInstance.address, nullAddress, (await router.WETH())));
-            await assertRevert(ClaimAndPredict.new(masterInstance.address, router.address, nullAddress));
+            claimAndPredict = await ClaimAndPredict.new(masterInstance.address, router.address, (await router.WETH()), users[0]);
+            await assertRevert(ClaimAndPredict.new(nullAddress, router.address, (await router.WETH()), users[0]));
+            await assertRevert(ClaimAndPredict.new(masterInstance.address, nullAddress, (await router.WETH()), users[0]));
+            await assertRevert(ClaimAndPredict.new(masterInstance.address, router.address, nullAddress, users[0]));
     
             await assertRevert(BLOTInstance.convertToPLOT(users[0], users[1],toWei(100)));
         });

@@ -70,13 +70,13 @@ contract ClaimAndPredict is NativeMetaTransaction {
       _;
     }
 
-    constructor(address _masterAddress, address _router, address _nativeCurrencyAddress) public {
+    constructor(address _masterAddress, address _router, address _nativeCurrencyAddress, address _authorized) public {
       require(_masterAddress != address(0));
       require(_router != address(0));
       require(_nativeCurrencyAddress != address(0));
 
       IMaster ms = IMaster(_masterAddress);
-      authorized = ms.authorized();
+      authorized = _authorized;
       allPlotMarkets = IAllMarkets(ms.getLatestAddress("AM"));
       predictionToken = ms.dAppToken();
       bPLOTToken = ms.getLatestAddress("BL");

@@ -69,7 +69,7 @@ contract("Rewards-Market", async function(users) {
 			referral = await Referral.deployed();
 			disputeResolution = await DisputeResolution.at(await masterInstance.getLatestAddress(web3.utils.toHex("DR")));
 			spInstance = await SwapAndPredictWithPlot.at(await masterInstance.getLatestAddress(web3.utils.toHex("SP")));
-            claimAndPredict = await ClaimAndPredict.new(masterInstance.address, router.address, (await router.WETH()));
+            claimAndPredict = await ClaimAndPredict.new(masterInstance.address, router.address, (await router.WETH()), users[0]);
             BLOTInstance = await BLOT.at(await masterInstance.getLatestAddress(web3.utils.toHex("BL")));
             await allMarkets.addAuthorizedProxyPreditictor(claimAndPredict.address);
 

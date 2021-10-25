@@ -61,7 +61,7 @@ describe("ClaimAndPredict", () => {
             // await marketIncentives.claimCreationReward(100,{from:users[11]});
             BLOTInstance = await BLOT.at(await masterInstance.getLatestAddress(web3.utils.toHex("BL")));
 
-            claimAndPedict = await ClaimAndPredict.new(masterInstance.address, router.address, (await router.WETH()));
+            claimAndPedict = await ClaimAndPredict.new(masterInstance.address, router.address, (await router.WETH()), users[0]);
             await assertRevert(BLOTInstance.convertToPLOT(users[0], users[1],toWei(100)));
         });
         it("Add claimAndPedict contract as minter in BLOT", async () => {
