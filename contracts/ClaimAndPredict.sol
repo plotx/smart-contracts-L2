@@ -277,7 +277,7 @@ contract ClaimAndPredict is NativeMetaTransaction {
       require(_actualClaim > 0);
 
       _provideApproval(predictionToken, bPLOTToken, _actualClaim);
-      require(IToken(bPLOTToken).mint(_claimData.user, _actualClaim));
+      require(IToken(bPLOTToken).transfer(_claimData.user, _actualClaim));
       return _actualClaim;
     }
 
