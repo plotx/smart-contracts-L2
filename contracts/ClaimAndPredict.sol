@@ -26,8 +26,7 @@ import "./interfaces/IMaster.sol";
 
 contract ClaimAndPredict is NativeMetaTransaction {
     using SafeMath for uint;
-
-    event SwapAndPredictFor(address predictFor, uint marketId, address swapFromToken, address swapToToken, uint inputAmount, uint outputAmount);
+    using SafeMath64 for uint64;
 
     struct MetaTxData {
       address targetAddress;
@@ -42,26 +41,37 @@ contract ClaimAndPredict is NativeMetaTransaction {
       address user;
       uint userClaimNonce;
       uint strategyId;
-      uint claimAmount;
-      uint totalClaimed;
+      uint64 claimAmount;
+      uint64 totalClaimed;
       uint8 v;
       bytes32 r;
       bytes32 s;
     }
 
-    IUniswapV2Router internal router;
+    struct UserData {
+      uint64 bonusClaimed;
+      uint64 bonusReturned;
+      uint64 claimNonce;
+      bool firstClaim;
+    }
+
     IAllMarkets internal allPlotMarkets;
     address internal predictionToken;
     address internal bPLOTToken;
 
-    mapping(address => uint) public bonusClaimed;
-    mapping(address => uint) public userClaimNonce;
+    // mapping(address => uint) public bonusClaimed;
+    // mapping(address => uint) internal returnClaimed;
+    // mapping(address => uint) public userClaimNonce;
+    mapping(address => UserData) public userData;
 
     mapping(address => bool) public allowedTokens;
 
-    mapping(uint => uint) public maxClaimPerStrategy;
+    mapping(uint => uint64) public maxClaimPerStrategy;
 
-    address public nativeCurrencyAddress;
+    uint internal bonusMinClaimAmount; // 10^^8
+    uint internal bonusClaimFeePerc; // No decimals
+    uint internal bonusClaimMaxFee; // 10^^8
+
     address public authorized;
     uint internal constant decimalDivider = 1e10;
 
@@ -70,10 +80,10 @@ contract ClaimAndPredict is NativeMetaTransaction {
       _;
     }
 
-    constructor(address _masterAddress, address _router, address _nativeCurrencyAddress, address _authorized) public {
+    event BonusClaimed(address userAddress, uint claimAmount, uint amountDeducted);
+
+    constructor(address _masterAddress, address _authorized) public {
       require(_masterAddress != address(0));
-      require(_router != address(0));
-      require(_nativeCurrencyAddress != address(0));
 
       IMaster ms = IMaster(_masterAddress);
       authorized = _authorized;
@@ -81,10 +91,43 @@ contract ClaimAndPredict is NativeMetaTransaction {
       predictionToken = ms.dAppToken();
       bPLOTToken = ms.getLatestAddress("BL");
 
-      router = IUniswapV2Router(_router);
-      nativeCurrencyAddress = _nativeCurrencyAddress;
+      bonusMinClaimAmount = 50 * 1e8;
+      bonusClaimFeePerc = 10;
+      bonusClaimMaxFee = 10 * 1e8;
 
       _initializeEIP712("CP");
+    }
+
+    /**
+    * @dev function to get integer parameters
+    * @param code Code of the parameter.
+    * @return codeVal Code of the parameter.
+    * @return value Value of the queried parameter.
+    */
+    function getUintParameters(bytes8 code) external view returns(bytes8 codeVal, uint256 value) {
+      codeVal = code;
+      if(code == "BMCA") { // bonusMinClaimAmount
+        value = bonusMinClaimAmount;
+      } else if(code == "BCFP") { // bonusClaimFeePerc
+        value = bonusClaimFeePerc;
+      } else if(code == "BCMF") {
+        value = bonusClaimMaxFee;
+      }
+    }
+
+    /**
+    * @dev function to update integer parameters
+    * @param code Code of the updating parameter.
+    * @param value Value to which the parameter should be updated
+    */
+    function updateUintParameters(bytes8 code, uint256 value) external onlyAuthorized {
+      if(code == "BMCA") { // bonusMinClaimAmount
+        bonusMinClaimAmount = value;
+      } else if(code == "BCFP") { // bonusClaimFeePerc
+        bonusClaimFeePerc = value;
+      } else if(code == "BCMF") {
+        bonusClaimMaxFee = value;
+      }
     }
 
     /**
@@ -101,29 +144,10 @@ contract ClaimAndPredict is NativeMetaTransaction {
      * @param _strategies Array of strategy Id's to update max claim amount
      * @param _maxClaim Array of max claim amounts corresponding to the same index of strategies array 
      */
-    function updateMaxClaimPerStrategy(uint[] calldata _strategies, uint[] calldata _maxClaim) external onlyAuthorized {
+    function updateMaxClaimPerStrategy(uint[] calldata _strategies, uint64[] calldata _maxClaim) external onlyAuthorized {
       for(uint i= 0;i<_strategies.length;i++) {
         maxClaimPerStrategy[_strategies[i]] = _maxClaim[i];
       }
-    }
-
-    /**
-     * @dev Allow a token to be used for swap and placing prediction
-     * @param _token Address of token contract
-     */
-    function whitelistTokenForSwap(address _token) external onlyAuthorized {
-      require(_token != address(0));
-      require(!allowedTokens[_token]);
-      allowedTokens[_token] = true;
-    }
-
-    /**
-     * @dev Remove a token from whitelist to be used for swap and placing prediction
-     * @param _token Address of token contract
-     */
-    function deWhitelistTokenForSwap(address _token) external onlyAuthorized {
-      require(allowedTokens[_token]);
-      allowedTokens[_token] = false;
     }
 
     /**
@@ -157,6 +181,25 @@ contract ClaimAndPredict is NativeMetaTransaction {
       return IToken(_token).balanceOf(address(this));
     }
 
+    function handleReturnClaim(address _user, uint _claimAmount) public returns(uint _finalClaim, uint amountToDeduct) {
+      require(_claimAmount > decimalDivider.mul(bonusMinClaimAmount));
+      uint64 bonusReturned = userData[_user].bonusReturned;
+      amountToDeduct = userData[_user].bonusClaimed.sub(bonusReturned);
+      if(bonusMinClaimAmount < amountToDeduct) {
+        amountToDeduct = bonusMinClaimAmount;
+      }
+      userData[_user].bonusReturned = bonusReturned.add(uint64(amountToDeduct));
+
+      amountToDeduct = decimalDivider.mul(amountToDeduct);
+      if(bonusReturned == 0) {
+        uint _feeDeduction = _claimAmount.mul(bonusClaimFeePerc).div(100);
+        _feeDeduction = bonusClaimMaxFee < _feeDeduction ? bonusClaimMaxFee:_feeDeduction;
+        amountToDeduct = amountToDeduct + _feeDeduction;
+      }
+      _finalClaim = _claimAmount.sub(amountToDeduct);
+      emit BonusClaimed(_user, _finalClaim, amountToDeduct);
+    }
+
     /**
     * @dev Function to preform claim operation and 
     */
@@ -168,116 +211,35 @@ contract ClaimAndPredict is NativeMetaTransaction {
     {
       require(_txData.userAddress == _claimData.user);
       uint _initialPlotBalance = getTokenBalance(predictionToken, false);
-      uint _claimAmount = _verifyAndClaim(_claimData);
+      uint _claimAmount = _verifyAndClaim(_claimData, _txData.functionSignature);
       NativeMetaTransaction(_txData.targetAddress).executeMetaTransaction(_claimData.user, _txData.functionSignature, _txData.sigR, _txData.sigS, _txData.sigV);
-
       require(_initialPlotBalance.sub(_claimAmount) == getTokenBalance(predictionToken, false));
       
     }
 
-    function claimSwapAndPredict(
-      ClaimData memory _claimData,
-      address[] memory _path,
-      uint _inputAmount,
-      uint _marketId,
-      uint _prediction,
-      uint64 _bPLOTPredictionAmount,
-      uint _minOutput
-    )
-      payable
-      public
-    {
-
-      bool _isNativeToken = (_path[0] == nativeCurrencyAddress && msg.value >0);
-      uint _initialFromTokenBalance = getTokenBalance(_path[0], _isNativeToken);
-      uint _initialToTokenBalance = getTokenBalance(_path[_path.length-1], false);
-
-      uint _claimAmount = _verifyAndClaim(_claimData);
-      _swapAndPlacePrediction(_path, _inputAmount, _minOutput, _claimData.user, _marketId, _prediction, _bPLOTPredictionAmount);
-
-      require(_initialFromTokenBalance.sub(msg.value) == getTokenBalance(_path[0], _isNativeToken));
-      require(_initialToTokenBalance.sub(_claimAmount) == getTokenBalance(_path[_path.length-1], false));
-    }
-
-    /**
-    * @dev Internal function to swap given user tokens to desired preditcion token and place prediction
-    * @param _path Order path to follow for swap transaction
-    * @param _inputAmount Amount of tokens to swap from. In Wei
-    * @param _minOutput Minimum output amount expected in swap
-    */
-    function _swapAndPlacePrediction(address[] memory _path, uint256 _inputAmount, uint _minOutput, address _user, uint _marketId, uint _prediction, uint64 _bPLOTPredictionAmount) internal {
-      address payable _msgSenderAddress = _msgSender();
-      require(_msgSenderAddress == _user);
-
-      uint[] memory _output; 
-      uint deadline = now*2;
-      require(_path[_path.length-1] == predictionToken);
-      require(allowedTokens[_path[0]],"Not allowed");
-      if((_path[0] == nativeCurrencyAddress && msg.value >0)) {
-        require(_inputAmount == msg.value);
-        _output = router.swapExactETHForTokens.value(msg.value)(
-          _minOutput,
-          _path,
-          address(this),
-          deadline
-        );
-      } else {
-        require(msg.value == 0);
-        _transferTokenFrom(_path[0], _user, address(this), _inputAmount);
-        _provideApproval(_path[0], address(router), _inputAmount);
-        _output = router.swapExactTokensForTokens(
-          _inputAmount,
-          _minOutput,
-          _path,
-          address(this),
-          deadline
-        );
+    function _verifyAndClaim(ClaimData memory _claimData, bytes memory _functionSignature) internal returns(uint _claimedAmount){
+      require(verifySign(_claimData.user, userData[_claimData.user].claimNonce, _claimData.claimAmount, _claimData.strategyId, _claimData.totalClaimed, _claimData.v, _claimData.r, _claimData.s, _functionSignature));
+      userData[_claimData.user].claimNonce++;
+      uint64 _maxClaim = maxClaimPerStrategy[_claimData.strategyId];
+      uint64 _bonusClaimedByUser = userData[_claimData.user].bonusClaimed;
+      if(_bonusClaimedByUser == 0) {
+        allPlotMarkets.setClaimFlag(_claimData.user);//Need to store previous market to check settlement
       }
-      require(_output[_output.length - 1] >= _minOutput);
-      // return _output[_output.length - 1];
-      _placePrediction(_user, _output[_output.length - 1], _marketId, _prediction, _bPLOTPredictionAmount);
-      emit SwapAndPredictFor(_user, _marketId, _path[0], predictionToken, _inputAmount, _inputAmount);
-    }
 
-    /**
-    * @dev Internal function to place prediction in given market
-    */
-    function _placePrediction(address _predictFor, uint _tokenDeposit, uint _marketId, uint _prediction, uint64 _bPLOTPredictionAmount) internal {
-      _provideApproval(predictionToken, address(allPlotMarkets), _tokenDeposit);
-      allPlotMarkets.depositAndPredictFor(_predictFor, _tokenDeposit, _marketId, predictionToken, _prediction, uint64(_tokenDeposit.div(decimalDivider)), _bPLOTPredictionAmount);
-    }
-
-    /**
-    * @dev Internal function to call transferFrom function of a given token
-    * @param _token Address of the ERC20 token
-    * @param _from Address from which the tokens are to be received
-    * @param _to Address to which the tokens are to be transferred
-    * @param _amount Amount of tokens to transfer. In Wei
-    */
-    function _transferTokenFrom(address _token, address _from, address _to, uint256 _amount) internal {
-      require(IToken(_token).transferFrom(_from, _to, _amount));
-    }
-
-    function _verifyAndClaim(ClaimData memory _claimData) internal returns(uint _claimedAmount){
-      require(verifySign(_claimData.user, userClaimNonce[_claimData.user], _claimData.claimAmount, _claimData.strategyId, _claimData.totalClaimed, _claimData.v, _claimData.r, _claimData.s));
-      userClaimNonce[_claimData.user]++;
-      uint _maxClaim = maxClaimPerStrategy[_claimData.strategyId];
-      uint _bonusClaimedByUser = bonusClaimed[_claimData.user];
       if(_bonusClaimedByUser < _claimData.totalClaimed) {
           _bonusClaimedByUser = _claimData.totalClaimed;
       }
 
-      uint _actualClaim = _claimData.claimAmount;
+      uint64 _actualClaim = _claimData.claimAmount;
       if(_bonusClaimedByUser.add(_actualClaim) > _maxClaim) {
         _actualClaim = _maxClaim.sub(_bonusClaimedByUser);
       }
 
-      bonusClaimed[_claimData.user] = _bonusClaimedByUser.add(_actualClaim);
+      userData[_claimData.user].bonusClaimed = _bonusClaimedByUser.add(_actualClaim);
 
       require(_actualClaim > 0);
 
-      _provideApproval(predictionToken, bPLOTToken, _actualClaim);
-      require(IToken(bPLOTToken).mint(_claimData.user, _actualClaim));
+      require(IToken(bPLOTToken).transfer(_claimData.user, decimalDivider.mul(_actualClaim)));
       return _actualClaim;
     }
 
@@ -289,19 +251,21 @@ contract ClaimAndPredict is NativeMetaTransaction {
      */ 
     function verifySign(
         address _user,
-        uint _userClaimNonce,
-        uint _claimAmount,
+        uint64 _userClaimNonce,
+        uint64 _claimAmount,
         uint _strategyId,
-        uint _totalClaimed,
+        uint64 _totalClaimed,
         uint8 _v,
         bytes32 _r,
-        bytes32 _s
+        bytes32 _s,
+        bytes memory _functionSignature
+        
     ) 
         public
         view
         returns(bool)
     {
-        bytes32 hash = getEncodedData(_user, _userClaimNonce, _claimAmount, _totalClaimed, _strategyId);
+        bytes32 hash = getEncodedData(_user, _userClaimNonce, _claimAmount, _totalClaimed, _strategyId, _functionSignature);
         return isValidSignature(hash, _v, _r, _s);
     }
 
@@ -310,10 +274,11 @@ contract ClaimAndPredict is NativeMetaTransaction {
      */ 
     function getEncodedData(
         address _user,
-        uint _userClaimNonce,
-        uint _claimAmount,
-        uint _totalClaimed,
-        uint _strategyId
+        uint64 _userClaimNonce,
+        uint64 _claimAmount,
+        uint64 _totalClaimed,
+        uint _strategyId,
+        bytes memory _functionSignature
     ) 
         public
         view
@@ -326,6 +291,7 @@ contract ClaimAndPredict is NativeMetaTransaction {
                 _claimAmount,
                 _strategyId,
                 _totalClaimed,
+                _functionSignature,
                 address(this)
             )
         );
