@@ -24,6 +24,10 @@ contract AllPlotMarkets_6 is AllPlotMarkets_5 {
 
   IClaimAndPredict internal trailBonusHandler;
 
+  function setTrailBonusHandler(address _trailBonusHandler) public onlyAuthorized {
+    trailBonusHandler = _trailBonusHandler;
+  }
+
   function setClaimFlag(address _user) public {
     require(msg.sender == address(trailBonusHandler));
     userBonusClaimedFlag[_user] = 1;
