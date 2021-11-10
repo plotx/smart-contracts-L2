@@ -25,7 +25,7 @@ contract AllPlotMarkets_6 is AllPlotMarkets_5 {
   IClaimAndPredict internal trailBonusHandler;
 
   function setTrailBonusHandler(address _trailBonusHandler) public onlyAuthorized {
-    trailBonusHandler = _trailBonusHandler;
+    trailBonusHandler = IClaimAndPredict(_trailBonusHandler);
   }
 
   function setClaimFlag(address _user) public {
@@ -44,7 +44,7 @@ contract AllPlotMarkets_6 is AllPlotMarkets_5 {
     userData[_msgSenderAddress].unusedBalance = userData[_msgSenderAddress].unusedBalance.sub(_token);
     require(_token > 0);
     uint _userClaim = _token;
-    if(userBonusClaimedFlag[_msgSenderAddress] == 1) {
+    if(userBonusClaimedFlag[_msgSenderAddress] == 1 && address(trailBonusHandler) != address(0)) {
       uint _deduction;
       (_userClaim, _deduction) = trailBonusHandler.handleReturnClaim(_msgSenderAddress, _userClaim);
       require((_userClaim.add(_deduction)) == _token);
