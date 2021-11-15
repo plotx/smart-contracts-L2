@@ -19,8 +19,7 @@ import "./interfaces/IClaimAndPredict.sol";
 import "./AllPlotMarkets_5.sol";
 
 contract AllPlotMarkets_6 is AllPlotMarkets_5 {
-  mapping (address => uint) internal userBonusConsumed;
-  mapping (address => uint) public userBonusClaimedFlag;
+  mapping (address => bool) internal userBonusClaimedFlag;
 
   IClaimAndPredict internal trailBonusHandler;
 
@@ -28,9 +27,9 @@ contract AllPlotMarkets_6 is AllPlotMarkets_5 {
     trailBonusHandler = IClaimAndPredict(_trailBonusHandler);
   }
 
-  function setClaimFlag(address _user) public {
-    require(msg.sender == address(trailBonusHandler));
-    userBonusClaimedFlag[_user] = 1;
+  function setClaimFlag(address _user, uint _userNonce) public {
+    require(msg.sender == address(trailBonusHandler) && (_userNonce !=0 || userData[_user].totalStaked == 0));
+    userBonusClaimedFlag[_user] = true;
   }
 
   /**
@@ -44,12 +43,12 @@ contract AllPlotMarkets_6 is AllPlotMarkets_5 {
     userData[_msgSenderAddress].unusedBalance = userData[_msgSenderAddress].unusedBalance.sub(_token);
     require(_token > 0);
     uint _userClaim = _token;
-    if(userBonusClaimedFlag[_msgSenderAddress] == 1 && address(trailBonusHandler) != address(0)) {
+    if(userBonusClaimedFlag[_msgSenderAddress] && address(trailBonusHandler) != address(0)) {
       uint _deduction;
       (_userClaim, _deduction) = trailBonusHandler.handleReturnClaim(_msgSenderAddress, _userClaim);
       require((_userClaim.add(_deduction)) == _token);
       _transferAsset(predictionToken, address(trailBonusHandler), _deduction);
-      userBonusClaimedFlag[_msgSenderAddress] = 2;
+      delete userBonusClaimedFlag[_msgSenderAddress];
     }
     _transferAsset(predictionToken, _msgSenderAddress, _userClaim);
     emit Withdrawn(_msgSenderAddress, _userClaim, now);

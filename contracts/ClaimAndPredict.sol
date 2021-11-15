@@ -69,6 +69,7 @@ contract ClaimAndPredict is NativeMetaTransaction {
     mapping(uint => uint64) public maxClaimPerStrategy;
 
     uint internal bonusMinClaimAmount; // 10^^8
+    uint internal bonusMaxReturnBackAmount; // 10^^8
     uint internal bonusClaimFeePerc; // No decimals
     uint internal bonusClaimMaxFee; // 10^^8
 
@@ -92,8 +93,9 @@ contract ClaimAndPredict is NativeMetaTransaction {
       bPLOTToken = ms.getLatestAddress("BL");
 
       bonusMinClaimAmount = 50 * 1e8;
+      bonusMaxReturnBackAmount = 50 * 1e8;
       bonusClaimFeePerc = 10;
-      bonusClaimMaxFee = 10 * 1e8;
+      bonusClaimMaxFee = 10 * 1e18;
 
       _initializeEIP712("CP");
     }
@@ -108,9 +110,11 @@ contract ClaimAndPredict is NativeMetaTransaction {
       codeVal = code;
       if(code == "BMCA") { // bonusMinClaimAmount
         value = bonusMinClaimAmount;
+      } if(code == "BMRA") { // bonusMaxReturnAmount
+        value = bonusMaxReturnBackAmount;
       } else if(code == "BCFP") { // bonusClaimFeePerc
         value = bonusClaimFeePerc;
-      } else if(code == "BCMF") {
+      } else if(code == "BCMF") { //bonusClaimMaxFee
         value = bonusClaimMaxFee;
       }
     }
@@ -123,9 +127,11 @@ contract ClaimAndPredict is NativeMetaTransaction {
     function updateUintParameters(bytes8 code, uint256 value) external onlyAuthorized {
       if(code == "BMCA") { // bonusMinClaimAmount
         bonusMinClaimAmount = value;
+      } if(code == "BMRA") { // bonusMaxReturnAmount
+        bonusMaxReturnBackAmount = value;
       } else if(code == "BCFP") { // bonusClaimFeePerc
         bonusClaimFeePerc = value;
-      } else if(code == "BCMF") {
+      } else if(code == "BCMF") { //bonusClaimMaxFee
         bonusClaimMaxFee = value;
       }
     }
@@ -182,16 +188,18 @@ contract ClaimAndPredict is NativeMetaTransaction {
     }
 
     function handleReturnClaim(address _user, uint _claimAmount) public returns(uint _finalClaim, uint amountToDeduct) {
-      require(_claimAmount > decimalDivider.mul(bonusMinClaimAmount));
+      require(msg.sender == address(allPlotMarkets));
+
       uint64 bonusReturned = userData[_user].bonusReturned;
       amountToDeduct = userData[_user].bonusClaimed.sub(bonusReturned);
-      if(bonusMinClaimAmount < amountToDeduct) {
-        amountToDeduct = bonusMinClaimAmount;
+      if(amountToDeduct > bonusMaxReturnBackAmount) {
+        amountToDeduct = bonusMaxReturnBackAmount;
       }
       userData[_user].bonusReturned = bonusReturned.add(uint64(amountToDeduct));
 
       amountToDeduct = decimalDivider.mul(amountToDeduct);
       if(bonusReturned == 0) {
+        require(_claimAmount > decimalDivider.mul(bonusMinClaimAmount));
         uint _feeDeduction = _claimAmount.mul(bonusClaimFeePerc).div(100);
         _feeDeduction = bonusClaimMaxFee < _feeDeduction ? bonusClaimMaxFee:_feeDeduction;
         amountToDeduct = amountToDeduct + _feeDeduction;
@@ -210,21 +218,21 @@ contract ClaimAndPredict is NativeMetaTransaction {
       external
     {
       require(_txData.userAddress == _claimData.user);
-      uint _initialPlotBalance = getTokenBalance(predictionToken, false);
+      uint _initialbPlotBalance = getTokenBalance(address(bPLOTToken), false);
       uint _claimAmount = _verifyAndClaim(_claimData, _txData.functionSignature);
       NativeMetaTransaction(_txData.targetAddress).executeMetaTransaction(_claimData.user, _txData.functionSignature, _txData.sigR, _txData.sigS, _txData.sigV);
-      require(_initialPlotBalance.sub(_claimAmount) == getTokenBalance(predictionToken, false));
+      require(_initialbPlotBalance.sub(_claimAmount) == getTokenBalance(address(bPLOTToken), false));
       
     }
 
     function _verifyAndClaim(ClaimData memory _claimData, bytes memory _functionSignature) internal returns(uint _claimedAmount){
-      require(verifySign(_claimData.user, userData[_claimData.user].claimNonce, _claimData.claimAmount, _claimData.strategyId, _claimData.totalClaimed, _claimData.v, _claimData.r, _claimData.s, _functionSignature));
-      userData[_claimData.user].claimNonce++;
+      UserData storage _userData = userData[_claimData.user];
+      require(verifySign(_claimData.user, _userData.claimNonce, _claimData.claimAmount, _claimData.strategyId, _claimData.totalClaimed, _claimData.v, _claimData.r, _claimData.s, _functionSignature));
       uint64 _maxClaim = maxClaimPerStrategy[_claimData.strategyId];
-      uint64 _bonusClaimedByUser = userData[_claimData.user].bonusClaimed;
-      if(_bonusClaimedByUser == 0) {
-        allPlotMarkets.setClaimFlag(_claimData.user);//Need to store previous market to check settlement
-      }
+      uint64 _bonusClaimedByUser = _userData.bonusClaimed;
+      // Check later=>If claimed == returned then set flag
+      allPlotMarkets.setClaimFlag(_claimData.user, _userData.claimNonce);
+      _userData.claimNonce++;
 
       if(_bonusClaimedByUser < _claimData.totalClaimed) {
           _bonusClaimedByUser = _claimData.totalClaimed;
@@ -235,12 +243,13 @@ contract ClaimAndPredict is NativeMetaTransaction {
         _actualClaim = _maxClaim.sub(_bonusClaimedByUser);
       }
 
-      userData[_claimData.user].bonusClaimed = _bonusClaimedByUser.add(_actualClaim);
+      _userData.bonusClaimed = _bonusClaimedByUser.add(_actualClaim);
 
       require(_actualClaim > 0);
 
-      require(IToken(bPLOTToken).transfer(_claimData.user, decimalDivider.mul(_actualClaim)));
-      return _actualClaim;
+      _claimedAmount = decimalDivider.mul(_actualClaim);
+      require(IToken(bPLOTToken).transfer(_claimData.user, _claimedAmount));
+      return _claimedAmount;
     }
 
     /** 
