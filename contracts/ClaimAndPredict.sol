@@ -52,7 +52,6 @@ contract ClaimAndPredict is NativeMetaTransaction {
       uint64 bonusClaimed;
       uint64 bonusReturned;
       uint64 claimNonce;
-      bool firstClaim;
     }
 
     IAllMarkets internal allPlotMarkets;
