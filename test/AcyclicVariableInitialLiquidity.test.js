@@ -9,6 +9,7 @@ const AllMarkets_5 = artifacts.require("AllPlotMarkets_5");
 const AllMarkets_3 = artifacts.require("AllPlotMarkets_3");
 const AcyclicMarkets = artifacts.require("MockAcyclicMarkets");
 const AcyclicMarkets_2 = artifacts.require("MockAcyclicMarkets_2");
+const AcyclicMarkets_3 = artifacts.require("AcyclicMarkets_3");
 const Referral = artifacts.require("Referral");
 const DisputeResolution = artifacts.require('DisputeResolution');
 const BigNumber = require("bignumber.js");
@@ -661,6 +662,128 @@ contract("Rewards-Market Raise dispute and pass the proposal ", async function(u
 		it("Should revert if tried to pass null address as market creator", async() => {
 			let nullAddress = "0x0000000000000000000000000000000000000000";
 			await assertRevert(allMarkets.createMarket([],[],nullAddress,1000*1e8));
+		});
+
+	});
+});
+
+contract("Rewards-Market Seperate auth address to settle markets", async function(users) {
+	describe("Scenario1", async () => {
+		it("0.0", async () => {
+			masterInstance = await OwnedUpgradeabilityProxy.deployed();
+			masterInstance = await Master.at(masterInstance.address);
+			plotusToken = await PlotusToken.deployed();
+			BLOTInstance = await BLOT.deployed();
+			timeNow = await latestTime();
+			// upgrading acyclicMarket and allMarket contracts
+			let acyclic2 = await AcyclicMarkets_2.new();
+			let allMarkets5 = await AllMarkets_5.new();
+			await masterInstance.upgradeMultipleImplementations([toHex("AM"),toHex("AC")],[allMarkets5.address,acyclic2.address]);
+			allMarkets = await AllMarkets_5.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));
+			acyclicMarkets = await AcyclicMarkets_2.at(await masterInstance.getLatestAddress(web3.utils.toHex("AC")));
+			await acyclicMarkets.updateUintParameters(toHex("RPS"),5);
+			// Done upgrading
+			await increaseTime(5 * 3600);
+            await plotusToken.transfer(users[12],toWei(100000));
+            await plotusToken.transfer(users[11],toWei(100000));
+            await plotusToken.transfer(masterInstance.address,toWei(500));
+            
+			nullAddress = await masterInstance.getLatestAddress(web3.utils.toHex("0"));
+         
+            await plotusToken.transfer(users[11],toWei(100));
+            await plotusToken.approve(allMarkets.address,toWei(200000),{from:users[11]});
+			await acyclicMarkets.setNextOptionPrice(18);
+			// await acyclicMarkets.claimRelayerRewards();
+			timeNow = await latestTime();
+            await acyclicMarkets.whitelistMarketCreator(users[11]);
+            await acyclicMarkets.createMarketWithVariableLiquidity("Question1", [2,3], [timeNow/1+4*3600,timeNow/1+8*3600,3600],toHex("IPL"),toHex("Cricket-IPL"), [100*10**8,1150*1e8,1150*1e8,],{from:users[11],gasPrice:500000});
+            // await marketIncentives.claimCreationReward(100,{from:users[11]});
+		});
+
+		it("Scenario 1: Few user wins", async () => {
+			let i;
+			let totalDepositedPlot = toWei(100);
+			let predictionVal  = [100];
+			let options=[1, 2, 3];
+
+			let relayerBalBefore = await plotusToken.balanceOf(users[0]);
+			await assertRevert(acyclicMarkets.claimRelayerRewards());
+			let relayerBalAfter = await plotusToken.balanceOf(users[0]);
+
+			assert.equal(((relayerBalAfter-relayerBalBefore)/1e18),0);
+
+			// relayerBalBefore = await plotusToken.balanceOf(users[11]);
+			// await acyclicMarkets.claimRelayerRewards({from:users[11]});
+			// relayerBalAfter = await plotusToken.balanceOf(users[11]);
+
+			// assert.equal(~~((relayerBalAfter-relayerBalBefore)/1e10),100000002);
+
+
+			let betpoints = [5555.55555, 63888.88888, 63888.88888];
+
+
+			for(i=0;i<3;i++)
+			{
+				let betPointUser = (await allMarkets.getUserPredictionPoints(users[11],7,options[i]))/1e5;
+				assert.equal(betPointUser,betpoints[i]);
+			}
+			let unusedBal = await allMarkets.getUserUnusedBalance(users[11]);
+			assert.equal(totalDepositedPlot/1e18-unusedBal[0]/1e18,100);
+
+			let acyclic3 = await AcyclicMarkets_3.new();
+			await masterInstance.upgradeMultipleImplementations([toHex("AC")],[acyclic3.address]);
+			acyclicMarkets = await AcyclicMarkets_3.at(await masterInstance.getLatestAddress(web3.utils.toHex("AC")));
+			await assertRevert(acyclicMarkets.changeAuthAddressToSettleMarkets(nullAddress));
+			await acyclicMarkets.changeAuthAddressToSettleMarkets(users[4]);
+			
+			await acyclicMarkets.settleMarket(7, 1, {from:users[4]});
+			await increaseTime(8*60*60);
+
+			await assertRevert(acyclicMarkets.settleMarket(7, 1));
+			await acyclicMarkets.settleMarket(7, 1, {from:users[4]});
+			await plotusToken.transfer(users[12], "700000000000000000000");
+			await plotusToken.approve(allMarkets.address, "500000000000000000000", {
+				from: users[12],
+			});
+
+			await increaseTime(4*60*61);
+
+			await allMarkets.emitMarketSettledEvent(7);
+
+			let reward = await allMarkets.getReturn(users[11],7);
+			assert.equal(Math.round(reward/1e2),2285*1e6);
+			let plotBalBefore = await plotusToken.balanceOf(users[11]);
+			let plotEthUnused = await allMarkets.getUserUnusedBalance(users[11]);
+			// await allMarkets.withdraw(plotEthUnused[0].iadd(plotEthUnused[1]), 100, {from: users[11]});
+			functionSignature = encode3("withdraw(uint,uint)", plotEthUnused[0].iadd(plotEthUnused[1]), 100);
+			await signAndExecuteMetaTx(
+		      privateKeyList[11],
+		      users[11],
+		      functionSignature,
+		      allMarkets,
+              "AM"
+		      );
+			let plotBalAfter = await plotusToken.balanceOf(users[11]);
+			assert.equal(Math.round((plotBalAfter-plotBalBefore)/1e18),Math.round(reward/1e8));
+			let marketCreatorReward = await acyclicMarkets.getPendingMarketCreationRewards(users[11]);
+			assert.equal(0,Math.round(marketCreatorReward/1e11));
+
+			let plotBalBeforeCreator = await plotusToken.balanceOf(users[11]);
+
+			functionSignature = encode3("claimCreationReward()");
+            await signAndExecuteMetaTx(
+                privateKeyList[11],
+                users[11],
+                functionSignature,
+                acyclicMarkets,
+              	"AC"
+                );
+
+			let plotBalAfterCreator = await plotusToken.balanceOf(users[11]);
+
+			assert.equal(Math.round((plotBalAfterCreator-plotBalBeforeCreator)/1e11),115*1e7);
+
+				
 		});
 
 	});

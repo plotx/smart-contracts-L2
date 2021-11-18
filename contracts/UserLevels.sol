@@ -24,6 +24,9 @@ import "./interfaces/IAuth.sol";
 
 contract UserLevels is IAuth {
 
+    event UserLevelLog(address userAddress, uint256 userLevel, uint256 timeStamp);
+    event LevelMultiplierLog(uint256[] userLevel, uint256[] multiplier, uint256 timeStamp);
+
     address public masterAddress;
 
     mapping(address => uint256) public userLevel;
@@ -48,6 +51,7 @@ contract UserLevels is IAuth {
       // Can set level to zero or a level that has multiplier set
       require(_level ==0 || levelMultiplier[_level] > 0);
       userLevel[_user] = _level;
+      emit UserLevelLog(_user, _level, now);
     }
 
     /**
@@ -60,6 +64,7 @@ contract UserLevels is IAuth {
       for(uint256 i = 0; i < _userLevels.length; i++) {
         levelMultiplier[_userLevels[i]] = _multipliers[i];
       }
+      emit LevelMultiplierLog(_userLevels, _multipliers, now);
     }
 
     /**
