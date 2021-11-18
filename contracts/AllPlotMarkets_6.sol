@@ -29,22 +29,10 @@ contract IMarketCreator {
 
 }
 
-contract IMarketPageData {
-  function addAcyclicMarket(uint _marketId) public;
-}
-
 contract AllPlotMarkets_6 is AllPlotMarkets_5 {
 
 
   mapping(uint => uint) internal totalPredictions;
-
-  IMarketPageData marketPage;
-
-  function setMarketPageContract(address _add) external onlyAuthorized {
-    require(_add != address(0));
-    marketPage = IMarketPageData(_add);
-
-  }
 
 
   function getMarketParams(uint _marketId) public view returns(bool,uint32,uint,uint32,uint,uint,PredictionStatus) {
@@ -92,16 +80,5 @@ contract AllPlotMarkets_6 is AllPlotMarkets_5 {
       super._storePredictionData(_marketId, _prediction, _msgSenderAddress, _predictionStake, predictionPoints);
       
   }
-
-  function createMarket(uint32[] memory _marketTimes, uint64[] memory _optionRanges, address _marketCreator, uint64 _initialLiquidity) 
-    public 
-    returns(uint64 _marketIndex)
-    {
-      if(msg.sender == IMaster(masterAddress).getLatestAddress("AC")){
-        marketPage.addAcyclicMarket(uint64(marketBasicData.length));
-      }
-      super.createMarket(_marketTimes, _optionRanges, _marketCreator, _initialLiquidity);
-    }
-    
 
 }
