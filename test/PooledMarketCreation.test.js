@@ -6,6 +6,7 @@ const PlotusToken = artifacts.require("MockPLOT");
 const AllMarkets = artifacts.require("MockAllMarkets");
 const CyclicMarkets = artifacts.require("MockCyclicMarkets");
 const PooledMarketCreation = artifacts.require("PooledMarketCreation");
+const PooledMarketCreation_2 = artifacts.require("PooledMarketCreation_2");
 const AllMarkets_V3 = artifacts.require("AllPlotMarkets_3");
 const CyclicMarkets_V2 = artifacts.require("MockCyclicMarkets_2");
 const EthChainlinkOracle = artifacts.require('MockChainLinkAggregator');
@@ -494,6 +495,54 @@ contract("Pooled Market Creation", async function(users) {
 		it("Should not be able to update marketTypeAdditionalReward for invalid market type", async () => {
 			await assertRevert(PMC.updateAdditionalRewardPerMarketType(0,5,12));
 
+		});
+
+		it("Transfer of LP token by passes unstake time check", async() => {
+			await plotusToken.transfer(users[4],toWei(600));
+			await plotusToken.transfer(users[5],toWei(600));
+            await plotusToken.approve(PMC.address,toWei(600),{from:users[4]});
+            await plotusToken.approve(PMC.address,toWei(600),{from:users[5]});
+
+			await PMC.stake(toWei(100), {from:users[4]});
+			await increaseTime(2*86400);
+
+			await PMC.stake(toWei(100), {from:users[5]});
+			await PMC.transfer(users[4], await PMC.balanceOf(users[5]), {from:users[5]});
+
+			let balanceBefore = await plotusToken.balanceOf(users[4]);
+			await PMC.unstake(await PMC.balanceOf(users[4]), {from: users[4]});
+			let balanceAfter = await plotusToken.balanceOf(users[4]);
+			assert.equal(balanceBefore/1 + toWei(200)/1, balanceAfter/1);
+		});
+
+		it("Upgrade contract", async() => {
+			let pmcV2Impl = await PooledMarketCreation_2.new();
+			await masterInstance.upgradeMultipleImplementations([toHex("PC")], [pmcV2Impl.address]);
+			PMC = await PooledMarketCreation_2.at(await masterInstance.getLatestAddress(web3.utils.toHex("PC")));
+		});
+
+		it("Transfer of LP token should be stopped in unstake restricted time", async() => {
+			await plotusToken.transfer(users[4],toWei(600));
+			await plotusToken.transfer(users[5],toWei(600));
+            await plotusToken.approve(PMC.address,toWei(600),{from:users[4]});
+            await plotusToken.approve(PMC.address,toWei(600),{from:users[5]});
+
+			await PMC.stake(toWei(100), {from:users[4]});
+			await increaseTime(2*86400);
+
+			await PMC.stake(toWei(100), {from:users[5]});
+			await assertRevert(PMC.transfer(users[4], await PMC.balanceOf(users[5]), {from:users[5]}));
+
+			let balanceBefore = await plotusToken.balanceOf(users[4]);
+			await PMC.unstake(await PMC.balanceOf(users[4]), {from: users[4]});
+			let balanceAfter = await plotusToken.balanceOf(users[4]);
+			assert.equal(balanceBefore/1 + toWei(100)/1, balanceAfter/1);
+			
+			await increaseTime(2*86400);
+			balanceBefore = await plotusToken.balanceOf(users[5]);
+			await PMC.unstake(await PMC.balanceOf(users[5]), {from: users[5]});
+			balanceAfter = await plotusToken.balanceOf(users[5]);
+			assert.equal(balanceBefore/1 + toWei(100)/1, balanceAfter/1);
 		});
 	});
 });
