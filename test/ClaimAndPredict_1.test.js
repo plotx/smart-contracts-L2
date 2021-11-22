@@ -145,7 +145,7 @@ describe("ClaimAndPredict", () => {
             totalClaimed[users[userIndex]]+=claimValue;
         });
 
-        it("Existing user should not get bPLOT", async () => {
+        it("Existing user also should get bPLOT", async () => {
             let userIndex = 2;            let marketIndex = 7;
             let depositVal = 0;            let plotPrediction  = 20;
             let claimValue = 20;            let option = 1;
@@ -195,7 +195,9 @@ describe("ClaimAndPredict", () => {
                 r: signData.r,
                 s: signData.s
             }
-            await assertRevert(claimAndPedict.claimAndPredict(claimDataJson, json))
+            await claimAndPedict.claimAndPredict(claimDataJson, json);
+            userClaimNonce[users[userIndex]]++;
+            totalClaimed[users[userIndex]]+=claimValue;
         });
         
         it("Should not be able to claim if total claim amount is < 50", async () => {
