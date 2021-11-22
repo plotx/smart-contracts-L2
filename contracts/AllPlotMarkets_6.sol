@@ -28,7 +28,7 @@ contract AllPlotMarkets_6 is AllPlotMarkets_5 {
   }
 
   function setClaimFlag(address _user, uint _userNonce) public {
-    require(msg.sender == address(trailBonusHandler) && (_userNonce !=0 || userData[_user].totalStaked == 0));
+    require(msg.sender == address(trailBonusHandler));
     userBonusClaimedFlag[_user] = true;
   }
 
