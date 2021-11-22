@@ -75,8 +75,12 @@ describe("ClaimAndPredict", () => {
             // await marketIncentives.claimCreationReward(100,{from:users[11]});
             BLOTInstance = await BLOT.at(await masterInstance.getLatestAddress(web3.utils.toHex("BL")));
 
-            claimAndPedict = await ClaimAndPredict.new(masterInstance.address, users[0]);
-            
+            claimAndPedict = await ClaimAndPredict.new();
+            claimAndPedict = await OwnedUpgradeabilityProxy.new(claimAndPedict.address);
+            claimAndPedict = await ClaimAndPredict.at(claimAndPedict.address);
+            claimAndPedict.initialize(masterInstance.address, users[0]);
+            await assertRevert(claimAndPedict.initialize(masterInstance.address, users[0]));
+
             let allMarketsV6Impl = await AllMarkets.new();
             await masterInstance.upgradeMultipleImplementations([toHex("AM")], [allMarketsV6Impl.address]);
             allMarkets = await AllMarkets.at(await masterInstance.getLatestAddress(web3.utils.toHex("AM")));

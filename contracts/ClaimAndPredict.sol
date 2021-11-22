@@ -82,8 +82,11 @@ contract ClaimAndPredict is NativeMetaTransaction {
 
     event BonusClaimed(address userAddress, uint claimAmount, uint amountDeducted);
 
-    constructor(address _masterAddress, address _authorized) public {
+    function initialize(address _masterAddress, address _authorized) public {
+      require(predictionToken == address(0), "Already initialized");
+  
       require(_masterAddress != address(0));
+      require(_authorized != address(0));
 
       IMaster ms = IMaster(_masterAddress);
       authorized = _authorized;
