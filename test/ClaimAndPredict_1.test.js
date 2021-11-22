@@ -78,8 +78,8 @@ describe("ClaimAndPredict", () => {
             claimAndPedict = await ClaimAndPredict.new();
             claimAndPedict = await OwnedUpgradeabilityProxy.new(claimAndPedict.address);
             claimAndPedict = await ClaimAndPredict.at(claimAndPedict.address);
-            claimAndPedict.initialize(masterInstance.address, users[0]);
-            await assertRevert(claimAndPedict.initialize(masterInstance.address, users[0]));
+            claimAndPedict.initialize(masterInstance.address, users[0], users[1]);
+            await assertRevert(claimAndPedict.initialize(masterInstance.address, users[0], users[1]));
 
             let allMarketsV6Impl = await AllMarkets.new();
             await masterInstance.upgradeMultipleImplementations([toHex("AM")], [allMarketsV6Impl.address]);

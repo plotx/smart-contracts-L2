@@ -73,6 +73,7 @@ contract ClaimAndPredict is NativeMetaTransaction {
     uint internal bonusClaimMaxFee; // 10^^8
 
     address public authorized;
+    address public ecosystemAddress;
     uint internal constant decimalDivider = 1e10;
 
     modifier onlyAuthorized() {
@@ -80,9 +81,11 @@ contract ClaimAndPredict is NativeMetaTransaction {
       _;
     }
 
-    event BonusClaimed(address userAddress, uint claimAmount, uint amountDeducted);
+    event BonusIssued(address indexed userAddress, uint amount, uint claimNonce, uint issuedOn);
+    event BonusClaimed(address indexed userAddress, uint claimAmount, uint amountDeducted);
+    event DepositWithdrawn(address userAddress, address tokenAddress, uint amount, uint timestamp);
 
-    function initialize(address _masterAddress, address _authorized) public {
+    function initialize(address _masterAddress, address _authorized, address _ecosystemAddress) public {
       require(predictionToken == address(0), "Already initialized");
   
       require(_masterAddress != address(0));
@@ -90,6 +93,7 @@ contract ClaimAndPredict is NativeMetaTransaction {
 
       IMaster ms = IMaster(_masterAddress);
       authorized = _authorized;
+      ecosystemAddress = _ecosystemAddress;
       allPlotMarkets = IAllMarkets(ms.getLatestAddress("AM"));
       predictionToken = ms.dAppToken();
       bPLOTToken = ms.getLatestAddress("BL");
@@ -159,15 +163,15 @@ contract ClaimAndPredict is NativeMetaTransaction {
     }
 
     /**
-     * @dev Withdraw any left tokens in the contract
+     * @dev Withdraw any left tokens in the contract to ecosystem address
      * @param _tokenAddress Address of the ERC20 token
-     * @param _recipient Address, indented to recieve the tokens
      * @param _amount Amount of tokens to provide approval for. In Wei
      */
-    function withdrawToken(address _tokenAddress, address _recipient, uint256 _amount) public 
+    function withdrawToken(address _tokenAddress, uint256 _amount) public 
     onlyAuthorized
     {
-      require(IToken(_tokenAddress).transfer(_recipient, _amount));
+      require(IToken(_tokenAddress).transfer(ecosystemAddress, _amount));
+      emit DepositWithdrawn(ecosystemAddress, _tokenAddress, _amount, now);
     }
 
     /**
@@ -191,7 +195,7 @@ contract ClaimAndPredict is NativeMetaTransaction {
 
     function handleReturnClaim(address _user, uint _claimAmount) public returns(uint _finalClaim, uint amountToDeduct) {
       require(msg.sender == address(allPlotMarkets));
-
+// Fee deduction to check, deduct on withdrawable amount not on claimable
       uint64 bonusReturned = userData[_user].bonusReturned;
       amountToDeduct = userData[_user].bonusClaimed.sub(bonusReturned);
       if(amountToDeduct > bonusMaxReturnBackAmount) {
@@ -224,7 +228,7 @@ contract ClaimAndPredict is NativeMetaTransaction {
       uint _claimAmount = _verifyAndClaim(_claimData, _txData.functionSignature);
       NativeMetaTransaction(_txData.targetAddress).executeMetaTransaction(_claimData.user, _txData.functionSignature, _txData.sigR, _txData.sigS, _txData.sigV);
       require(_initialbPlotBalance.sub(_claimAmount) == getTokenBalance(address(bPLOTToken), false));
-      
+      emit BonusIssued(_claimData.user, _claimAmount, userData[_claimData.user].claimNonce, now);
     }
 
     function _verifyAndClaim(ClaimData memory _claimData, bytes memory _functionSignature) internal returns(uint _claimedAmount){
