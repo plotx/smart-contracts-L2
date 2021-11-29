@@ -15,7 +15,7 @@
 
 pragma solidity 0.5.7;
 
-import "./AllPlotMarkets_5.sol";
+import "./AllPlotMarkets_6.sol";
 
 contract IMarketCreator {
   struct MarketData {
@@ -29,7 +29,7 @@ contract IMarketCreator {
 
 }
 
-contract AllPlotMarkets_6 is AllPlotMarkets_5 {
+contract AllPlotMarkets_7 is AllPlotMarkets_6 {
 
 
   mapping(uint => uint) internal totalPredictions;
