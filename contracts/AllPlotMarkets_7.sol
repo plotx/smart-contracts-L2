@@ -33,6 +33,7 @@ contract AllPlotMarkets_7 is AllPlotMarkets_6 {
 
 
   mapping(uint => uint) internal totalPredictions;
+  mapping(uint =>mapping(uint => uint)) internal totalPredictionsOnOption;
 
 
   function getMarketParams(uint _marketId) public view returns(bool,uint32,uint,uint32,uint,uint,PredictionStatus) {
@@ -43,16 +44,17 @@ contract AllPlotMarkets_7 is AllPlotMarkets_6 {
     return (creatorContract == IMaster(masterAddress).getLatestAddress("CM"),marketBasicData[_marketId].startTime, marketExpireTime(_marketId), marketSettleTime(_marketId),totalPredictions[_marketId],marketDataExtended[_marketId].totalStaked,marketStatus(_marketId));
   }
 
-  function getOptionSpecificData(uint _marketId) public view returns(uint[] memory plotStaked,uint64[] memory optionRanges,uint64[] memory optionPrices,uint,uint,uint) {
+  function getOptionSpecificData(uint _marketId) public view returns(uint[] memory plotStaked,uint64[] memory optionRanges,uint64[] memory optionPrices,uint,uint,uint,uint[] memory predictionOnOption) {
 
     plotStaked = new uint[](marketDataExtended[_marketId].optionRanges.length +1);
+    predictionOnOption = new uint[](marketDataExtended[_marketId].optionRanges.length +1);
     for (uint i = 0; i < marketDataExtended[_marketId].optionRanges.length +1; i++) {
       plotStaked[i] = marketOptionsAvailable[_marketId][i+1].amountStaked;
+      predictionOnOption[i] = totalPredictionsOnOption[_marketId][i+1];
     }
-    uint winningOption = marketDataExtended[_marketId].WinningOption;
-    address creatorContract = marketDataExtended[_marketId].marketCreatorContract;  
+   address creatorContract = marketDataExtended[_marketId].marketCreatorContract;  
     
-   return  (plotStaked, marketDataExtended[_marketId].optionRanges, IMarket(creatorContract).getAllOptionPrices(_marketId),winningOption,getTotalPredictionPoints(_marketId), marketDataExtended[_marketId].rewardToDistribute);
+   return  (plotStaked, marketDataExtended[_marketId].optionRanges, IMarket(creatorContract).getAllOptionPrices(_marketId),marketDataExtended[_marketId].WinningOption,getTotalPredictionPoints(_marketId), marketDataExtended[_marketId].rewardToDistribute,predictionOnOption);
 
   }
 
@@ -77,6 +79,7 @@ contract AllPlotMarkets_7 is AllPlotMarkets_6 {
 
   function _storePredictionData(uint _marketId, uint _prediction, address _msgSenderAddress, uint64 _predictionStake, uint64 predictionPoints) internal {
       totalPredictions[_marketId] = totalPredictions[_marketId].add(1);
+      totalPredictionsOnOption[_marketId][_prediction] = totalPredictionsOnOption[_marketId][_prediction].add(1);
       super._storePredictionData(_marketId, _prediction, _msgSenderAddress, _predictionStake, predictionPoints);
       
   }
