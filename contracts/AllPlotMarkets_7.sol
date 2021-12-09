@@ -32,38 +32,38 @@ contract IMarketCreator {
 contract AllPlotMarkets_7 is AllPlotMarkets_6 {
 
 
-  mapping(uint => uint) internal totalPredictions;
   mapping(uint =>mapping(uint => uint)) internal totalPredictionsOnOption;
 
 
-  function getMarketParams(uint _marketId) public view returns(bool,uint32,uint,uint32,uint,uint,PredictionStatus) {
+  function getMarketParams(uint _marketId) public view returns(bool,uint32,uint,uint32,uint,PredictionStatus,uint) {
     // IMaster ms = IMaster(masterAddress);
     address creatorContract = marketDataExtended[_marketId].marketCreatorContract;
     require(creatorContract != address(0), "Invalid marketId");
    
-    return (creatorContract == IMaster(masterAddress).getLatestAddress("CM"),marketBasicData[_marketId].startTime, marketExpireTime(_marketId), marketSettleTime(_marketId),totalPredictions[_marketId],marketDataExtended[_marketId].totalStaked,marketStatus(_marketId));
+    return (creatorContract == IMaster(masterAddress).getLatestAddress("CM"),marketBasicData[_marketId].startTime, marketExpireTime(_marketId), marketSettleTime(_marketId),marketDataExtended[_marketId].totalStaked,marketStatus(_marketId),getTotalPredictionPoints(_marketId));
   }
 
-  function getOptionSpecificData(uint _marketId) public view returns(uint[] memory plotStaked,uint64[] memory optionRanges,uint64[] memory optionPrices,uint,uint,uint,uint[] memory predictionOnOption) {
+  function getOptionSpecificData(uint _marketId) public view returns(uint[] memory plotStaked,uint64[] memory optionRanges,uint64[] memory optionPrices,uint,uint,uint[] memory predictionOnOption, uint totalPredictions) {
 
     plotStaked = new uint[](marketDataExtended[_marketId].optionRanges.length +1);
     predictionOnOption = new uint[](marketDataExtended[_marketId].optionRanges.length +1);
     for (uint i = 0; i < marketDataExtended[_marketId].optionRanges.length +1; i++) {
       plotStaked[i] = marketOptionsAvailable[_marketId][i+1].amountStaked;
       predictionOnOption[i] = totalPredictionsOnOption[_marketId][i+1];
+      totalPredictions = totalPredictions.add(predictionOnOption[i]);
     }
    address creatorContract = marketDataExtended[_marketId].marketCreatorContract;  
     
-   return  (plotStaked, marketDataExtended[_marketId].optionRanges, IMarket(creatorContract).getAllOptionPrices(_marketId),marketDataExtended[_marketId].WinningOption,getTotalPredictionPoints(_marketId), marketDataExtended[_marketId].rewardToDistribute,predictionOnOption);
+   return  (plotStaked, marketDataExtended[_marketId].optionRanges, IMarket(creatorContract).getAllOptionPrices(_marketId),marketDataExtended[_marketId].WinningOption, marketDataExtended[_marketId].rewardToDistribute,predictionOnOption,totalPredictions);
 
   }
 
-  function getMarketDataExtended(uint _marketId, address _user) public view returns(address marketCreator,bool,uint64 assetType) {
+  function getMarketDataExtended(uint _marketId, address _user) public view returns(address marketCreator,bool,uint64 assetType, uint64 marketType) {
     address creatorContract = marketDataExtended[_marketId].marketCreatorContract;
     IMarketCreator market = IMarketCreator(creatorContract);
     if(creatorContract == IMaster(masterAddress).getLatestAddress("CM")) {
 
-        (,assetType,marketCreator) = market.marketData(_marketId);
+        (marketType,assetType,marketCreator) = market.marketData(_marketId);
 
 
       } else {
@@ -74,11 +74,10 @@ contract AllPlotMarkets_7 is AllPlotMarkets_6 {
       {
         isPredicted = _hasUserParticipated(_marketId,_user);
       }
-      return (marketCreator,isPredicted,assetType);
+      return (marketCreator,isPredicted,assetType,marketType);
   }
 
   function _storePredictionData(uint _marketId, uint _prediction, address _msgSenderAddress, uint64 _predictionStake, uint64 predictionPoints) internal {
-      totalPredictions[_marketId] = totalPredictions[_marketId].add(1);
       totalPredictionsOnOption[_marketId][_prediction] = totalPredictionsOnOption[_marketId][_prediction].add(1);
       super._storePredictionData(_marketId, _prediction, _msgSenderAddress, _predictionStake, predictionPoints);
       
