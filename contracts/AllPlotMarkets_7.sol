@@ -43,18 +43,20 @@ contract AllPlotMarkets_7 is AllPlotMarkets_6 {
     return (creatorContract == IMaster(masterAddress).getLatestAddress("CM"),marketBasicData[_marketId].startTime, marketExpireTime(_marketId), marketSettleTime(_marketId),marketDataExtended[_marketId].totalStaked,marketStatus(_marketId),getTotalPredictionPoints(_marketId));
   }
 
-  function getOptionSpecificData(uint _marketId) public view returns(uint[] memory plotStaked,uint64[] memory optionRanges,uint64[] memory optionPrices,uint,uint,uint[] memory predictionOnOption, uint totalPredictions) {
+  function getOptionSpecificData(uint _marketId) public view returns(uint[] memory plotStaked,uint64[] memory optionRanges,uint64[] memory optionPrices,uint,uint,uint[] memory predictionOnOption, uint totalPredictions, uint[] memory positionsPerOption) {
 
     plotStaked = new uint[](marketDataExtended[_marketId].optionRanges.length +1);
     predictionOnOption = new uint[](marketDataExtended[_marketId].optionRanges.length +1);
+    positionsPerOption = new uint[](marketDataExtended[_marketId].optionRanges.length +1);
     for (uint i = 0; i < marketDataExtended[_marketId].optionRanges.length +1; i++) {
       plotStaked[i] = marketOptionsAvailable[_marketId][i+1].amountStaked;
       predictionOnOption[i] = totalPredictionsOnOption[_marketId][i+1];
       totalPredictions = totalPredictions.add(predictionOnOption[i]);
+      positionsPerOption[i] = marketOptionsAvailable[_marketId][i+1].predictionPoints;
     }
    address creatorContract = marketDataExtended[_marketId].marketCreatorContract;  
     
-   return  (plotStaked, marketDataExtended[_marketId].optionRanges, IMarket(creatorContract).getAllOptionPrices(_marketId),marketDataExtended[_marketId].WinningOption, marketDataExtended[_marketId].rewardToDistribute,predictionOnOption,totalPredictions);
+   return  (plotStaked, marketDataExtended[_marketId].optionRanges, IMarket(creatorContract).getAllOptionPrices(_marketId),marketDataExtended[_marketId].WinningOption, marketDataExtended[_marketId].rewardToDistribute,predictionOnOption,totalPredictions,positionsPerOption);
 
   }
 
