@@ -30,7 +30,8 @@ contract AcyclicMarkets_4 is AcyclicMarkets_3 {
    IMarketPageData marketPage;
 
   function setMarketPageContract(address _add) external onlyAuthorized {
-    require(_add != address(0));
+    // require(_add != address(0));
+    // can be null address in order to disable it
     marketPage = IMarketPageData(_add);
 
   }
@@ -52,14 +53,17 @@ contract AcyclicMarkets_4 is AcyclicMarkets_3 {
       marketData[_marketId].marketCreator = _msgSender();
       allMarkets.createMarket(_timesArray, _optionRanges, _msgSender(), _marketInitialLiquidity);
 
-      marketPage.addAcyclicMarket(_marketId);
-
+      if(address(marketPage)!=address(0)){
+        marketPage.addAcyclicMarket(_marketId);
+      }
       emit MarketParams(_marketId, _questionDetails, _optionRanges,_marketTimes, stakingFactorMinStake, minTimePassed, _msgSender(), _marketType, _marketCurr);
     }
 
     function createMarketWithVariableLiquidity(string memory _questionDetails, uint64[] memory _optionRanges, uint32[] memory _marketTimes,bytes8 _marketType, bytes32 _marketCurr, uint64[] memory _marketInitialLiquidities) public {
       uint64 _marketId = allMarkets.getTotalMarketsLength();
-      marketPage.addAcyclicMarket(_marketId);
+      if(address(marketPage)!=address(0)){
+        marketPage.addAcyclicMarket(_marketId);
+      }
       super.createMarketWithVariableLiquidity(_questionDetails,_optionRanges,_marketTimes,_marketType,_marketCurr,_marketInitialLiquidities);
     }
 

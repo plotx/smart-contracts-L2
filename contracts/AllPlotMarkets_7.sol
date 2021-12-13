@@ -35,49 +35,49 @@ contract AllPlotMarkets_7 is AllPlotMarkets_6 {
   mapping(uint =>mapping(uint => uint)) internal totalPredictionsOnOption;
 
 
-  function getMarketParams(uint _marketId) public view returns(bool,uint32,uint,uint32,uint,PredictionStatus,uint) {
-    // IMaster ms = IMaster(masterAddress);
-    address creatorContract = marketDataExtended[_marketId].marketCreatorContract;
-    require(creatorContract != address(0), "Invalid marketId");
+  // function getMarketParams(uint _marketId) public view returns(address,uint32,uint32) {
+  //   // IMaster ms = IMaster(masterAddress);
+  //   address creatorContract = marketDataExtended[_marketId].marketCreatorContract;
+  //   require(creatorContract != address(0), "Invalid marketId");
    
-    return (creatorContract == IMaster(masterAddress).getLatestAddress("CM"),marketBasicData[_marketId].startTime, marketExpireTime(_marketId), marketSettleTime(_marketId),marketDataExtended[_marketId].totalStaked,marketStatus(_marketId),getTotalPredictionPoints(_marketId));
-  }
+  //   // returning creator contract address, need to compare with cyclic contract address in API to know if it is cyclic market or not
+  //   return (creatorContract,marketBasicData[_marketId].startTime, marketSettleTime(_marketId));
+  // }
 
-  function getOptionSpecificData(uint _marketId) public view returns(uint[] memory plotStaked,uint64[] memory optionRanges,uint64[] memory optionPrices,uint,uint,uint[] memory predictionOnOption, uint totalPredictions, uint[] memory positionsPerOption) {
-
-    plotStaked = new uint[](marketDataExtended[_marketId].optionRanges.length +1);
-    predictionOnOption = new uint[](marketDataExtended[_marketId].optionRanges.length +1);
-    positionsPerOption = new uint[](marketDataExtended[_marketId].optionRanges.length +1);
-    for (uint i = 0; i < marketDataExtended[_marketId].optionRanges.length +1; i++) {
+  function getMarketParams(uint _marketId) public view returns(uint[] memory plotStaked,uint64[] memory optionPrices,uint[] memory predictionOnOption, uint[] memory positionsPerOption,address creatorContract,uint32,uint32) {
+    uint optionLen = marketDataExtended[_marketId].optionRanges.length.add(1);
+    plotStaked = new uint[](optionLen);
+    predictionOnOption = new uint[](optionLen);
+    positionsPerOption = new uint[](optionLen);
+    for (uint i = 0; i < optionLen; i++) {
       plotStaked[i] = marketOptionsAvailable[_marketId][i+1].amountStaked;
       predictionOnOption[i] = totalPredictionsOnOption[_marketId][i+1];
-      totalPredictions = totalPredictions.add(predictionOnOption[i]);
       positionsPerOption[i] = marketOptionsAvailable[_marketId][i+1].predictionPoints;
     }
-   address creatorContract = marketDataExtended[_marketId].marketCreatorContract;  
+   creatorContract = marketDataExtended[_marketId].marketCreatorContract;  
     
-   return  (plotStaked, marketDataExtended[_marketId].optionRanges, IMarket(creatorContract).getAllOptionPrices(_marketId),marketDataExtended[_marketId].WinningOption, marketDataExtended[_marketId].rewardToDistribute,predictionOnOption,totalPredictions,positionsPerOption);
+   return  (plotStaked, IMarket(creatorContract).getAllOptionPrices(_marketId),predictionOnOption,positionsPerOption,creatorContract,marketBasicData[_marketId].startTime, marketSettleTime(_marketId));
 
   }
 
-  function getMarketDataExtended(uint _marketId, address _user) public view returns(address marketCreator,bool,uint64 assetType, uint64 marketType) {
-    address creatorContract = marketDataExtended[_marketId].marketCreatorContract;
-    IMarketCreator market = IMarketCreator(creatorContract);
-    if(creatorContract == IMaster(masterAddress).getLatestAddress("CM")) {
+  // function getMarketDataExtended(uint _marketId, address _user) public view returns(address marketCreator,bool,uint64 assetType, uint64 marketType) {
+  //   address creatorContract = marketDataExtended[_marketId].marketCreatorContract;
+  //   IMarketCreator market = IMarketCreator(creatorContract);
+  //   if(creatorContract == IMaster(masterAddress).getLatestAddress("CM")) {
 
-        (marketType,assetType,marketCreator) = market.marketData(_marketId);
+  //       (marketType,assetType,marketCreator) = market.marketData(_marketId);
 
 
-      } else {
-        marketCreator = market.getMarketCreator(_marketId);
-      }
-      bool isPredicted;
-      if(_user != address(0))
-      {
-        isPredicted = _hasUserParticipated(_marketId,_user);
-      }
-      return (marketCreator,isPredicted,assetType,marketType);
-  }
+  //     } else {
+  //       marketCreator = market.getMarketCreator(_marketId);
+  //     }
+  //     bool isPredicted;
+  //     if(_user != address(0))
+  //     {
+  //       isPredicted = _hasUserParticipated(_marketId,_user);
+  //     }
+  //     return (marketCreator,isPredicted,assetType,marketType);
+  // }
 
   function _storePredictionData(uint _marketId, uint _prediction, address _msgSenderAddress, uint64 _predictionStake, uint64 predictionPoints) internal {
       totalPredictionsOnOption[_marketId][_prediction] = totalPredictionsOnOption[_marketId][_prediction].add(1);
