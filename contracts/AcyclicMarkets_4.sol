@@ -60,11 +60,25 @@ contract AcyclicMarkets_4 is AcyclicMarkets_3 {
     }
 
     function createMarketWithVariableLiquidity(string memory _questionDetails, uint64[] memory _optionRanges, uint32[] memory _marketTimes,bytes8 _marketType, bytes32 _marketCurr, uint64[] memory _marketInitialLiquidities) public {
+      require(!paused);
+      address _marketCreator = _msgSender();
+      require(whiteListedMarketCreators[_marketCreator] || oneTimeMarketCreator[_marketCreator]);
+      delete oneTimeMarketCreator[_marketCreator];
+    //   require(_marketInitialLiquidities >= minLiquidityByCreator);
+      uint32[] memory _timesArray = new uint32[](_marketTimes.length+1);
+      _timesArray[0] = uint32(now);
+      _timesArray[1] = _marketTimes[0].sub(uint32(now));
+      _timesArray[2] = _marketTimes[1].sub(uint32(now));
+      _timesArray[3] = _marketTimes[2];
       uint64 _marketId = allMarkets.getTotalMarketsLength();
       if(address(marketPage)!=address(0)){
         marketPage.addAcyclicMarket(_marketId);
       }
-      super.createMarketWithVariableLiquidity(_questionDetails,_optionRanges,_marketTimes,_marketType,_marketCurr,_marketInitialLiquidities);
+      marketData[_marketId].pricingData = PricingData(stakingFactorMinStake, stakingFactorWeightage, timeWeightage, minTimePassed);
+      marketData[_marketId].marketCreator = _marketCreator;
+      allMarkets.createMarketWithVariableLiquidity(_timesArray, _optionRanges, _marketCreator, _marketInitialLiquidities);
+
+      emit MarketParams(_marketId, _questionDetails, _optionRanges,_marketTimes, stakingFactorMinStake, minTimePassed, _marketCreator, _marketType, _marketCurr);
     }
 
 }
