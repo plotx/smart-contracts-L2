@@ -29,8 +29,20 @@ contract AllPlotMarkets_8 is AllPlotMarkets_7 {
   * @dev Withdraw pending balance for giver user
   * @param _userAddress Address of the user to withdraw tokens for
   */
-  function withdrawForInactiveUser(address _userAddress) public {
+  function withdrawFor(address _userAddress) public {
+    _withdrawReward(0, _userAddress);
     _withdraw(userData[_userAddress].unusedBalance, 1, 0, _userAddress);
+  }
+
+  /**
+  * @dev Withdraw provided amount of deposited and available prediction token
+  * @param _token Amount of prediction token to withdraw
+  * @param _maxRecords Maximum number of records to check
+  */
+  function withdraw(uint _token, uint _maxRecords) public {
+    address payable _msgSenderAddress = _msgSender();
+    _withdrawReward(_maxRecords, _msgSenderAddress);
+    _withdraw(_token, _maxRecords, 0, _msgSenderAddress);
   }
 
   /**
@@ -40,7 +52,6 @@ contract AllPlotMarkets_8 is AllPlotMarkets_7 {
   * @param _tokenLeft Amount of prediction token left unused for user
   */
   function _withdraw(uint _token, uint _maxRecords, uint _tokenLeft, address _msgSenderAddress) internal {
-    _withdrawReward(_maxRecords, _msgSenderAddress);
     userData[_msgSenderAddress].unusedBalance = userData[_msgSenderAddress].unusedBalance.sub(_token);
     require(_token > 0);
     uint _userClaim = _token;
