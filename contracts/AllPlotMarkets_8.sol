@@ -27,11 +27,13 @@ contract AllPlotMarkets_8 is AllPlotMarkets_7 {
   
   /**
   * @dev Withdraw pending balance for giver user
-  * @param _userAddress Address of the user to withdraw tokens for
+  * @param _userAddresses Address of the user to withdraw tokens for
   */
-  function withdrawFor(address _userAddress) public {
-    _withdrawReward(0, _userAddress);
-    _withdraw(userData[_userAddress].unusedBalance, 1, 0, _userAddress);
+  function withdrawFor(address[] memory _userAddresses) public {
+    for(uint i = 0; i<_userAddresses.length;i++) {
+      _withdrawReward(0, _userAddresses[i]);
+      _withdraw(userData[_userAddresses[i]].unusedBalance, 1, 0, _userAddresses[i]);
+    }
   }
 
   /**
