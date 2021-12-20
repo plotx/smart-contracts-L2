@@ -19,16 +19,15 @@ import "./AllPlotMarkets_7.sol";
 
 contract AllPlotMarkets_8 is AllPlotMarkets_7 {
 
-  address internal authToWithdrawFor;
+  address internal authToForceWithdraw;
 
   function setAuthToWithdrawFor(address _authToForceWithdraw) public onlyAuthorized {
       authToForceWithdraw = _authToForceWithdraw;
   }
   
   /**
-  * @dev Withdraw provided amount of deposited and available prediction token
-  * @param _token Amount of prediction token to withdraw
-  * @param _maxRecords Maximum number of records to check
+  * @dev Withdraw pending balance for giver user
+  * @param _userAddress Address of the user to withdraw tokens for
   */
   function withdrawForInactiveUser(address _userAddress) public {
     _withdraw(userData[_userAddress].unusedBalance, 1, 0, _userAddress);
