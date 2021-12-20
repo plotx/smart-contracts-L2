@@ -39,6 +39,7 @@ contract ClaimAndPredict_2 is ClaimAndPredict {
       if(_claimAmount < amountToDeduct) {
         _finalClaim = _claimAmount.sub(amountToDeduct);
       } else {
+        require(_forceClaimFlag);
         _finalClaim = 0;
       }
       emit BonusClaimed(_user, _finalClaim, amountToDeduct);
