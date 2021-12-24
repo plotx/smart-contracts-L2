@@ -24,6 +24,25 @@ contract ClaimAndPredict_2 is ClaimAndPredict {
       revert("DEPR");//Deprecated
     }
 
+    /**
+    * @dev function to update integer parameters
+    * @param code Code of the updating parameter.
+    * @param value Value to which the parameter should be updated
+    */
+    function updateUintParameters(bytes8 code, uint256 value) external onlyAuthorized {
+      require(value <= 10e8); // Since we are maintaining all values with 8 decimals
+      if(code == "BMCA") { // bonusMinClaimAmount
+        bonusMinClaimAmount = value;
+      } if(code == "BMRA") { // bonusMaxReturnAmount
+        bonusMaxReturnBackAmount = value;
+      } else if(code == "BCFP") { // bonusClaimFeePerc
+        require(value < 100); // Fee should be less than 100%
+        bonusClaimFeePerc = value;
+      } else if(code == "BCMF") { //bonusClaimMaxFee
+        bonusClaimMaxFee = value;
+      }
+    }
+
     function handleReturnClaim_2(address _user, uint _claimAmount, bool _forceClaimFlag) public returns(uint _finalClaim, uint amountToDeduct) {
       require(msg.sender == address(allPlotMarkets));
       uint64 bonusReturned = userData[_user].bonusReturned;
