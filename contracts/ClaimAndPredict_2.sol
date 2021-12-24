@@ -30,7 +30,7 @@ contract ClaimAndPredict_2 is ClaimAndPredict {
     * @param value Value to which the parameter should be updated
     */
     function updateUintParameters(bytes8 code, uint256 value) external onlyAuthorized {
-      require(value <= 10e8); // Since we are maintaining all values with 8 decimals
+      require(value <= uint64(value)); // Shouldn't overflow with uint 64 as we are maintaining all our storage with uint 64
       if(code == "BMCA") { // bonusMinClaimAmount
         bonusMinClaimAmount = value;
       } if(code == "BMRA") { // bonusMaxReturnAmount
