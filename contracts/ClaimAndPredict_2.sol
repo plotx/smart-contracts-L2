@@ -20,6 +20,10 @@ import "./ClaimAndPredict.sol";
 
 contract ClaimAndPredict_2 is ClaimAndPredict {
 
+    function handleReturnClaim(address _user, uint _claimAmount) public returns(uint _finalClaim, uint amountToDeduct) {
+      revert("DEPR");//Deprecated
+    }
+
     function handleReturnClaim_2(address _user, uint _claimAmount, bool _forceClaimFlag) public returns(uint _finalClaim, uint amountToDeduct) {
       require(msg.sender == address(allPlotMarkets));
       uint64 bonusReturned = userData[_user].bonusReturned;
