@@ -59,11 +59,12 @@ contract ClaimAndPredict_2 is ClaimAndPredict {
         _feeDeduction = bonusClaimMaxFee < _feeDeduction ? bonusClaimMaxFee:_feeDeduction;
         amountToDeduct = amountToDeduct + _feeDeduction;
       }
-      if(_claimAmount < amountToDeduct) {
+      if(_claimAmount > amountToDeduct) {
         _finalClaim = _claimAmount.sub(amountToDeduct);
       } else {
         require(_forceClaimFlag);
         _finalClaim = 0;
+        amountToDeduct = _claimAmount;
       }
       emit BonusClaimed(_user, _finalClaim, amountToDeduct);
     }
