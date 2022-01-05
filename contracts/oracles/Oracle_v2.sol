@@ -45,7 +45,7 @@ contract ManualFeedOracle is IOracle {
   function initiate(address _authorized, address _multiSigWallet, string memory _currencyName) public {
     require(authorizedAddres == address(0));
     require(_authorized != address(0));
-    require(_multiSigWallet = address(0));
+    require(_multiSigWallet != address(0));
     authorizedAddres = _authorized;
     multiSigWallet = _multiSigWallet;
     currencyName = _currencyName;
