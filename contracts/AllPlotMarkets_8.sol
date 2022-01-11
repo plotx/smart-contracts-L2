@@ -66,7 +66,9 @@ contract AllPlotMarkets_8 is AllPlotMarkets_7 {
       (_userClaim, _deduction) = trailBonusHandler.handleReturnClaim_2(_msgSenderAddress, _userClaim, _forceClaimFlag);
       require((_userClaim.add(_deduction)) == _token);
       _transferAsset(predictionToken, address(trailBonusHandler), _deduction);
-      delete userBonusClaimedFlag[_msgSenderAddress];
+      if(_userClaim != 0) {
+        delete userBonusClaimedFlag[_msgSenderAddress];
+      }
     }
     _transferAsset(predictionToken, _msgSenderAddress, _userClaim);
     emit Withdrawn(_msgSenderAddress, _userClaim, now);

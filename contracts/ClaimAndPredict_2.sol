@@ -50,7 +50,7 @@ contract ClaimAndPredict_2 is ClaimAndPredict {
       if(amountToDeduct > bonusMaxReturnBackAmount) {
         amountToDeduct = bonusMaxReturnBackAmount;
       }
-      userData[_user].bonusReturned = bonusReturned.add(uint64(amountToDeduct));
+      uint64 _deductableBonus = uint64(amountToDeduct);
 
       amountToDeduct = decimalDivider.mul(amountToDeduct);
       if(bonusReturned == 0) {
@@ -65,7 +65,12 @@ contract ClaimAndPredict_2 is ClaimAndPredict {
         require(_forceClaimFlag);
         _finalClaim = 0;
         amountToDeduct = _claimAmount;
+        uint64 _claimAmount64 = uint64(_claimAmount.div(decimalDivider));
+        if(_claimAmount64 < _deductableBonus) {
+          _deductableBonus = _claimAmount64;
+        }
       }
+      userData[_user].bonusReturned = bonusReturned.add(_deductableBonus);
       emit BonusClaimed(_user, _finalClaim, amountToDeduct);
     }
 
