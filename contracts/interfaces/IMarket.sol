@@ -6,5 +6,6 @@ contract IMarket {
   function getUintParameters(bytes8 code) external view returns(bytes8 codeVal, uint256 value);
   function handleFee(uint _marketId, uint64 _cummulativeFee, address _msgSenderAddress, address _relayer) external;
   function calculatePredictionPointsAndMultiplier(address _user, uint256 _marketId, uint256 _prediction, uint64 _stake) external returns(uint64 predictionPoints);
+  function calculateFeeAndPositions(address _user, uint256 _marketId, uint256 _prediction, uint64 _stake, uint32 _startTime, uint64 optionPrice, bytes calldata signature)external returns(uint64 predictionPoints, uint64 predictionAmount, uint64 fee);
   function setRewardPoolShareForCreator(uint _marketId, uint _amount) external;
 }
