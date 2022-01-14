@@ -75,6 +75,7 @@ contract AllPlotMarkets_8 is AllPlotMarkets_7 {
   }
 
   function _placePrediction(uint _marketId, address _msgSenderAddress, address _asset, uint64 _predictionStake, uint256 _prediction) internal {
+    revert("DEPR");
     // super._placePrediction(_marketId, _msgSenderAddress, _asset, _predictionStake, _prediction);
   }
 
