@@ -41,15 +41,6 @@ contract OptionPricing3_v2 is IOptionPricing {
         return uint64(uint(100000).div(_optionLength));
 
         }
-        //  else {
-        //   uint _value = uint(100000).mul(_optionPricingParams[0]).div(_optionPricingParams[1]);
-        //   require(_value == uint64(_value), "Uint 64 Overflow");
-        //   return uint64(_value);
-        // }
-
-        // uint _stakeOnOppOption = _optionPricingParams[1].sub(_optionPricingParams[0]);
-        // uint _tso = ;
-        // uint _pa = _marketPricingData[4].mul(1e16);
         return _optionPriceInternal(_optionPricingParams[0].mul(1e16), _marketPricingData[4].mul(1e16), _optionPricingParams[1].sub(_optionPricingParams[0]), _marketPricingData[4]);
     }
 
@@ -62,12 +53,17 @@ contract OptionPricing3_v2 is IOptionPricing {
      * @return  Array consist of Max Distance between current option and any option, predicting Option distance from max distance, cummulative option distance
      **/
     function _optionPriceInternal(uint _tso, uint _pa, uint _stakeOnOppOption, uint _predictionAmount) internal pure returns(uint64) {
+        // log operation : ln(1+_tso/_pa)
+        // Simplified to ln(_tso+_pa)-ln(_tso)
         int256 _logOperation = LogarithmLib.ln(int256(_tso.add(_pa))) - LogarithmLib.ln(int256(_tso));
         uint64 _logOutput = uint64(_logOperation/1e16);
-        // uint _operation_2 = _stakeOnOppOption.mul(_logOutput).div(1e8);
+        // Operation 2: _predictionAmount + _stake on opposite option * logOperation
         uint _operation_2 = _predictionAmount + _stakeOnOppOption.mul(_logOutput).div(1e8);
+        // VOP: _predictionAmount/(Operation 2), Added 5 decimals
         uint vop = _predictionAmount.mul(1e5)/_operation_2;
+        // VOP: VOP+=0.02
         vop = vop.add(vopLowerBoundary);
+        // VOP: if vop > 0.98=>vop=0.98
         if(vop > vopUpperBoundary) {
             vop = vopUpperBoundary;
         }
