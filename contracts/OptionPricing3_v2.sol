@@ -61,7 +61,7 @@ contract OptionPricing3_v2 is IOptionPricing {
         // Operation 2: _predictionAmount + _stake on opposite option * logOperation
         uint _operation_2 = _predictionAmount + _stakeOnOppOption.mul(_logOutput).div(1e8);
         // VOP: _predictionAmount/(Operation 2), Added 5 decimals
-        uint vop = _predictionAmount.mul(1e5)/_operation_2;
+        uint vop = (_predictionAmount.mul(1e5)).div(_operation_2);
         // VOP: VOP+=0.02
         vop = vop.add(vopLowerBoundary);
         // VOP: if vop > 0.98=>vop=0.98
