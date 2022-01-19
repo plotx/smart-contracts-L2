@@ -12,8 +12,8 @@ contract OptionPricing2_v2 is IOptionPricing {
   using SafeMath for uint;
 
   uint internal constant _optionLength = 2;
-  uint internal constant vopUpperBoundary = 98; // With 2 decimals
-  uint internal constant vopLowerBoundary = 2; // With 2 decimals
+  uint internal constant vopUpperBoundary = 98000; // With 5 decimals
+  uint internal constant vopLowerBoundary = 2000; // With 5 decimals
 
   function optionLength() public view returns(uint) {
     return _optionLength;
@@ -41,18 +41,19 @@ contract OptionPricing2_v2 is IOptionPricing {
     return uint64(uint(100000).div(_optionLength));
 
     }
-    return _optionPriceInternal(_optionPricingParams[0].mul(1e16), _marketPricingData[4].mul(1e16), _optionPricingParams[1].sub(_optionPricingParams[0]), _marketPricingData[4]);
+      return _optionPriceInternal(_optionPricingParams[0].mul(1e16), _optionPricingParams[1].sub(_optionPricingParams[0]), _marketPricingData[4]);
   }
 
   /**
     * @dev Gets price for given market and option
-    * @param _tso Total Staked on selected option raised by 24 decimals
-    * @param _pa Prediction amount raised by 24 decimals
+    * @param _tso Total Staked on selected option raised by 24 decimals, 
+    * as the input to log operation has to be 24 decimal number.
     * @param _stakeOnOppOption Total staked on rest of the options with 8 decimals
     * @param _predictionAmount Prediction amount with 8 decimals
     * @return Option price
     **/
-  function _optionPriceInternal(uint _tso, uint _pa, uint _stakeOnOppOption, uint _predictionAmount) internal pure returns(uint64) {
+  function _optionPriceInternal(uint _tso, uint _stakeOnOppOption, uint _predictionAmount) internal pure returns(uint64) {
+    uint _pa = _predictionAmount.mul(1e16);
     // log operation : ln(1+_pa/_tso)
     // Simplified to ln(_tso+_pa)-ln(_tso)
     int256 _logOperation = LogarithmLib.ln(int256(_tso.add(_pa))) - LogarithmLib.ln(int256(_tso));
