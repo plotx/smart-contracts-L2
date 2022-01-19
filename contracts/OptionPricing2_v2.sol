@@ -50,10 +50,10 @@ contract OptionPricing2_v2 is IOptionPricing {
     * @param _pa Prediction amount raised by 24 decimals
     * @param _stakeOnOppOption Total staked on rest of the options with 8 decimals
     * @param _predictionAmount Prediction amount with 8 decimals
-    * @return  Array consist of Max Distance between current option and any option, predicting Option distance from max distance, cummulative option distance
+    * @return Option price
     **/
   function _optionPriceInternal(uint _tso, uint _pa, uint _stakeOnOppOption, uint _predictionAmount) internal pure returns(uint64) {
-    // log operation : ln(1+_tso/_pa)
+    // log operation : ln(1+_pa/_tso)
     // Simplified to ln(_tso+_pa)-ln(_tso)
     int256 _logOperation = LogarithmLib.ln(int256(_tso.add(_pa))) - LogarithmLib.ln(int256(_tso));
     uint64 _logOutput = uint64(_logOperation/1e16);
