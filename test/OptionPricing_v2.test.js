@@ -5,6 +5,7 @@ const PlotusToken = artifacts.require("MockPLOT");
 const AllMarkets = artifacts.require("MockAllMarkets_6");
 const UserLevels = artifacts.require("UserLevels");
 const CyclicMarkets = artifacts.require('MockCyclicMarkets');
+const PooledMarketCreation = artifacts.require('PooledMarketCreation_3');
 const MockCyclicMarkets_4 = artifacts.require('CyclicMarkets_6');
 const CyclicMarkets_4 = artifacts.require('CyclicMarkets_4');
 const OptionPricing3 = artifacts.require("OptionPricing3_v2");
@@ -41,7 +42,7 @@ describe("Option pricing V2 with Multiplier: 3 bucket market", () => {
             userLevels = await UserLevels.deployed();
             marketId = 6;
             await increaseTime(4 * 60 * 60 + 1);
-            await plotusToken.transfer(userMarketCreator, toWei(1000));
+            await plotusToken.transfer(userMarketCreator, toWei(1000000));
             await plotusToken.approve(allMarkets.address, toWei(1000), { from: userMarketCreator });
             await cyclicMarkets.whitelistMarketCreator(userMarketCreator);
             
@@ -52,6 +53,14 @@ describe("Option pricing V2 with Multiplier: 3 bucket market", () => {
             cyclicMarketsV4Impl = await MockCyclicMarkets_4.new();
             await masterInstance.upgradeMultipleImplementations([toHex("CM")], [cyclicMarketsV4Impl.address]);
             cyclicMarkets = await MockCyclicMarkets_4.at(await masterInstance.getLatestAddress(web3.utils.toHex("CM")));
+
+            pmImpl = await PooledMarketCreation.new();
+			await masterInstance.addNewContract(toHex("PC"), pmImpl.address);
+            pmcInstance = await PooledMarketCreation.at(await masterInstance.getLatestAddress(web3.utils.toHex("PC")));
+			await cyclicMarkets.whitelistMarketCreator(pmcInstance.address);
+            await plotusToken.approve(pmcInstance.address, toWei(10000000));
+            await pmcInstance.stake(toWei(1000000));
+            await pmcInstance.approveToAllMarkets(toWei(1000000));
             
             optionPricing3 = await OptionPricing3.new();
             optionPricing2 = await OptionPricing2.new();
@@ -68,7 +77,12 @@ describe("Option pricing V2 with Multiplier: 3 bucket market", () => {
         });
 
         it("Create market", async () => {
-          await cyclicMarkets.createMarketWithOptionRanges(0, 0, [119500000000, 123000000000], { from: userMarketCreator });
+          await assertRevert(pmcInstance.createMarketWithOptionRanges(0, 0, [119500000000, 123000000000], { from: userMarketCreator }));
+          await pmcInstance.whitelistMarketCreator(userMarketCreator);
+          await assertRevert(pmcInstance.whitelistMarketCreator(userMarketCreator));
+          await pmcInstance.createMarketWithOptionRanges(0, 0, [119500000000, 123000000000], { from: userMarketCreator });
+          await pmcInstance.deWhitelistMarketCreator(userMarketCreator);
+          await assertRevert(pmcInstance.deWhitelistMarketCreator(userMarketCreator));
           marketId++;
           let mcPairInitialLiquidity = 100;
           let predictionFee = mcPairInitialLiquidity*2/100;
@@ -108,7 +122,7 @@ describe("Option pricing V2 with Multiplier: 3 bucket market", () => {
           await userLevels.setUserLevel(user3, 5);
           await userLevels.setUserLevel(user4, 10);
           await userLevels.setUserLevel(user5, 22);
-          await userLevels.setUserLevel(userMarketCreator, 10);
+          await userLevels.setUserLevel(pmcInstance.address, 10);
         })
         it("1.1 Position without User levels", async () => {
             await cyclicMarkets.removeUserLevelsContract();
@@ -205,9 +219,9 @@ describe("Option pricing V2 with Multiplier: 3 bucket market", () => {
 
             assert.equal((await allMarkets.getUserPredictionPoints(user6, marketId, 1))/1, 200000000);
 
-            assert.equal((await allMarkets.getUserPredictionPoints(userMarketCreator, marketId, 1)), 117601);
-            assert.equal((await allMarkets.getUserPredictionPoints(userMarketCreator, marketId, 2)), 117601);
-            assert.equal((await allMarkets.getUserPredictionPoints(userMarketCreator, marketId, 3)), 117601);
+            assert.equal((await allMarkets.getUserPredictionPoints(pmcInstance.address, marketId, 1)), 117601);
+            assert.equal((await allMarkets.getUserPredictionPoints(pmcInstance.address, marketId, 2)), 117601);
+            assert.equal((await allMarkets.getUserPredictionPoints(pmcInstance.address, marketId, 3)), 117601);
 
             // predictionPointsBeforeUser1 = (await allMarkets.getUserPredictionPoints(user1, marketId, 2)) / 1e5;
             // predictionPointsBeforeUser2 = (await allMarkets.getUserPredictionPoints(user2, marketId, 2)) / 1e5;
