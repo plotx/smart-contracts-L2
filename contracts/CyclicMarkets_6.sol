@@ -116,14 +116,14 @@ contract CyclicMarkets_6 is CyclicMarkets_5 {
   * @param _marketId  Market ID
   * @return _optionPrices array consisting of prices for all available options
   **/
-  function getAllOptionPricesWithStake(uint _marketId, uint defaultPredictionAmount) external view returns(uint[] memory _optionPrices) {
+  function getAllOptionPricesWithStake(uint _marketId, uint defaultPredictionAmount) external view returns(uint64[] memory _optionPrices) {
     uint _optionLength;
     if(marketOptionPricing[_marketId] != address(0)) {
       _optionLength = IOptionPricing(marketOptionPricing[_marketId]).optionLength();
     } else {
       _optionLength = 3;
     }
-    _optionPrices = new uint[](_optionLength);
+    _optionPrices = new uint64[](_optionLength);
     for(uint i=0; i< _optionLength; i++) {
       _optionPrices[i] = getOptionPriceWithStake(_marketId,i+1, defaultPredictionAmount);
     }
