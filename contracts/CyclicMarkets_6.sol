@@ -94,20 +94,23 @@ contract CyclicMarkets_6 is CyclicMarkets_5 {
     //   return super.getOptionPrice(_marketId, _prediction);
     // }
 
-    uint _marketCurr = marketData[_marketId].marketCurrencyIndex;
+    // uint _marketCurr = marketData[_marketId].marketCurrencyIndex;
 
-    uint[] memory _marketPricingDataArray = new uint[](5);
-    PricingData storage _marketPricingData = marketPricingData[_marketId];
-    _marketPricingDataArray[0] = _marketPricingData.stakingFactorMinStake;
-    _marketPricingDataArray[1] = _marketPricingData.stakingFactorWeightage;
-    _marketPricingDataArray[2] = _marketPricingData.currentPriceWeightage;
-    _marketPricingDataArray[3] = _marketPricingData.minTimePassed;
-    _marketPricingDataArray[4] = _predictionAmount;
+    uint[] memory _marketPricingDataArray = new uint[](1);
+    // Commenting these as they are no longer required for new option pricing formula
+    // Keeping the variable same, to not disturb the existing interace
+    // PricingData storage _marketPricingData = marketPricingData[_marketId];
+    // _marketPricingDataArray[0] = _marketPricingData.stakingFactorMinStake;
+    // _marketPricingDataArray[1] = _marketPricingData.stakingFactorWeightage;
+    // _marketPricingDataArray[2] = _marketPricingData.currentPriceWeightage;
+    // _marketPricingDataArray[3] = _marketPricingData.minTimePassed;
+    _marketPricingDataArray[0] = _predictionAmount;
 
     // Fetching current price
-    uint currentPrice = IOracle(marketCurrencies[_marketCurr].marketFeed).getLatestPrice();
+    // uint currentPrice = IOracle(marketCurrencies[_marketCurr].marketFeed).getLatestPrice();
 
-    return IOptionPricing(marketOptionPricing[_marketId]).getOptionPrice(_marketId, currentPrice, _prediction, _marketPricingDataArray, address(allMarkets));
+    // Current price is no longer required, so passing zero to getOptionPrice
+    return IOptionPricing(marketOptionPricing[_marketId]).getOptionPrice(_marketId, 0, _prediction, _marketPricingDataArray, address(allMarkets));
 
   }
 

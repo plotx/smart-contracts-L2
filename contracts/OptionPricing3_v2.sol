@@ -41,7 +41,7 @@ contract OptionPricing3_v2 is IOptionPricing {
         return uint64(uint(100000).div(_optionLength));
 
         }
-        return _optionPriceInternal(_optionPricingParams[0].mul(1e16), _optionPricingParams[1].sub(_optionPricingParams[0]), _marketPricingData[4]);
+        return _optionPriceInternal(_optionPricingParams[0].mul(1e16), _optionPricingParams[1].sub(_optionPricingParams[0]), _marketPricingData[0]);
     }
 
     /**
