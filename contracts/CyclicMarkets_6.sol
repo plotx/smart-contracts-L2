@@ -36,6 +36,7 @@ contract CyclicMarkets_6 is CyclicMarkets_5 {
       uint64 _marketIndex = allMarkets.getTotalMarketsLength();
       uint _optionLength = marketTypeOptionPricing[_marketTypeIndex];
       marketOptionPricing[_marketIndex] = optionPricingContracts[_optionLength];
+      require(_optionLength - 1 == _optionRanges.length);
     //   _optionRanges = _calculateOptionRanges(marketOptionPricing[_marketIndex], _marketType.optionRangePerc, _marketCurrency.decimals, _marketCurrency.roundOfToNearest, _marketCurrency.marketFeed);
       _marketTimes[0] = _startTime; 
       _marketTimes[1] = _marketType.predictionTime;
