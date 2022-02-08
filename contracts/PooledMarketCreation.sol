@@ -14,6 +14,7 @@ contract ICyclicMarkets {
       uint64 penultimateMarket;
       bool paused;
     }
+    function createMarketWithOptionRanges(uint32 _marketCurrencyIndex,uint32 _marketTypeIndex, uint64[] calldata _optionRanges) external;
     function createMarket(uint32 _marketCurrencyIndex,uint32 _marketTypeIndex, uint80 _roundId) public;
     function claimCreationReward() external;
     function getInitialLiquidity(uint _marketType) external view returns(uint);
