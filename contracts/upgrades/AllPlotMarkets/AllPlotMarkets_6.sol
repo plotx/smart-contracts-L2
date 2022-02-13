@@ -15,7 +15,7 @@
 
 pragma solidity 0.5.7;
 
-import "./interfaces/IClaimAndPredict.sol";
+import "../../interfaces/IClaimAndPredict.sol";
 import "./AllPlotMarkets_5.sol";
 
 contract AllPlotMarkets_6 is AllPlotMarkets_5 {
