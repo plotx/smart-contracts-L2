@@ -35,6 +35,14 @@ contract CyclicMarkets_7 is CyclicMarkets_6 {
   }
 
   /**
+  * @dev Unset the referral contract address
+  */
+  function removeReferralContract() external onlyAuthorized {
+    require(address(referral) != address(0) && referralReward == 0);
+    delete referral;
+  }
+
+  /**
   * @dev function to reward user for initiating market creation calls as per the new incetive calculations
   */
   function claimCreationReward() external {
@@ -73,11 +81,9 @@ contract CyclicMarkets_7 is CyclicMarkets_6 {
     (uint256 _value, ) = IOracle(_feedAdd).getSettlementPrice(allMarkets.marketSettleTime(_marketId), _roundId);
     allMarkets.settleMarket(_marketId, _value);
     if(allMarkets.marketStatus(_marketId) >= IAllMarkets.PredictionStatus.InSettlement) {
-      _transferAsset(plotToken, masterAddress, (10**predictionDecimalMultiplier).mul(marketFeeParams.daoFee[_marketId]));
-      delete marketFeeParams.daoFee[_marketId];
+      _transferAsset(plotToken, masterAddress, (10**predictionDecimalMultiplier).mul(marketTempData[_marketId].daoFee));
       marketCreationReward[marketData[_marketId].marketCreator] = marketCreationReward[marketData[_marketId].marketCreator].add((10**predictionDecimalMultiplier).mul(marketTempData[_marketId].marketCreatorFee));
       emit MarketCreatorReward(marketData[_marketId].marketCreator, _marketId, (10**predictionDecimalMultiplier).mul(marketTempData[_marketId].marketCreatorFee));
-      delete marketTempData[_marketId].marketCreatorFee;
       
       _transferAsset(plotToken, address(referral), referralReward);
       delete referralReward;

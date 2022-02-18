@@ -28,6 +28,14 @@ contract AcyclicMarkets_5 is AcyclicMarkets_4 {
   mapping(uint256 => MarketTempData) internal marketTempData;
   uint internal referralReward;
 
+  /**
+  * @dev Unset the referral contract address
+  */
+  function removeReferralContract() external onlyAuthorized {
+    require(address(referral) != address(0) && referralReward == 0);
+    delete referral;
+  }
+
   function accrueRewards() public {
     allMarkets.transferAccumulatedRewards();
     _transferAsset(plotToken, address(referral), referralReward);
@@ -78,11 +86,9 @@ contract AcyclicMarkets_5 is AcyclicMarkets_4 {
     allMarkets.settleMarket(_marketId, _answer);
     if(allMarkets.marketStatus(_marketId) >= IAllMarkets.PredictionStatus.InSettlement) {
       _transferAsset(plotToken, masterAddress, (10**predictionDecimalMultiplier).mul(marketTempData[_marketId].daoFee));
-      delete marketTempData[_marketId].daoFee;
 
       marketCreationReward[marketData[_marketId].marketCreator] = marketCreationReward[marketData[_marketId].marketCreator].add((10**predictionDecimalMultiplier).mul(marketTempData[_marketId].marketCreatorFee));
       emit MarketCreatorReward(marketData[_marketId].marketCreator, _marketId, marketTempData[_marketId].marketCreatorFee);
-      delete marketTempData[_marketId].marketCreatorFee;
 
       _transferAsset(plotToken, address(referral), referralReward);
       delete referralReward;
