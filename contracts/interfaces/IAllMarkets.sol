@@ -54,4 +54,6 @@ contract IAllMarkets {
     function depositAndPredictFor(address _predictFor, uint _tokenDeposit, uint _marketId, address _asset, uint256 _prediction, uint64 _plotPredictionAmount, uint64 _bPLOTPredictionAmount) external;
 
     function setClaimFlag(address _user, uint _userNonce) public;
+    
+    function transferAccumulatedRewards() external;
 }
