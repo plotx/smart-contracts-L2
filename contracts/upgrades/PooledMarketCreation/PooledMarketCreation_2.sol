@@ -1,6 +1,6 @@
 pragma solidity 0.5.7;
 
-import "./PooledMarketCreation.sol";
+import "../../PooledMarketCreation.sol";
 
 contract PooledMarketCreation_2 is PooledMarketCreation {
 

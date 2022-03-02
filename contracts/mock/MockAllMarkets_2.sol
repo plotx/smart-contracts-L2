@@ -1,6 +1,6 @@
 pragma solidity 0.5.7;
 
-import "../AllPlotMarkets_2.sol";
+import "../upgrades/AllPlotMarkets/AllPlotMarkets_2.sol";
 
 contract MockAllMarkets_2 is AllPlotMarkets_2 {
 

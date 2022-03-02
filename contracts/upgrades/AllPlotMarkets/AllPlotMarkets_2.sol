@@ -15,7 +15,7 @@
 
 pragma solidity 0.5.7;
 
-import "./AllPlotMarkets.sol";
+import "../../AllPlotMarkets.sol";
 
 contract AllPlotMarkets_2 is AllPlotMarkets {
 

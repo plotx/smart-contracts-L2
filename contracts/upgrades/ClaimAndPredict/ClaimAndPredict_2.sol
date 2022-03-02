@@ -16,7 +16,7 @@
 pragma solidity 0.5.7;
 pragma experimental ABIEncoderV2;
 
-import "./ClaimAndPredict.sol";
+import "../../ClaimAndPredict.sol";
 
 contract ClaimAndPredict_2 is ClaimAndPredict {
 
