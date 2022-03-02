@@ -35,7 +35,6 @@ contract CyclicMarkets_7 is CyclicMarkets_6 {
   }
 
   /**
-<<<<<<< HEAD
   * @dev Unset the referral contract address
   */
   function removeReferralContract() external onlyAuthorized {
@@ -44,8 +43,6 @@ contract CyclicMarkets_7 is CyclicMarkets_6 {
   }
 
   /**
-=======
->>>>>>> cb1473130210e848b07c2314ba556de756d05393
   * @dev function to reward user for initiating market creation calls as per the new incetive calculations
   */
   function claimCreationReward() external {
