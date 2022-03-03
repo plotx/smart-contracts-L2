@@ -41,9 +41,10 @@ contract UserLevels2 is IAuth {
      * @dev Initialize the dependencies
      * @param _masterAddress Master address of the PLOT platform.
      */
-    constructor(address _masterAddress) public {
+    function initialize(address _masterAddress) public {
       IMaster ms = IMaster(_masterAddress);
       authorized = ms.authorized();
+      require(msg.sender == authorized);
       masterAddress = _masterAddress;
     }
 
