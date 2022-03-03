@@ -57,30 +57,6 @@ contract CyclicMarkets_7 is CyclicMarkets_6 {
   }
 
   /**
-  * @dev Internal function to calculate prediction points
-  * @param _marketId Index of the market
-  * @param _prediction Option predicted by the user
-  * @param _user User Address
-  * @param _multiplierApplied Flag defining if user had already availed multiplier
-  * @param _predictionStake Amount staked by the user
-  */
-  function _calculatePredictionPoints(uint _marketId, uint256 _prediction, address _user, bool _multiplierApplied, uint _predictionStake) internal view returns(uint64 predictionPoints, bool isMultiplierApplied) {
-    uint _stakeValue = _predictionStake.mul(1e10);
-    if(_stakeValue < minPredictionAmount || _stakeValue > maxPredictionAmount) {
-      return (0, isMultiplierApplied);
-    }
-    uint64 _optionPrice = getOptionPriceWithStake(_marketId, _prediction, _predictionStake);
-    predictionPoints = uint64(_predictionStake).div(_optionPrice);
-    if(!_multiplierApplied || (initialPredictionFlag)) {
-      uint256 _predictionPoints = predictionPoints;
-      if(address(userLevels) != address(0)) {
-        (_predictionPoints, isMultiplierApplied) = checkMultiplier(_user,  predictionPoints);
-      }
-      predictionPoints = uint64(_predictionPoints);
-    }
-  }
-
-  /**
   * @dev Check if user gets any multiplier on his positions
   * @param _user User address
   * @param _predictionPoints The actual positions user got during prediction.
