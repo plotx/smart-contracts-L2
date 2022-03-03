@@ -53,7 +53,7 @@ contract AcyclicMarkets_5 is AcyclicMarkets_4 {
     (, , uint64 _levelFeeDiscount) = userLevels.getUserLevelAndPerks(_user);
     _feePerc = _currentFee;
     if(_levelFeeDiscount > 0) {
-      _feePerc = _feePerc.mul(10000).div(_levelFeeDiscount);
+      _feePerc = _feePerc.add(_feePerc.mul(_levelFeeDiscount).div(10000));
     }
   }
 
