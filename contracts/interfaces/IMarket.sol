@@ -7,4 +7,5 @@ contract IMarket {
   function handleFee(uint _marketId, uint64 _cummulativeFee, address _msgSenderAddress, address _relayer) external;
   function calculatePredictionPointsAndMultiplier(address _user, uint256 _marketId, uint256 _prediction, uint64 _stake) external returns(uint64 predictionPoints);
   function setRewardPoolShareForCreator(uint _marketId, uint _amount) external;
+  function handleFee_2(uint _marketId, uint64 _predictionAmount, address _msgSenderAddress, address _relayer) external returns(uint64);
 }
