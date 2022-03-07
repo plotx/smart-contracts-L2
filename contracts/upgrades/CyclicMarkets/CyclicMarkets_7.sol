@@ -49,10 +49,12 @@ contract CyclicMarkets_7 is CyclicMarkets_6 {
   }
 
   function _getFeePerc(address _user, uint64 _currentFee) internal view returns(uint64 _feePerc) {
-    (, , uint64 _levelFeeDiscount) = userLevels.getUserLevelAndPerks(_user);
     _feePerc = _currentFee;
-    if(_levelFeeDiscount > 0) {
-      _feePerc = _feePerc.add(_feePerc.mul(_levelFeeDiscount).div(10000));
+    if(address(userLevels) != address(0)) {
+      (, , uint64 _levelFeeDiscount) = userLevels.getUserLevelAndPerks(_user);
+      if(_levelFeeDiscount > 0) {
+        _feePerc = _feePerc.sub(_feePerc.mul(_levelFeeDiscount).div(10000));
+      }
     }
   }
 
