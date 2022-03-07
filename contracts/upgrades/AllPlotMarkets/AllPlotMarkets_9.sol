@@ -15,9 +15,9 @@
 
 pragma solidity 0.5.7;
 
-import "./AllPlotMarkets_7.sol";
+import "./AllPlotMarkets_8.sol";
 
-contract AllPlotMarkets_8 is AllPlotMarkets_7 {
+contract AllPlotMarkets_9 is AllPlotMarkets_8 {
 
   /**
     * @dev Internal function to deduct fee from the prediction amount
