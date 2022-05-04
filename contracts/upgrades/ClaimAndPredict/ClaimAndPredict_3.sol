@@ -29,7 +29,7 @@ contract ClaimAndPredict_3 is ClaimAndPredict_2 {
     external
   {
     require(authorized == _msgSender());
-    require(IToken(predictionToken).approve(bPLOTToken, _amount);
+    require(IToken(predictionToken).approve(bPLOTToken, _amount));
     require(IToken(bPLOTToken).mint(address(this), _amount));
   }
 
