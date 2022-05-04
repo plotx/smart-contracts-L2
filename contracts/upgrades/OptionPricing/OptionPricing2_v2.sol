@@ -1,9 +1,9 @@
 pragma solidity 0.5.7;
 
-import "./external/openzeppelin-solidity/math/SafeMath.sol";
-import "./external/logOperations/LogarithmLib.sol";
-import "./interfaces/IOptionPricing.sol";
-import "./interfaces/IAllMarkets.sol";
+import "../../external/openzeppelin-solidity/math/SafeMath.sol";
+import "../../external/logOperations/LogarithmLib.sol";
+import "../../interfaces/IOptionPricing.sol";
+import "../../interfaces/IAllMarkets.sol";
 
 contract OptionPricing2_v2 is IOptionPricing {
   using SafeMath32 for uint32;

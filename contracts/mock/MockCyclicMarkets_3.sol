@@ -1,6 +1,6 @@
 pragma solidity 0.5.7;
 
-import "../CyclicMarkets_3.sol";
+import "../upgrades/CyclicMarkets/CyclicMarkets_3.sol";
 
 contract MockCyclicMarkets_3 is CyclicMarkets_3 {
 

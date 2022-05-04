@@ -16,7 +16,7 @@
 pragma solidity 0.5.7;
 
 import "./CyclicMarkets_2.sol";
-import "./interfaces/IOptionPricing.sol";
+import "../../interfaces/IOptionPricing.sol";
 
 contract CyclicMarkets_3 is CyclicMarkets_2 {
 

@@ -12,7 +12,7 @@
 
 pragma solidity 0.5.7;
 
-import "./bPLOTToken.sol";
+import "../../bPLOTToken.sol";
 
 contract BPLOT_2 is BPLOT {
 

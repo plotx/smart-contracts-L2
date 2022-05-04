@@ -15,7 +15,7 @@
 
 pragma solidity 0.5.7;
 
-import "./CyclicMarkets.sol";
+import "../../CyclicMarkets.sol";
 
 contract CyclicMarkets_2 is CyclicMarkets {
 
